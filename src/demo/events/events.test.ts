@@ -42,7 +42,10 @@ describe("the mock events", () => {
   });
 
   it("cover every category and severity", () => {
-    expect(new Set(events.map((e) => e.category))).toEqual(new Set(CATEGORY_ORDER));
+    // "other" is for real sources whose records match no category.
+    expect(new Set(events.map((e) => e.category))).toEqual(
+      new Set(CATEGORY_ORDER.filter((c) => c !== "other")),
+    );
     expect(new Set(events.map((e) => e.severity))).toEqual(new Set(SEVERITIES));
   });
 
@@ -52,7 +55,7 @@ describe("the mock events", () => {
       expect(event.time).toBeGreaterThan(NOW - 30 * DAY);
     }
     const times = events.map((e) => e.time);
-    expect(times).toEqual([...times].sort((a, b) => b - a));
+    expect(times).toEqual([...times].sort((a, b) => (b ?? 0) - (a ?? 0)));
   });
 
   it("carry something to show in the details panel", () => {

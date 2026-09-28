@@ -21,6 +21,13 @@ renamed to the new version number at release time.
 
 ## Unreleased
 
+### Added
+
+- `getMediaItemByRid(mediaSetRid, mediaItemRid)`: read a media item by its RID
+  when there is no path to hand, through the same resident LRU, Cache Storage
+  tier and concurrency lanes as `getMediaItem`. Failures are the typed errors
+  `describeFoundryError` understands.
+
 ### Changed
 
 - `@osdk/client`, `@osdk/foundry.datasets` and `@osdk/foundry.mediasets` peers

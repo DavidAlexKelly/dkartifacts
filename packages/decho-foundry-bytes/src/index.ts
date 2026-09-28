@@ -45,6 +45,7 @@ export {
   getCacheStats,
   getLaneStats,
   getMediaItem,
+  getMediaItemByRid,
   getMediaItemJson,
   getMemoryBudgetBytes,
   getRange,

@@ -3,29 +3,39 @@
  *
  * The "events" half of a world-monitor style dashboard: incidents on a globe,
  * grouped into clusters when zoomed out and split apart as you zoom in, with
- * a feed, filters and a details panel. The data is mock (./mockEvents); the
- * map is not — basemap tiles and DEM come from Foundry exactly as on the
- * other pages.
+ * a feed, filters and a details panel.
  *
- * Two extensions on one stock basemap:
+ * Events come from mock data (./mockEvents), from Foundry sources, or both:
  *
- *   elevation()        terrain and hillshade, so zooming into an event in
- *                      mountains shows the ground it happened on, and the
- *                      same DEM answers "how high is it here" in the panel.
- *   eventsExtension()  a clustered GeoJSON source and its layers (./eventsLayer).
+ *   datasets     a table read once — ACLED-style exports, incident logs
+ *   media sets   a GeoJSON, JSON or CSV item — zones, curated incident files
+ *   streams      read on open, then polled — a live feed
+ *
+ * Each source's columns are unknown in advance, so ./sources/interpret.ts
+ * decides what they mean (location, title, category, severity, time, …) and
+ * the sources panel shows what it decided. Records located by a point become
+ * events; records located by a shape become areas, drawn under the events.
+ * Sources come from the URL (`?dataset=…&mediaset=rid::path&stream=…`) or
+ * from the panel, which this browser remembers.
+ *
+ * Three extensions on one stock basemap:
+ *
+ *   elevation()         terrain and hillshade; the same DEM answers "how
+ *                       high is it here" in the details panel.
+ *   areasExtension()    shapes from the sources, under the labels.
+ *   eventsExtension()   a clustered GeoJSON source on top of everything.
  *
  * Interaction:
  *
  *   - click a cluster  → zoom to the level where it splits
  *   - hover a cluster  → what is in it, by category
- *   - click an event   → details panel; "Zoom to event" flies in with pitch
+ *   - click an event   → details; "Zoom to event" flies in with pitch
+ *   - click an area    → its fields
  *   - click the map    → clear the selection
  *
- * Filters replace the source's data rather than hiding layers, so clusters
- * re-form from what is left (see eventsLayer.ts). The terrain and globe
- * switches rebuild the map — a MapLibre style is assembled once — and the
- * current view is carried across so the rebuild does not throw you back to
- * the spawn point.
+ * Filters replace the sources' data rather than hiding layers, so clusters
+ * re-form from what is left. The terrain and globe switches rebuild the map
+ * (a MapLibre style is assembled once); the current view is carried across.
  */
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
@@ -35,15 +45,12 @@ import { DechoBasemap } from "@acc/decho-basemap/react";
 import { elevation } from "@acc/decho-elevation/extension";
 import type { DemSourceHandle } from "@acc/decho-elevation";
 import {
-  errorPanel,
-  mapPanel,
   panelCheckbox,
   panelFigures,
   panelHeading,
   panelMuted,
   panelSeparator,
   panelToggle,
-  surface,
 } from "@/components/mapPanel";
 import {
   CATEGORIES,
@@ -60,13 +67,51 @@ import {
   type EventsSource,
 } from "./eventsLayer";
 import {
+  AREA_LAYERS,
+  areaSelectionFilter,
+  areasExtension,
+  setAreaData,
+} from "./areasLayer";
+import {
   SEVERITIES,
   generateEvents,
+  sortNewestFirst,
   type EventCategory,
   type MonitorEvent,
   type Severity,
 } from "./mockEvents";
 import { capitalise, relativeTime } from "./format";
+import { AreaDetails, EventDetails } from "./Details";
+import { SourcesSection } from "./SourcesSection";
+import {
+  dedupe,
+  loadSavedSources,
+  saveSources,
+  sourceKey,
+  sourcesFromSearch,
+  type SourceConfig,
+} from "./sources/config";
+import { boundsOf, shapeBounds, type Bounds } from "./sources/geo";
+import type { MonitorArea } from "./sources/interpret";
+import { useEventSources } from "./sources/useEventSources";
+import {
+  actionButton,
+  dot,
+  errorStyle,
+  feed,
+  feedRow,
+  feedTitle,
+  hoverCard,
+  legend,
+  legendItem,
+  liveBadge,
+  mockBadge,
+  sectionLabel,
+  segment,
+  segmented,
+  sidePanel,
+  sidePanelContent,
+} from "./styles";
 
 const BASEMAP_RID = "ri.foundry.main.dataset.c7e99de1-90a4-4e22-bd26-b42316d70fe4";
 const ASSETS_RID = "ri.foundry.main.dataset.8637f7a1-7503-459c-82c9-78e6ffa94e6e";
@@ -79,7 +124,8 @@ const DAY = 24 * 60 * 60 * 1000;
 const WINDOWS: Array<{ label: string; ms: number | null }> = [
   { label: "24 h", ms: DAY },
   { label: "7 d", ms: 7 * DAY },
-  { label: "30 d", ms: null },
+  { label: "30 d", ms: 30 * DAY },
+  { label: "All", ms: null },
 ];
 
 /** How far "Zoom to event" goes: past the cluster limit, into the relief. */
@@ -98,18 +144,44 @@ interface ClusterHover {
   breakdown: Array<{ category: EventCategory; count: number }>;
 }
 
+type Selection = { kind: "event"; id: string } | { kind: "area"; id: string } | null;
+
 function EventsPage(): React.ReactElement {
   // One timestamp for the page's life: the mock data is placed relative to it
   // and "3 h ago" is measured from it, so the two cannot disagree.
   const [now] = useState(() => Date.now());
-  const events = useMemo(() => generateEvents({ now }), [now]);
-  const byId = useMemo(() => new Map(events.map((e) => [e.id, e])), [events]);
+  const mockEvents = useMemo(() => generateEvents({ now }), [now]);
 
+  // ── Sources ────────────────────────────────────────────────────────────────
+  const [urlSources] = useState(() => sourcesFromSearch(window.location.search));
+  const fromUrl = urlSources.length > 0;
+  const [configs, setConfigs] = useState<SourceConfig[]>(() =>
+    fromUrl ? urlSources : loadSavedSources(),
+  );
+  useEffect(() => {
+    if (!fromUrl) {saveSources(configs);}
+  }, [configs, fromUrl]);
+  // Mock data by default only when there is nothing real to show.
+  const [mock, setMock] = useState(() => configs.length === 0);
+  const { states, reload } = useEventSources(configs, now);
+
+  const events = useMemo(
+    () => sortNewestFirst([...(mock ? mockEvents : []), ...states.flatMap((s) => s.events)]),
+    [mock, mockEvents, states],
+  );
+  const areas = useMemo(() => states.flatMap((s) => s.areas), [states]);
+  const eventsById = useMemo(() => new Map(events.map((e) => [e.id, e])), [events]);
+  const areasById = useMemo(() => new Map(areas.map((a) => [a.id, a])), [areas]);
+
+  // ── Filters ────────────────────────────────────────────────────────────────
   const [categories, setCategories] = useState<Set<EventCategory>>(
     () => new Set(CATEGORY_ORDER),
   );
   const [minSeverity, setMinSeverity] = useState<Severity>("low");
-  const [windowMs, setWindowMs] = useState<number | null>(7 * DAY);
+  // Real data is rarely all from the last week; mock data is.
+  const [windowMs, setWindowMs] = useState<number | null>(() =>
+    configs.length > 0 ? null : 7 * DAY,
+  );
 
   const [terrain, setTerrain] = useState(true);
   const [globe, setGlobe] = useState(true);
@@ -117,13 +189,17 @@ function EventsPage(): React.ReactElement {
   const [map, setMap] = useState<maplibregl.Map | null>(null);
   const [dem, setDem] = useState<DemSourceHandle | null>(null);
   const [zoom, setZoom] = useState(SPAWN.zoom);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selection, setSelection] = useState<Selection>(null);
   const [hover, setHover] = useState<ClusterHover | null>(null);
   const [groundHeight, setGroundHeight] = useState<number | null | "loading">(null);
 
   const visible = useMemo(
     () => filterEvents(events, { categories, minSeverity, windowMs, now }),
     [events, categories, minSeverity, windowMs, now],
+  );
+  const visibleAreas = useMemo(
+    () => areas.filter((area) => categories.has(area.category)),
+    [areas, categories],
   );
   // Counts beside each category ignore the category filter itself, so turning
   // a category off does not make its own count read zero.
@@ -139,13 +215,20 @@ function EventsPage(): React.ReactElement {
     }
     return counts;
   }, [events, minSeverity, windowMs, now]);
+  // "Other" only appears once a source has produced some.
+  const shownCategories = CATEGORY_ORDER.filter(
+    (category) => category !== "other" || (categoryCounts.get("other") ?? 0) > 0 || areas.some((a) => a.category === "other"),
+  );
 
-  const selected = selectedId ? byId.get(selectedId) ?? null : null;
+  const selectedEvent = selection?.kind === "event" ? eventsById.get(selection.id) ?? null : null;
+  const selectedArea = selection?.kind === "area" ? areasById.get(selection.id) ?? null : null;
 
-  // Read at the moment a map is (re)built: the extension is seeded with the
-  // current filter and the camera with the current view.
+  // Read at the moment a map is (re)built: the extensions are seeded with the
+  // current data and the camera with the current view.
   const visibleRef = useRef(visible);
   visibleRef.current = visible;
+  const areasRef = useRef(visibleAreas);
+  areasRef.current = visibleAreas;
   const viewRef = useRef<View>(SPAWN);
 
   const signature = `${terrain}-${globe}`;
@@ -157,6 +240,7 @@ function EventsPage(): React.ReactElement {
         sky: terrain,
         onReady: setDem,
       }),
+      areasExtension(areasRef.current),
       eventsExtension(visibleRef.current),
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -177,39 +261,48 @@ function EventsPage(): React.ReactElement {
     setHover(null);
   }, [signature]);
 
-  // Filters → data.
+  // Data → map.
   useEffect(() => {
     if (map) {setEventData(map, visible);}
   }, [map, visible]);
-
-  // Selection → ring.
   useEffect(() => {
-    if (map?.getLayer(EVENT_LAYERS.selected)) {
-      map.setFilter(
-        EVENT_LAYERS.selected,
-        selectionFilter(selectedId) as maplibregl.FilterSpecification,
-      );
-    }
-  }, [map, selectedId]);
+    if (map) {setAreaData(map, visibleAreas);}
+  }, [map, visibleAreas]);
 
-  // A selection that the filters have since hidden is dropped, not left
-  // pointing at an event the map no longer shows.
+  // Selection → rings.
   useEffect(() => {
-    if (selectedId && !visible.some((event) => event.id === selectedId)) {
-      setSelectedId(null);
+    if (!map) {return;}
+    const eventId = selection?.kind === "event" ? selection.id : null;
+    const areaId = selection?.kind === "area" ? selection.id : null;
+    if (map.getLayer(EVENT_LAYERS.selected)) {
+      map.setFilter(EVENT_LAYERS.selected, selectionFilter(eventId) as maplibregl.FilterSpecification);
     }
-  }, [visible, selectedId]);
+    if (map.getLayer(AREA_LAYERS.selected)) {
+      map.setFilter(AREA_LAYERS.selected, areaSelectionFilter(areaId) as maplibregl.FilterSpecification);
+    }
+  }, [map, selection]);
+
+  // A selection the filters (or a removed source) have since hidden is
+  // dropped, not left pointing at something the map no longer shows.
+  useEffect(() => {
+    if (selection?.kind === "event" && !visible.some((event) => event.id === selection.id)) {
+      setSelection(null);
+    }
+    if (selection?.kind === "area" && !visibleAreas.some((area) => area.id === selection.id)) {
+      setSelection(null);
+    }
+  }, [visible, visibleAreas, selection]);
 
   // Ground height under the selected event, from the same DEM as the relief.
   useEffect(() => {
-    if (!selected || !dem) {
+    if (!selectedEvent || !dem) {
       setGroundHeight(null);
       return;
     }
     let cancelled = false;
     setGroundHeight("loading");
     dem
-      .heightAt(selected.lon, selected.lat)
+      .heightAt(selectedEvent.lon, selectedEvent.lat)
       .then((height) => {
         if (!cancelled) {setGroundHeight(Number.isFinite(height) ? height : null);}
       })
@@ -219,36 +312,40 @@ function EventsPage(): React.ReactElement {
     return () => {
       cancelled = true;
     };
-  }, [selected, dem]);
+  }, [selectedEvent, dem]);
 
   // Map interaction. Registered per map instance and removed with it.
   useEffect(() => {
     if (!map) {return;}
-    const clickable = [EVENT_LAYERS.cluster, EVENT_LAYERS.point];
+    const eventLayers = [EVENT_LAYERS.cluster, EVENT_LAYERS.point];
+    const areaLayers = [AREA_LAYERS.fill, AREA_LAYERS.line];
 
-    const onClusterClick = (event: maplibregl.MapLayerMouseEvent) => {
-      const feature = event.features?.[0];
-      if (!feature || feature.geometry.type !== "Point") {return;}
-      const clusterId = Number(feature.properties?.cluster_id);
-      const center = feature.geometry.coordinates as [number, number];
-      const source = map.getSource(EVENTS_SOURCE) as unknown as EventsSource | undefined;
-      void source
-        ?.getClusterExpansionZoom(clusterId)
-        .then((expansion) => {
-          // A little past the split, so the children land clear of each other.
-          map.easeTo({ center, zoom: Math.min(expansion + 0.3, 18), duration: 700 });
-        })
-        .catch(() => undefined);
-    };
-
-    const onPointClick = (event: maplibregl.MapLayerMouseEvent) => {
-      const id = event.features?.[0]?.properties?.id;
-      if (typeof id === "string") {setSelectedId(id);}
-    };
-
-    const onMapClick = (event: maplibregl.MapMouseEvent) => {
-      const hits = map.queryRenderedFeatures(event.point, { layers: clickable });
-      if (hits.length === 0) {setSelectedId(null);}
+    // One handler rather than one per layer, so an event drawn over an area
+    // wins the click instead of both firing.
+    const onClick = (event: maplibregl.MapMouseEvent) => {
+      const [hit] = map.queryRenderedFeatures(event.point, { layers: eventLayers });
+      if (hit?.layer.id === EVENT_LAYERS.cluster && hit.geometry.type === "Point") {
+        const center = hit.geometry.coordinates as [number, number];
+        const source = map.getSource(EVENTS_SOURCE) as unknown as EventsSource | undefined;
+        void source
+          ?.getClusterExpansionZoom(Number(hit.properties?.cluster_id))
+          .then((expansion) => {
+            // A little past the split, so the children land clear of each other.
+            map.easeTo({ center, zoom: Math.min(expansion + 0.3, 18), duration: 700 });
+          })
+          .catch(() => undefined);
+        return;
+      }
+      if (hit?.layer.id === EVENT_LAYERS.point && typeof hit.properties?.id === "string") {
+        setSelection({ kind: "event", id: hit.properties.id });
+        return;
+      }
+      const [area] = map.queryRenderedFeatures(event.point, { layers: areaLayers });
+      if (area && typeof area.properties?.id === "string") {
+        setSelection({ kind: "area", id: area.properties.id });
+        return;
+      }
+      setSelection(null);
     };
 
     const onClusterMove = (event: maplibregl.MapLayerMouseEvent) => {
@@ -263,11 +360,11 @@ function EventsPage(): React.ReactElement {
     };
     const onClusterLeave = () => setHover(null);
 
-    const pointer = () => {
-      map.getCanvas().style.cursor = "pointer";
-    };
-    const unpointer = () => {
-      map.getCanvas().style.cursor = "";
+    const onMouseMove = (event: maplibregl.MapMouseEvent) => {
+      const interactive = map.queryRenderedFeatures(event.point, {
+        layers: [...eventLayers, ...areaLayers],
+      });
+      map.getCanvas().style.cursor = interactive.length > 0 ? "pointer" : "";
     };
 
     const onMoveEnd = () => {
@@ -279,35 +376,25 @@ function EventsPage(): React.ReactElement {
     // point at the wrong place.
     const onMoveStart = () => setHover(null);
 
-    map.on("click", EVENT_LAYERS.cluster, onClusterClick);
-    map.on("click", EVENT_LAYERS.point, onPointClick);
-    map.on("click", onMapClick);
+    map.on("click", onClick);
+    map.on("mousemove", onMouseMove);
     map.on("mousemove", EVENT_LAYERS.cluster, onClusterMove);
     map.on("mouseleave", EVENT_LAYERS.cluster, onClusterLeave);
-    for (const layer of clickable) {
-      map.on("mouseenter", layer, pointer);
-      map.on("mouseleave", layer, unpointer);
-    }
     map.on("movestart", onMoveStart);
     map.on("moveend", onMoveEnd);
 
     return () => {
-      map.off("click", EVENT_LAYERS.cluster, onClusterClick);
-      map.off("click", EVENT_LAYERS.point, onPointClick);
-      map.off("click", onMapClick);
+      map.off("click", onClick);
+      map.off("mousemove", onMouseMove);
       map.off("mousemove", EVENT_LAYERS.cluster, onClusterMove);
       map.off("mouseleave", EVENT_LAYERS.cluster, onClusterLeave);
-      for (const layer of clickable) {
-        map.off("mouseenter", layer, pointer);
-        map.off("mouseleave", layer, unpointer);
-      }
       map.off("movestart", onMoveStart);
       map.off("moveend", onMoveEnd);
     };
   }, [map]);
 
   const flyTo = (event: MonitorEvent) => {
-    setSelectedId(event.id);
+    setSelection({ kind: "event", id: event.id });
     map?.flyTo({
       center: [event.lon, event.lat],
       zoom: EVENT_ZOOM,
@@ -318,8 +405,23 @@ function EventsPage(): React.ReactElement {
     });
   };
 
+  const fit = (bounds: Bounds | null, maxZoom = 13) => {
+    if (bounds) {map?.fitBounds(bounds, { padding: { top: 60, bottom: 60, left: 320, right: 360 }, maxZoom, duration: 1400 });}
+  };
+
+  const zoomToArea = (area: MonitorArea) => fit(shapeBounds(area.geometry));
+
+  const fitToData = () => {
+    const points: Array<[number, number]> = visible.map((e) => [e.lon, e.lat]);
+    for (const area of visibleAreas) {
+      const bounds = shapeBounds(area.geometry);
+      if (bounds) {points.push(...bounds);}
+    }
+    fit(boundsOf(points), 10);
+  };
+
   const resetView = () => {
-    setSelectedId(null);
+    setSelection(null);
     map?.flyTo({
       center: [SPAWN.lon, SPAWN.lat],
       zoom: SPAWN.zoom,
@@ -337,6 +439,14 @@ function EventsPage(): React.ReactElement {
       return next;
     });
   };
+
+  const addSource = (config: SourceConfig) => {
+    setConfigs((previous) => dedupe([...previous, config]));
+    // Real data is rarely inside the mock's week.
+    setWindowMs(null);
+  };
+  const removeSource = (key: string) =>
+    setConfigs((previous) => previous.filter((config) => sourceKey(config) !== key));
 
   const critical = visible.filter((event) => event.severity === "critical").length;
 
@@ -372,118 +482,137 @@ function EventsPage(): React.ReactElement {
         }}
       />
 
-      {/* ── Filters and feed ─────────────────────────────────────────────── */}
+      {/* ── Filters, sources and feed ────────────────────────────────────── */}
       <div style={sidePanel}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span style={panelHeading}>Event monitor</span>
-          <span style={mockBadge}>MOCK DATA</span>
-        </div>
-        <div style={panelFigures}>
-          {visible.length} of {events.length} events
-          {critical > 0 && (
-            <span style={{ color: SEVERITY_COLOURS.critical }}> · {critical} critical</span>
-          )}
-        </div>
+        <div style={sidePanelContent}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={panelHeading}>Event monitor</span>
+            {mock && <span style={mockBadge}>MOCK DATA</span>}
+          </div>
+          <div style={panelFigures}>
+            {visible.length.toLocaleString("en-GB")} of {events.length.toLocaleString("en-GB")} events
+            {visibleAreas.length > 0 && ` · ${visibleAreas.length} areas`}
+            {critical > 0 && (
+              <span style={{ color: SEVERITY_COLOURS.critical }}> · {critical} critical</span>
+            )}
+          </div>
 
-        <div style={panelSeparator} />
+          <div style={panelSeparator} />
 
-        <div style={sectionLabel}>Time window</div>
-        <div style={segmented}>
-          {WINDOWS.map((option) => (
-            <button
-              key={option.label}
-              type="button"
-              style={segment(windowMs === option.ms)}
-              aria-pressed={windowMs === option.ms}
-              onClick={() => setWindowMs(option.ms)}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
+          <SourcesSection
+            states={states}
+            mock={mock}
+            onMockChange={setMock}
+            onAdd={addSource}
+            onRemove={removeSource}
+            onReload={reload}
+            fromUrl={fromUrl}
+          />
 
-        <div style={sectionLabel}>Minimum severity</div>
-        <div style={segmented}>
-          {SEVERITIES.map((severity) => (
-            <button
-              key={severity}
-              type="button"
-              style={segment(minSeverity === severity, SEVERITY_COLOURS[severity])}
-              aria-pressed={minSeverity === severity}
-              onClick={() => setMinSeverity(severity)}
-            >
-              {capitalise(severity)}
-            </button>
-          ))}
-        </div>
+          <div style={panelSeparator} />
 
-        <div style={sectionLabel}>Categories</div>
-        {CATEGORY_ORDER.map((category) => (
-          <label key={category} style={{ ...panelToggle, justifyContent: "space-between" }}>
-            <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <input
-                type="checkbox"
-                checked={categories.has(category)}
-                onChange={() => toggleCategory(category)}
-                style={panelCheckbox}
-              />
-              <span style={dot(CATEGORIES[category].colour)} />
-              {CATEGORIES[category].label}
-            </span>
-            <span style={panelFigures}>{categoryCounts.get(category) ?? 0}</span>
-          </label>
-        ))}
+          <div style={sectionLabel}>Time window</div>
+          <div style={segmented}>
+            {WINDOWS.map((option) => (
+              <button
+                key={option.label}
+                type="button"
+                style={segment(windowMs === option.ms)}
+                aria-pressed={windowMs === option.ms}
+                onClick={() => setWindowMs(option.ms)}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
 
-        <div style={panelSeparator} />
+          <div style={sectionLabel}>Minimum severity</div>
+          <div style={segmented}>
+            {SEVERITIES.map((severity) => (
+              <button
+                key={severity}
+                type="button"
+                style={segment(minSeverity === severity, SEVERITY_COLOURS[severity])}
+                aria-pressed={minSeverity === severity}
+                onClick={() => setMinSeverity(severity)}
+              >
+                {capitalise(severity)}
+              </button>
+            ))}
+          </div>
 
-        <div style={sectionLabel}>Latest</div>
-        <div style={feed}>
-          {visible.length === 0 && <div style={panelMuted}>Nothing matches the filters.</div>}
-          {visible.slice(0, 40).map((event) => (
-            <button
-              key={event.id}
-              type="button"
-              style={feedRow(event.id === selectedId)}
-              onClick={() => flyTo(event)}
-              title={event.title}
-            >
-              <span style={{ ...dot(CATEGORIES[event.category].colour), marginTop: 5 }} />
-              <span style={{ minWidth: 0 }}>
-                <span style={feedTitle}>{event.title}</span>
-                <span style={panelMuted}>
-                  {event.country} · {relativeTime(event.time, now)}
-                  {event.severity === "critical" || event.severity === "high" ? (
-                    <span style={{ color: SEVERITY_COLOURS[event.severity] }}>
-                      {" "}
-                      · {event.severity}
-                    </span>
-                  ) : null}
-                </span>
+          <div style={sectionLabel}>Categories</div>
+          {shownCategories.map((category) => (
+            <label key={category} style={{ ...panelToggle, justifyContent: "space-between" }}>
+              <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <input
+                  type="checkbox"
+                  checked={categories.has(category)}
+                  onChange={() => toggleCategory(category)}
+                  style={panelCheckbox}
+                />
+                <span style={dot(CATEGORIES[category].colour)} />
+                {CATEGORIES[category].label}
               </span>
-            </button>
+              <span style={panelFigures}>{categoryCounts.get(category) ?? 0}</span>
+            </label>
           ))}
-        </div>
 
-        <div style={panelSeparator} />
+          <div style={panelSeparator} />
 
-        <Toggle label="3D terrain" value={terrain} onChange={setTerrain} />
-        <Toggle label="Globe" value={globe} onChange={setGlobe} />
-        <div style={panelMuted}>
-          {dem && zoom < dem.minZoom
-            ? `Relief from z${dem.minZoom} · now z${zoom.toFixed(1)}`
-            : `z${zoom.toFixed(1)}`}
+          <div style={sectionLabel}>Latest</div>
+          <div style={feed}>
+            {visible.length === 0 && <div style={panelMuted}>Nothing matches the filters.</div>}
+            {visible.slice(0, 40).map((event) => (
+              <button
+                key={event.id}
+                type="button"
+                style={feedRow(selection?.kind === "event" && event.id === selection.id)}
+                onClick={() => flyTo(event)}
+                title={event.title}
+              >
+                <span style={{ ...dot(CATEGORIES[event.category].colour), marginTop: 5 }} />
+                <span style={{ minWidth: 0, flex: 1 }}>
+                  <span style={feedTitle}>{event.title}</span>
+                  <span style={panelMuted}>
+                    {event.country || event.place || event.source} · {relativeTime(event.time, now)}
+                    {event.severity === "critical" || event.severity === "high" ? (
+                      <span style={{ color: SEVERITY_COLOURS[event.severity] }}>
+                        {" "}
+                        · {event.severity}
+                      </span>
+                    ) : null}
+                  </span>
+                </span>
+                {event.live && <span style={{ ...liveBadge, marginTop: 3 }}>LIVE</span>}
+              </button>
+            ))}
+          </div>
+
+          <div style={panelSeparator} />
+
+          <Toggle label="3D terrain" value={terrain} onChange={setTerrain} />
+          <Toggle label="Globe" value={globe} onChange={setGlobe} />
+          <div style={panelMuted}>
+            {dem && zoom < dem.minZoom
+              ? `Relief from z${dem.minZoom} · now z${zoom.toFixed(1)}`
+              : `z${zoom.toFixed(1)}`}
+          </div>
+          <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
+            <button type="button" style={{ ...actionButton, flex: 1 }} onClick={fitToData}>
+              Fit to data
+            </button>
+            <button type="button" style={{ ...actionButton, flex: 1 }} onClick={resetView}>
+              Reset view
+            </button>
+          </div>
         </div>
-        <button type="button" style={{ ...actionButton, marginTop: 4 }} onClick={resetView}>
-          Reset view
-        </button>
       </div>
 
       {/* ── Cluster hover ────────────────────────────────────────────────── */}
       {hover && (
         <div style={{ ...hoverCard, left: hover.x + 16, top: hover.y + 16 }}>
-          <div style={panelHeading}>
-            {hover.count} events — click to expand
-          </div>
+          <div style={panelHeading}>{hover.count} events — click to expand</div>
           {hover.breakdown.map(({ category, count }) => (
             <div key={category} style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <span style={dot(CATEGORIES[category].colour)} />
@@ -495,14 +624,21 @@ function EventsPage(): React.ReactElement {
       )}
 
       {/* ── Details ──────────────────────────────────────────────────────── */}
-      {selected && (
+      {selectedEvent && (
         <EventDetails
-          event={selected}
+          event={selectedEvent}
           now={now}
           groundHeight={groundHeight}
           demReady={dem != null}
-          onZoom={() => flyTo(selected)}
-          onClose={() => setSelectedId(null)}
+          onZoom={() => flyTo(selectedEvent)}
+          onClose={() => setSelection(null)}
+        />
+      )}
+      {selectedArea && (
+        <AreaDetails
+          area={selectedArea}
+          onZoom={() => zoomToArea(selectedArea)}
+          onClose={() => setSelection(null)}
         />
       )}
 
@@ -528,83 +664,6 @@ function EventsPage(): React.ReactElement {
   );
 }
 
-function EventDetails({
-  event,
-  now,
-  groundHeight,
-  demReady,
-  onZoom,
-  onClose,
-}: {
-  event: MonitorEvent;
-  now: number;
-  groundHeight: number | null | "loading";
-  demReady: boolean;
-  onZoom: () => void;
-  onClose: () => void;
-}): React.ReactElement {
-  const category = CATEGORIES[event.category];
-  return (
-    <div style={detailsPanel} role="dialog" aria-label={event.title}>
-      <div style={{ ...detailsStripe, background: category.colour }} />
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <span style={chip(category.colour)}>{category.label}</span>
-        <span style={chip(SEVERITY_COLOURS[event.severity])}>{capitalise(event.severity)}</span>
-        <button type="button" style={closeButton} onClick={onClose} aria-label="Close">
-          ×
-        </button>
-      </div>
-
-      <div style={{ font: "600 15px/1.35 sans-serif", marginTop: 6 }}>{event.title}</div>
-      <div style={panelMuted}>
-        {relativeTime(event.time, now)} · {new Date(event.time).toUTCString().slice(5, 22)} UTC
-      </div>
-
-      <p style={{ margin: "8px 0 4px", lineHeight: 1.5 }}>{event.summary}</p>
-
-      <div style={metricsGrid}>
-        {event.metrics.map((metric) => (
-          <div key={metric.label} style={metricTile}>
-            <div style={panelMuted}>{metric.label}</div>
-            <div style={{ font: "600 14px/1.3 sans-serif" }}>{metric.value}</div>
-          </div>
-        ))}
-      </div>
-
-      <div style={panelSeparator} />
-
-      <dl style={facts}>
-        <dt style={panelMuted}>Location</dt>
-        <dd style={factValue}>
-          {event.place}, {event.country}
-        </dd>
-        <dt style={panelMuted}>Coordinates</dt>
-        <dd style={{ ...factValue, ...panelFigures, color: surface.text }}>
-          {event.lat.toFixed(4)}, {event.lon.toFixed(4)}
-        </dd>
-        <dt style={panelMuted}>Ground elevation</dt>
-        <dd style={factValue}>
-          {!demReady
-            ? "—"
-            : groundHeight === "loading"
-              ? "Reading the DEM…"
-              : groundHeight == null
-                ? "No DEM coverage here"
-                : `${Math.round(groundHeight).toLocaleString("en-GB")} m`}
-        </dd>
-        <dt style={panelMuted}>Source</dt>
-        <dd style={factValue}>{event.source}</dd>
-        <dt style={panelMuted}>Event id</dt>
-        <dd style={{ ...factValue, ...panelFigures }}>{event.id}</dd>
-      </dl>
-
-      <button type="button" style={{ ...actionButton, marginTop: 8 }} onClick={onZoom}>
-        Zoom to event
-      </button>
-    </div>
-  );
-}
-
 function Toggle({
   label,
   value,
@@ -626,197 +685,5 @@ function Toggle({
     </label>
   );
 }
-
-// ── Styles ──────────────────────────────────────────────────────────────────
-
-const sidePanel: React.CSSProperties = {
-  ...mapPanel,
-  top: 12,
-  left: 12,
-  bottom: 12,
-  width: 280,
-  overflowY: "auto",
-};
-
-const sectionLabel: React.CSSProperties = {
-  ...panelMuted,
-  textTransform: "uppercase",
-  letterSpacing: 0.6,
-  fontSize: 10,
-  marginTop: 6,
-};
-
-const mockBadge: React.CSSProperties = {
-  font: "600 9px/1 sans-serif",
-  letterSpacing: 0.6,
-  padding: "3px 5px",
-  borderRadius: 4,
-  border: `1px solid ${surface.border}`,
-  color: surface.muted,
-};
-
-const segmented: React.CSSProperties = {
-  display: "flex",
-  gap: 4,
-};
-
-function segment(active: boolean, colour?: string): React.CSSProperties {
-  return {
-    flex: 1,
-    padding: "4px 0",
-    borderRadius: 5,
-    border: `1px solid ${active ? colour ?? surface.accent : surface.border}`,
-    background: active ? "rgba(255,255,255,0.12)" : "transparent",
-    color: active ? surface.text : surface.muted,
-    font: "11px/1.4 sans-serif",
-    cursor: "pointer",
-  };
-}
-
-function dot(colour: string, size = 8): React.CSSProperties {
-  return {
-    display: "inline-block",
-    flex: "none",
-    width: size,
-    height: size,
-    borderRadius: "50%",
-    background: colour,
-    boxShadow: "0 0 0 1px rgba(255,255,255,0.5)",
-  };
-}
-
-const feed: React.CSSProperties = {
-  display: "flex",
-  flexDirection: "column",
-  gap: 2,
-  maxHeight: 260,
-  overflowY: "auto",
-  margin: "0 -6px",
-};
-
-function feedRow(active: boolean): React.CSSProperties {
-  return {
-    display: "flex",
-    gap: 8,
-    alignItems: "flex-start",
-    textAlign: "left",
-    padding: "5px 6px",
-    borderRadius: 5,
-    border: "none",
-    background: active ? "rgba(255,255,255,0.12)" : "transparent",
-    color: surface.text,
-    cursor: "pointer",
-    font: "12px/1.4 sans-serif",
-  };
-}
-
-const feedTitle: React.CSSProperties = {
-  display: "block",
-  whiteSpace: "nowrap",
-  overflow: "hidden",
-  textOverflow: "ellipsis",
-};
-
-const actionButton: React.CSSProperties = {
-  padding: "6px 10px",
-  borderRadius: 6,
-  border: `1px solid ${surface.border}`,
-  background: "rgba(255,255,255,0.08)",
-  color: surface.text,
-  font: "12px/1.4 sans-serif",
-  cursor: "pointer",
-};
-
-const hoverCard: React.CSSProperties = {
-  ...mapPanel,
-  pointerEvents: "none",
-  minWidth: 200,
-  zIndex: 3,
-};
-
-const detailsPanel: React.CSSProperties = {
-  ...mapPanel,
-  top: 12,
-  right: 12,
-  width: 330,
-  maxHeight: "calc(100% - 24px)",
-  overflowY: "auto",
-  paddingTop: 14,
-};
-
-const detailsStripe: React.CSSProperties = {
-  position: "absolute",
-  top: 0,
-  left: 0,
-  right: 0,
-  height: 4,
-  borderRadius: "8px 8px 0 0",
-};
-
-function chip(colour: string): React.CSSProperties {
-  return {
-    padding: "2px 7px",
-    borderRadius: 10,
-    border: `1px solid ${colour}`,
-    color: colour,
-    font: "600 10px/1.5 sans-serif",
-    letterSpacing: 0.3,
-  };
-}
-
-const closeButton: React.CSSProperties = {
-  marginLeft: "auto",
-  border: "none",
-  background: "transparent",
-  color: surface.muted,
-  font: "18px/1 sans-serif",
-  cursor: "pointer",
-  padding: 2,
-};
-
-const metricsGrid: React.CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "1fr 1fr",
-  gap: 6,
-};
-
-const metricTile: React.CSSProperties = {
-  padding: "6px 8px",
-  borderRadius: 6,
-  background: "rgba(255,255,255,0.06)",
-};
-
-const facts: React.CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "auto 1fr",
-  columnGap: 12,
-  rowGap: 3,
-  margin: 0,
-};
-
-const factValue: React.CSSProperties = { margin: 0 };
-
-const legend: React.CSSProperties = {
-  ...mapPanel,
-  bottom: 12,
-  left: 304,
-  flexDirection: "row",
-  alignItems: "center",
-  gap: 12,
-  padding: "6px 10px",
-};
-
-const legendItem: React.CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  gap: 5,
-};
-
-const errorStyle: React.CSSProperties = {
-  ...errorPanel,
-  top: 12,
-  left: 304,
-  zIndex: 3,
-};
 
 export default EventsPage;
