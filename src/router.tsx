@@ -6,6 +6,7 @@ import SymbolsPage from "@/PackageApps/tacticalGraphics/SymbolsPage";
 import MilMapPage from "@/mil/MilMapPage";
 import ElevationPage from "@/PackageApps/dechoElevation/ElevationPage";
 import CompositeDemoPage from "@/demo/CompositeDemoPage";
+import EventsPage from "@/demo/events/EventsPage";
 import UnitSymbolPickerPage from "@/PackageApps/unitSymbolPicker/UnitSymbolPickerPage";
 import RoutePage from "@/PackageApps/dechoPathfinding/RoutePage";
 import StylingPage from "@/PackageApps/dechoStyling/StylingPage";
@@ -51,6 +52,12 @@ export const router = createBrowserRouter(
           // exists for.
           path: "/demo",
           element: <CompositeDemoPage />,
+        },
+        {
+          // A world-monitor style event map: mock data, clustered, over the
+          // basemap and elevation extensions.
+          path: "/events",
+          element: <EventsPage />,
         },
         {
           // @acc/unit-symbol-picker — a SIDC, three ways.

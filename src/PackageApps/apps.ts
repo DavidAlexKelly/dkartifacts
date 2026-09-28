@@ -46,6 +46,13 @@ export const EXAMPLE_APPS: ExampleApp[] = [
       "The basemap with an add-on: DEM cells from Foundry decoded in the browser into 3D terrain, hillshade, hypsometric tint and slope bands, plus labelled contours traced per cell — and the raster contours the same DEM can draw without them. Click two points for the section between them and whether one can see the other.",
   },
   {
+    path: "/events",
+    label: "Event monitor",
+    packageName: "basemap + elevation",
+    blurb:
+      "The events side of a world-monitor dashboard, on the Foundry basemap and DEM: mock incidents on a globe that group into clusters when zoomed out and split apart as you zoom in. Click a cluster to expand it, click an event for its details and the ground elevation under it, and filter by category, severity and time window.",
+  },
+  {
     path: "/symbol-picker",
     label: "Unit symbol picker",
     packageName: "@acc/unit-symbol-picker",
