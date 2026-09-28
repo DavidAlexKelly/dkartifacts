@@ -1,0 +1,58 @@
+/* BlueprintJS */
+@import "normalize.css";
+@import "@blueprintjs/core/lib/css/blueprint.css";
+@import "@blueprintjs/icons/lib/css/blueprint-icons.css";
+
+:root {
+  font-family:
+    "Source Sans Pro", system-ui, Avenir, Helvetica, Arial, sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#root-container {
+  align-items: center;
+  display: flex;
+  flex: 1;
+}
+
+#root {
+  margin: 0 auto;
+  max-width: 1280px;
+  padding: calc(var(--bp-surface-spacing) * 8);
+}
+
+/*
+ * The template centres #root in a flex row and gives it a max-width and
+ * padding, which is right for a document-shaped page and wrong for an
+ * application shell: a map ends up letterboxed, and `align-items: center`
+ * stops it stretching.
+ *
+ * MapLibre also sizes itself from its container AT CONSTRUCTION TIME, so a
+ * container that is zero-height for even the first frame produces a map that
+ * never renders and never recovers on its own. Hence `height`, not just
+ * `min-height`, all the way down to the shell.
+ *
+ * Applied by AppShell for as long as it is mounted, so every example route
+ * gets it and the auth callback — which is a document — does not.
+ */
+body.app-shell-route #root-container {
+  align-items: stretch;
+  height: 100vh;
+}
+
+body.app-shell-route #root {
+  height: 100%;
+  max-width: none;
+  padding: 0;
+  width: 100%;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  min-height: 100vh;
+}

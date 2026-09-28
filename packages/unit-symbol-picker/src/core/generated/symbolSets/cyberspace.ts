@@ -1,0 +1,71 @@
+/**
+ * GENERATED FILE — do not edit by hand.
+ *
+ * Source: schemas/Cyberspace.xml
+ * Standard: MIL-STD-2525D / APP-6D, JointMilSyML (http://disa.mil/JointMilSyML.xsd)
+ * Regenerate: npm run generate   (from packages/unit-symbol-picker)
+ */
+
+import type { SymbolSetTable } from "../types";
+
+export const CYBERSPACE: SymbolSetTable = {
+  code: "60",
+  id: "SS_CYBERSPACE",
+  label: "Cyberspace",
+  icons: [
+    { code: "000000", label: "Unspecified", path: ["Unspecified"], abstract: true },
+    { code: "110000", label: "Botnet", path: ["Botnet"], abstract: true },
+    { code: "110100", label: "Command and Control (C2)", path: ["Botnet", "Command and Control (C2)"] },
+    { code: "110200", label: "Herder", path: ["Botnet", "Herder"] },
+    { code: "110300", label: "Callback Domain", path: ["Botnet", "Callback Domain"] },
+    { code: "110400", label: "Zombie", path: ["Botnet", "Zombie"] },
+    { code: "120000", label: "Infection", path: ["Infection"], abstract: true },
+    { code: "120100", label: "Advanced Persistent Threat (APT)", path: ["Infection", "Advanced Persistent Threat (APT)"] },
+    { code: "120101", label: "APT with C2", path: ["Infection", "Advanced Persistent Threat (APT)", "APT with C2"] },
+    { code: "120102", label: "APT with Self Propagation", path: ["Infection", "Advanced Persistent Threat (APT)", "APT with Self Propagation"] },
+    { code: "120103", label: "APT with C2 and Self Propagation", path: ["Infection", "Advanced Persistent Threat (APT)", "APT with C2 and Self Propagation"] },
+    { code: "120104", label: "APT Other", path: ["Infection", "Advanced Persistent Threat (APT)", "APT Other"] },
+    { code: "120200", label: "Non-Advanced Persistent Threat (NAPT)", path: ["Infection", "Non-Advanced Persistent Threat (NAPT)"] },
+    { code: "120201", label: "NAPT with C2", path: ["Infection", "Non-Advanced Persistent Threat (NAPT)", "NAPT with C2"] },
+    { code: "120202", label: "NAPT with Self Propagation", path: ["Infection", "Non-Advanced Persistent Threat (NAPT)", "NAPT with Self Propagation"] },
+    { code: "120203", label: "NAPT with C2 and Self Propagation", path: ["Infection", "Non-Advanced Persistent Threat (NAPT)", "NAPT with C2 and Self Propagation"] },
+    { code: "120204", label: "NAPT Other", path: ["Infection", "Non-Advanced Persistent Threat (NAPT)", "NAPT Other"] },
+    { code: "130000", label: "Health and Status", path: ["Health and Status"], abstract: true },
+    { code: "130100", label: "Normal", path: ["Health and Status", "Normal"] },
+    { code: "130200", label: "Network Outage", path: ["Health and Status", "Network Outage"] },
+    { code: "130300", label: "Unknown", path: ["Health and Status", "Unknown"] },
+    { code: "130400", label: "Impaired", path: ["Health and Status", "Impaired"] },
+    { code: "140000", label: "Device Type", path: ["Device Type"], abstract: true },
+    { code: "140100", label: "Core Router", path: ["Device Type", "Core Router"] },
+    { code: "140200", label: "Router", path: ["Device Type", "Router"] },
+    { code: "140300", label: "Cross Domain Solution", path: ["Device Type", "Cross Domain Solution"] },
+    { code: "140400", label: "Mail Server", path: ["Device Type", "Mail Server"] },
+    { code: "140500", label: "Web Server", path: ["Device Type", "Web Server"] },
+    { code: "140600", label: "Domain Server", path: ["Device Type", "Domain Server"] },
+    { code: "140700", label: "File Server", path: ["Device Type", "File Server"] },
+    { code: "140800", label: "Peer-to-Peer Node", path: ["Device Type", "Peer-to-Peer Node"] },
+    { code: "140900", label: "Firewall", path: ["Device Type", "Firewall"] },
+    { code: "141000", label: "Switch", path: ["Device Type", "Switch"] },
+    { code: "141100", label: "Host", path: ["Device Type", "Host"] },
+    { code: "141200", label: "Virtual Private Network (VPN)", path: ["Device Type", "Virtual Private Network (VPN)"] },
+    { code: "150000", label: "Device Domain", path: ["Device Domain"], abstract: true },
+    { code: "150100", label: "Department of Defense (DoD)", path: ["Device Domain", "Department of Defense (DoD)"] },
+    { code: "150200", label: "Government", path: ["Device Domain", "Government"] },
+    { code: "150300", label: "Contractor", path: ["Device Domain", "Contractor"] },
+    { code: "150400", label: "Supervisory Control and Data Acquisition (SCADA)", path: ["Device Domain", "Supervisory Control and Data Acquisition (SCADA)"] },
+    { code: "150500", label: "Non-Government", path: ["Device Domain", "Non-Government"] },
+    { code: "160000", label: "Effect", path: ["Effect"], abstract: true },
+    { code: "160100", label: "Infection", path: ["Effect", "Infection"] },
+    { code: "160200", label: "Degradation", path: ["Effect", "Degradation"] },
+    { code: "160300", label: "Data Spoofing", path: ["Effect", "Data Spoofing"] },
+    { code: "160400", label: "Data Manipulation", path: ["Effect", "Data Manipulation"] },
+    { code: "160500", label: "Exfiltration", path: ["Effect", "Exfiltration"] },
+    { code: "160600", label: "Power Outage", path: ["Effect", "Power Outage"] },
+    { code: "160700", label: "Network Outage", path: ["Effect", "Network Outage"] },
+    { code: "160800", label: "Service Outage", path: ["Effect", "Service Outage"] },
+    { code: "160900", label: "Device Outage", path: ["Effect", "Device Outage"] },
+  ],
+  sectorOneModifiers: [],
+  sectorTwoModifiers: [],
+  specialEntitySubTypes: [],
+};

@@ -1,0 +1,128 @@
+{
+  "name": "@acc/app6d",
+  "version": "3.7.0",
+  "description": "Reusable parametric graphic engine + APP-6D/MIL-STD-2525 symbol catalog, adapter-agnostic overlay rendering and editing handles, with a MapLibre adapter and React hooks.",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": true,
+  "files": [
+    "dist",
+    "src",
+    "!**/*.test.ts",
+    "README.md",
+    "CHANGELOG.md"
+  ],
+  "//files": "src is shipped deliberately, matching @acc/decho-basemap: the .js.map files tsup emits reference ../src/*, so without it every stack trace and go-to-definition in a consumer dead-ends. It also makes the tarball a complete, relocatable copy of the package. The old .npmignore listed src as excluded; files[] wins over .npmignore, and this is the intended behaviour.",
+  "exports": {
+    "./engine": {
+      "types": "./dist/engine/index.d.ts",
+      "import": "./dist/engine/index.js",
+      "require": "./dist/engine/index.cjs"
+    },
+    "./symbols": {
+      "types": "./dist/symbols/index.d.ts",
+      "import": "./dist/symbols/index.js",
+      "require": "./dist/symbols/index.cjs"
+    },
+    "./symbols/individual": {
+      "types": "./dist/symbols/individual/index.d.ts",
+      "import": "./dist/symbols/individual/index.js",
+      "require": "./dist/symbols/individual/index.cjs"
+    },
+    "./adapter": {
+      "types": "./dist/adapter/index.d.ts",
+      "import": "./dist/adapter/index.js",
+      "require": "./dist/adapter/index.cjs"
+    },
+    "./core": {
+      "types": "./dist/core/index.d.ts",
+      "import": "./dist/core/index.js",
+      "require": "./dist/core/index.cjs"
+    },
+    "./maplibre": {
+      "types": "./dist/maplibre/index.d.ts",
+      "import": "./dist/maplibre/index.js",
+      "require": "./dist/maplibre/index.cjs"
+    },
+    "./react": {
+      "types": "./dist/react/index.d.ts",
+      "import": "./dist/react/index.js",
+      "require": "./dist/react/index.cjs"
+    },
+    "./milsymbol": {
+      "types": "./dist/milsymbol/index.d.ts",
+      "import": "./dist/milsymbol/index.js",
+      "require": "./dist/milsymbol/index.cjs"
+    },
+    "./extension": {
+      "types": "./dist/extension/index.d.ts",
+      "import": "./dist/extension/index.js",
+      "require": "./dist/extension/index.cjs"
+    },
+    "./orders": {
+      "types": "./dist/orders/index.d.ts",
+      "import": "./dist/orders/index.js",
+      "require": "./dist/orders/index.cjs"
+    },
+    "./geojson": {
+      "types": "./dist/geojson/index.d.ts",
+      "import": "./dist/geojson/index.js",
+      "require": "./dist/geojson/index.cjs"
+    }
+  },
+  "publishConfig": {
+    "registry": "https://accenture.palantirfoundry.com/artifacts/api/repositories/ri.artifacts.main.repository.df396b79-3da5-473f-91c2-7be67d95c46c/contents/release/npm/"
+  },
+  "//publishConfig": "The same Foundry Artifacts npm repository @acc/decho-basemap publishes to \u2014 one repository can host any number of packages, and every consuming repo already resolves through it. This URL is the PUBLIC host, which is correct when publishing from a machine that can reach it; from a Code Workspace it does not resolve and the --registry flag in the root README's publishing section overrides it.",
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "smoke": "bash scripts/smoke-test.sh",
+    "prepublishOnly": "npm run typecheck && npm test && npm run build"
+  },
+  "//scripts": "lint is deliberately absent: the repository's flat eslint config at the root lints packages/*/src with the same rules as everything else, and a second nested config would be silently ignored by `eslint .` anyway.",
+  "peerDependencies": {
+    "maplibre-gl": ">=3.0.0",
+    "milsymbol": ">=3.0.0",
+    "react": ">=18.0.0"
+  },
+  "peerDependenciesMeta": {
+    "maplibre-gl": {
+      "optional": true
+    },
+    "milsymbol": {
+      "optional": true
+    },
+    "react": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.0",
+    "jsdom": "^26.1.0",
+    "maplibre-gl": "^5.0.0",
+    "milsymbol": "^3.0.4",
+    "react": "^18.2.0",
+    "tsup": "^8.0.0",
+    "typescript": "~5.5.4",
+    "vitest": "^3.2.4"
+  },
+  "//devDependencies.jsdom": "Only OrderHandleController.test.ts needs it, via a `// @vitest-environment jsdom` docblock \u2014 the suite otherwise runs in node. Easy to miss when pruning: without it that one file fails to load and vitest still reports the other six as passing.",
+  "//devDependencies": "There is no nested node_modules here: this package is built and tested with the toolchain installed at the repository root, which npm exposes to `npm run` through the ancestor node_modules/.bin. The list is kept accurate anyway, because it is what an extraction of this directory into its own repository would need to install. Versions are aligned with the root so the two cannot disagree.",
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "app6d",
+    "mil-std-2525",
+    "sidc",
+    "nato",
+    "tactical-graphics",
+    "maplibre",
+    "military-symbology",
+    "parametric-graphics"
+  ]
+}

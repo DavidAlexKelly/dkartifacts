@@ -1,0 +1,782 @@
+/* ==========================================================================
+   @acc/decho-components — the components, as classes
+   --------------------------------------------------------------------------
+       import "@acc/decho-styling/tokens.css";      <- the variables
+       import "@acc/decho-components/styles.css";   <- this file
+
+   NOTE the first import. This is the one delivery in this package that needs
+   @acc/decho-styling loaded: a declaration in a stylesheet can carry a
+   fallback, but repeating the base value in all ~250 of them would be a
+   second copy of the palette — exactly what the generated fallbacks in
+   src/core/fallbacks.ts exist to avoid. The COMPONENTS have no such
+   requirement: they emit var(--decho-…, <base value>) and are correct with
+   nothing else installed at all.
+
+   Every rule reads the custom properties and nothing else, so:
+
+     - a host that overrides `--decho-color-accent` on a subtree restyles all
+       of this inside it and none of it outside, and
+     - `.decho-modern` restyles all of it too, WITHOUT a single theme-specific
+       rule in this file. There is no `.decho-modern .decho-card` anywhere
+       below, and there should never be one: a component that needs a rule per
+       theme is a component whose themes will drift.
+
+   The mechanism worth knowing is how surfaces are painted:
+
+       background-color: var(--decho-color-surface);
+       background-image: var(--decho-gradient-hairline), var(--decho-gradient-surface);
+
+   Both gradients are `none` in classic — `background-image: none, none` is
+   valid and paints nothing — so classic gets the flat surface it always had,
+   and modern gets its glowing top edge and its wash from the same declaration.
+   The hairline is a background layer rather than a border or a ::before because
+   a border cannot fade out at both ends, and because the inline recipes in
+   src/core/recipes.ts have no pseudo-elements and must match this exactly.
+
+   Class names are prefixed `decho-` and every selector is a class: no element
+   selectors, no reset, no `html`/`body` rules. This stylesheet is imported
+   into applications that already have a reset — and into widgets embedded in
+   somebody else's — so it styles what it is asked to style and nothing more.
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   Baseline
+   -------------------------------------------------------------------------- */
+
+.decho-root {
+  font-family: var(--decho-font-family-sans);
+  font-size: var(--decho-font-size-md);
+  line-height: 1.45;
+  color: var(--decho-color-text);
+  /* Native controls and scrollbars, dark, in one declaration. */
+  color-scheme: var(--decho-effect-color-scheme);
+}
+
+/* Opt in: a widget embedded in a host panel usually must not paint one.
+   In modern this is also where the light comes from — the surfaces above are
+   translucent, and without this they have nothing to be translucent over. */
+.decho-root--filled {
+  background-color: var(--decho-color-bg);
+  background-image: var(--decho-gradient-app);
+  background-repeat: no-repeat;
+  /* `scroll`, not `local`: this element is usually the scroll container, and
+     with `local` the light scrolls away with the content — leaving the
+     translucent surfaces over flat black, which is how modern ends up grey. */
+  background-attachment: scroll;
+}
+
+/* --------------------------------------------------------------------------
+   Card
+   -------------------------------------------------------------------------- */
+
+.decho-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--decho-space-4);
+  padding: var(--decho-space-5);
+  background-color: var(--decho-color-surface);
+  background-image: var(--decho-gradient-hairline), var(--decho-gradient-surface);
+  background-repeat: no-repeat, no-repeat;
+  background-size: 100% 1px, auto;
+  background-position: top left, center;
+  backdrop-filter: var(--decho-effect-surface-blur);
+  -webkit-backdrop-filter: var(--decho-effect-surface-blur);
+  border: 1px solid var(--decho-color-border-subtle);
+  border-radius: var(--decho-radius-lg);
+  box-shadow: var(--decho-shadow-card);
+  color: var(--decho-color-text);
+  transition:
+    border-color var(--decho-effect-transition),
+    box-shadow var(--decho-effect-transition),
+    transform var(--decho-effect-transition);
+}
+
+.decho-card--interactive {
+  cursor: pointer;
+}
+
+.decho-card--interactive:hover {
+  border-color: var(--decho-color-border);
+  box-shadow: var(--decho-shadow-card-hover);
+}
+
+.decho-card--interactive:focus-visible {
+  outline: none;
+  border-color: var(--decho-color-accent);
+  box-shadow: 0 0 0 2px var(--decho-color-accent-soft);
+}
+
+.decho-card--selected {
+  border-color: var(--decho-color-accent);
+  box-shadow: var(--decho-shadow-selected);
+}
+
+/* Status stripe. Tone, not decoration — same six tones as the tags. */
+.decho-card--accent  { border-left: 3px solid var(--decho-color-accent); }
+.decho-card--info    { border-left: 3px solid var(--decho-color-info); }
+.decho-card--success { border-left: 3px solid var(--decho-color-success); }
+.decho-card--warning { border-left: 3px solid var(--decho-color-warning); }
+.decho-card--danger  { border-left: 3px solid var(--decho-color-danger); }
+.decho-card--neutral { border-left: 3px solid var(--decho-color-text-muted); }
+
+.decho-card__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--decho-space-5);
+}
+
+.decho-card__title {
+  margin: 0;
+  font-size: var(--decho-font-size-lg);
+  font-weight: 600;
+  color: var(--decho-color-text);
+}
+
+.decho-card__meta {
+  margin: 0;
+  font-size: var(--decho-font-size-sm);
+  color: var(--decho-color-text-muted);
+}
+
+.decho-card__body {
+  margin: 0;
+}
+
+.decho-card__footer {
+  display: flex;
+  align-items: center;
+  gap: var(--decho-space-4);
+  padding-top: var(--decho-space-4);
+  border-top: 1px solid var(--decho-color-border-subtle);
+}
+
+/* --------------------------------------------------------------------------
+   Tag
+   -------------------------------------------------------------------------- */
+
+.decho-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--decho-space-2);
+  padding: 1px var(--decho-space-3);
+  border: 1px solid var(--decho-color-neutral-soft);
+  border-radius: var(--decho-radius-pill);
+  background: var(--decho-color-neutral-soft);
+  color: var(--decho-color-text-muted);
+  font-size: var(--decho-font-size-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  line-height: 1.6;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.decho-tag--accent {
+  background: var(--decho-color-accent-soft);
+  border-color: var(--decho-color-accent-soft);
+  color: var(--decho-color-accent);
+}
+
+.decho-tag--info {
+  background: var(--decho-color-info-soft);
+  border-color: var(--decho-color-info-soft);
+  color: var(--decho-color-info);
+}
+
+.decho-tag--success {
+  background: var(--decho-color-success-soft);
+  border-color: var(--decho-color-success-soft);
+  color: var(--decho-color-success);
+}
+
+.decho-tag--warning {
+  background: var(--decho-color-warning-soft);
+  border-color: var(--decho-color-warning-soft);
+  color: var(--decho-color-warning);
+}
+
+.decho-tag--danger {
+  background: var(--decho-color-danger-soft);
+  border-color: var(--decho-color-danger-soft);
+  color: var(--decho-color-danger);
+}
+
+/* Filled, for the one tag on a row that has to be read first. */
+.decho-tag--solid {
+  border-color: transparent;
+  color: var(--decho-color-on-accent);
+}
+
+.decho-tag--solid.decho-tag--accent  { background: var(--decho-color-accent); }
+.decho-tag--solid.decho-tag--info    { background: var(--decho-color-info); }
+.decho-tag--solid.decho-tag--success { background: var(--decho-color-success); }
+.decho-tag--solid.decho-tag--warning { background: var(--decho-color-warning); }
+.decho-tag--solid.decho-tag--danger  { background: var(--decho-color-danger); }
+.decho-tag--solid.decho-tag--neutral { background: var(--decho-color-text-muted); }
+
+/* The halo is written in currentColor, so one token serves all six tones:
+   each dot sets its own colour below and the glow follows it. */
+.decho-dot {
+  flex: 0 0 auto;
+  width: 6px;
+  height: 6px;
+  border-radius: var(--decho-radius-pill);
+  background: currentColor;
+  box-shadow: var(--decho-shadow-dot);
+  color: var(--decho-color-text-muted);
+}
+
+.decho-dot--accent  { color: var(--decho-color-accent); }
+.decho-dot--info    { color: var(--decho-color-info); }
+.decho-dot--success { color: var(--decho-color-success); }
+.decho-dot--warning { color: var(--decho-color-warning); }
+.decho-dot--danger  { color: var(--decho-color-danger); }
+
+/* --------------------------------------------------------------------------
+   Button
+   -------------------------------------------------------------------------- */
+
+.decho-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--decho-space-3);
+  padding: 5px var(--decho-space-5);
+  background-color: var(--decho-color-surface);
+  background-image: var(--decho-gradient-raised);
+  border: 1px solid var(--decho-color-border);
+  border-radius: var(--decho-radius-md);
+  color: var(--decho-color-text);
+  font-family: var(--decho-font-family-sans);
+  font-size: var(--decho-font-size-md);
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background var(--decho-effect-transition),
+    border-color var(--decho-effect-transition),
+    box-shadow var(--decho-effect-transition);
+}
+
+.decho-button:hover:not(:disabled) {
+  background-color: var(--decho-color-surface-raised);
+  border-color: var(--decho-color-border-strong);
+}
+
+.decho-button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--decho-color-accent-soft);
+}
+
+.decho-button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.decho-button--primary {
+  background-color: var(--decho-color-accent);
+  background-image: var(--decho-gradient-accent);
+  border-color: transparent;
+  color: var(--decho-color-on-accent);
+}
+
+.decho-button--primary:hover:not(:disabled) {
+  background-color: var(--decho-color-accent-hover);
+  border-color: transparent;
+  box-shadow: var(--decho-shadow-card-hover);
+}
+
+.decho-button--ghost {
+  background-color: transparent;
+  background-image: none;
+  border-color: transparent;
+  color: var(--decho-color-text-muted);
+}
+
+.decho-button--ghost:hover:not(:disabled) {
+  background-color: var(--decho-color-accent-soft);
+  border-color: transparent;
+  color: var(--decho-color-text);
+}
+
+.decho-button--danger {
+  background-color: transparent;
+  background-image: none;
+  border-color: var(--decho-color-danger);
+  color: var(--decho-color-danger);
+}
+
+.decho-button--danger:hover:not(:disabled) {
+  background-color: var(--decho-color-danger);
+  color: var(--decho-color-on-accent);
+}
+
+.decho-button--sm {
+  padding: 3px var(--decho-space-4);
+  font-size: var(--decho-font-size-sm);
+}
+
+/* 28px square: the geometry the map toolbars in this project already use, so a
+   control added next to one does not read as bolted on. */
+.decho-button--icon {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+}
+
+.decho-button--active {
+  border-color: var(--decho-color-accent);
+  color: var(--decho-color-accent);
+}
+
+/* --------------------------------------------------------------------------
+   Panel
+   -------------------------------------------------------------------------- */
+
+.decho-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  background-color: var(--decho-color-surface);
+  background-image: var(--decho-gradient-hairline), var(--decho-gradient-surface);
+  background-repeat: no-repeat, no-repeat;
+  background-size: 100% 1px, auto;
+  background-position: top left, center;
+  backdrop-filter: var(--decho-effect-surface-blur);
+  -webkit-backdrop-filter: var(--decho-effect-surface-blur);
+  border: 1px solid var(--decho-color-border-subtle);
+  border-radius: var(--decho-radius-lg);
+  box-shadow: var(--decho-shadow-panel);
+  color: var(--decho-color-text);
+}
+
+/* Floating over a map: translucent, so the terrain being worked on still
+   shows, and blurred, so the text on top of it stays readable. */
+.decho-panel--overlay {
+  background-color: var(--decho-color-surface-overlay);
+  border-color: var(--decho-color-border-overlay);
+  backdrop-filter: var(--decho-effect-blur);
+  -webkit-backdrop-filter: var(--decho-effect-blur);
+}
+
+.decho-panel__header {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--decho-space-5);
+  padding: var(--decho-space-4) var(--decho-space-5);
+  border-bottom: 1px solid var(--decho-color-border-subtle);
+  color: var(--decho-color-text-muted);
+  font-size: var(--decho-font-size-sm);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* min-height: 0 is load-bearing: a flex child defaults to min-height:auto and
+   refuses to shrink below its content, so without it a long list pushes the
+   header out of the panel instead of scrolling inside it. */
+.decho-panel__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: var(--decho-space-5);
+}
+
+.decho-panel__body--scroll {
+  overflow: auto;
+}
+
+/* --------------------------------------------------------------------------
+   Navigation rail — icon tile, label, one line of description
+   -------------------------------------------------------------------------- */
+
+.decho-nav {
+  display: flex;
+  flex-direction: column;
+  gap: var(--decho-space-2);
+}
+
+.decho-nav-item {
+  display: flex;
+  align-items: center;
+  gap: var(--decho-space-5);
+  width: 100%;
+  padding: var(--decho-space-4) var(--decho-space-5);
+  background-color: transparent;
+  background-image: none;
+  border: 1px solid transparent;
+  border-radius: var(--decho-radius-lg);
+  color: var(--decho-color-text-muted);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background var(--decho-effect-transition),
+    border-color var(--decho-effect-transition),
+    color var(--decho-effect-transition);
+}
+
+.decho-nav-item:hover {
+  background-color: var(--decho-color-surface-raised);
+  border-color: var(--decho-color-border-subtle);
+  color: var(--decho-color-text);
+}
+
+.decho-nav-item:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--decho-color-accent-soft);
+}
+
+/* The active row is washed left-to-right rather than tinted flat: brightest at
+   the accent edge, so it reads as lit from there instead of merely coloured. */
+.decho-nav-item--active {
+  background-color: var(--decho-color-accent-soft);
+  background-image: var(--decho-gradient-raised);
+  border-color: var(--decho-color-border-strong);
+  box-shadow: var(--decho-shadow-card);
+  color: var(--decho-color-text);
+}
+
+.decho-nav-item__icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  background-color: var(--decho-color-surface-raised);
+  background-image: var(--decho-gradient-raised);
+  border: 1px solid var(--decho-color-border-subtle);
+  border-radius: var(--decho-radius-md);
+  color: var(--decho-color-text-muted);
+}
+
+.decho-nav-item--active .decho-nav-item__icon {
+  background-color: var(--decho-color-accent-soft);
+  border-color: var(--decho-color-border-strong);
+  color: var(--decho-color-accent-hover);
+}
+
+.decho-nav-item__text {
+  min-width: 0;
+}
+
+.decho-nav-item__label {
+  font-size: var(--decho-font-size-lg);
+  font-weight: 600;
+  line-height: 1.3;
+  color: inherit;
+}
+
+.decho-nav-item__description {
+  font-size: var(--decho-font-size-sm);
+  line-height: 1.3;
+  color: var(--decho-color-text-faint);
+}
+
+/* --------------------------------------------------------------------------
+   Section label — the uppercase caption that heads a group
+   -------------------------------------------------------------------------- */
+
+.decho-section-label {
+  display: flex;
+  align-items: center;
+  gap: var(--decho-space-5);
+  color: var(--decho-color-text-faint);
+  font-size: var(--decho-font-size-xs);
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+/* Trailing hairline that fills the remaining width. */
+.decho-section-label--ruled::after {
+  content: "";
+  flex: 1 1 auto;
+  height: 1px;
+  background: var(--decho-color-border-subtle);
+}
+
+/* --------------------------------------------------------------------------
+   Form controls
+   -------------------------------------------------------------------------- */
+
+.decho-label {
+  display: block;
+  margin-bottom: var(--decho-space-2);
+  color: var(--decho-color-text-muted);
+  font-size: var(--decho-font-size-xs);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.decho-input,
+.decho-select,
+.decho-textarea {
+  width: 100%;
+  padding: 5px var(--decho-space-4);
+  background: var(--decho-color-bg);
+  border: 1px solid var(--decho-color-border);
+  border-radius: var(--decho-radius-sm);
+  color: var(--decho-color-text);
+  font-family: var(--decho-font-family-sans);
+  font-size: var(--decho-font-size-md);
+  line-height: 1.4;
+}
+
+.decho-input:focus,
+.decho-select:focus,
+.decho-textarea:focus {
+  outline: none;
+  border-color: var(--decho-color-accent);
+  box-shadow: 0 0 0 2px var(--decho-color-accent-soft);
+}
+
+.decho-input--invalid {
+  border-color: var(--decho-color-danger);
+}
+
+/* --------------------------------------------------------------------------
+   Toolbar — the floating control cluster over a map
+   -------------------------------------------------------------------------- */
+
+.decho-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--decho-space-1);
+  padding: var(--decho-space-2);
+  background-color: var(--decho-color-surface-overlay);
+  background-image: var(--decho-gradient-hairline), var(--decho-gradient-surface);
+  background-repeat: no-repeat, no-repeat;
+  background-size: 100% 1px, auto;
+  background-position: top left, center;
+  border: 1px solid var(--decho-color-border-overlay);
+  border-radius: var(--decho-radius-lg);
+  box-shadow: var(--decho-shadow-panel);
+  backdrop-filter: var(--decho-effect-blur);
+  -webkit-backdrop-filter: var(--decho-effect-blur);
+  color: var(--decho-color-text);
+}
+
+.decho-toolbar__separator {
+  align-self: stretch;
+  width: 1px;
+  background: var(--decho-color-border-overlay);
+}
+
+/* --------------------------------------------------------------------------
+   Application shell — header, sidebar, content, footer, breadcrumb
+   --------------------------------------------------------------------------
+   The class-based twin of ../react/App*.tsx. Same geometry, same tokens, so an
+   app can build its frame in markup and its pages with the components, or the
+   other way round, and the seam does not show.
+   -------------------------------------------------------------------------- */
+
+.decho-app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  color: var(--decho-color-text);
+}
+
+/* The row holding the sidebar and the content column. */
+.decho-app__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  overflow: hidden;
+}
+
+.decho-app-header {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--decho-space-5);
+  min-height: 48px;
+  padding: var(--decho-space-4) var(--decho-space-6);
+  background-color: var(--decho-color-surface);
+  background-image: var(--decho-gradient-hairline), var(--decho-gradient-surface);
+  background-repeat: no-repeat, no-repeat;
+  background-size: 100% 1px, auto;
+  background-position: top left, center;
+  backdrop-filter: var(--decho-effect-surface-blur);
+  -webkit-backdrop-filter: var(--decho-effect-surface-blur);
+  border-bottom: 1px solid var(--decho-color-border-subtle);
+  color: var(--decho-color-text);
+}
+
+.decho-app-brand {
+  display: flex;
+  align-items: center;
+  gap: var(--decho-space-4);
+  min-width: 0;
+  color: var(--decho-color-text);
+  font-size: var(--decho-font-size-xl);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.decho-app-sidebar {
+  flex: 0 0 auto;
+  width: 260px;
+  min-width: 260px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  background-color: var(--decho-color-surface);
+  background-image: var(--decho-gradient-surface);
+  backdrop-filter: var(--decho-effect-surface-blur);
+  -webkit-backdrop-filter: var(--decho-effect-surface-blur);
+  border-right: 1px solid var(--decho-color-border-subtle);
+  color: var(--decho-color-text);
+  transition: width var(--decho-effect-transition);
+}
+
+/* Narrowed, not unmounted: the icons stay, the labels go, and scroll position
+   and open state survive because nothing remounts. */
+.decho-app-sidebar--collapsed {
+  width: 64px;
+  min-width: 64px;
+}
+
+.decho-app-sidebar__scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: var(--decho-space-4);
+}
+
+.decho-app-content {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+  padding: var(--decho-space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--decho-space-6);
+}
+
+/* For a page that must be full-bleed: a map, or a table with its own chrome. */
+.decho-app-content--bleed {
+  padding: 0;
+  gap: 0;
+}
+
+.decho-app-footer {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--decho-space-5);
+  padding: var(--decho-space-4) var(--decho-space-6);
+  border-top: 1px solid var(--decho-color-border-subtle);
+  color: var(--decho-color-text-muted);
+  font-size: var(--decho-font-size-sm);
+}
+
+.decho-breadcrumb {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--decho-space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--decho-color-text-muted);
+  font-size: var(--decho-font-size-sm);
+}
+
+.decho-breadcrumb__item {
+  display: flex;
+  align-items: center;
+  gap: var(--decho-space-3);
+}
+
+/* Presentational: mark it aria-hidden in the markup too, or a screen reader
+   reads "Plans slash Exercise 12 slash Objectives". */
+.decho-breadcrumb__separator {
+  color: var(--decho-color-text-faint);
+  user-select: none;
+}
+
+.decho-breadcrumb a {
+  color: var(--decho-color-link);
+  text-decoration: none;
+}
+
+.decho-breadcrumb [aria-current="page"] {
+  color: var(--decho-color-text);
+}
+
+/* --------------------------------------------------------------------------
+   Layout and text utilities
+   -------------------------------------------------------------------------- */
+
+.decho-row {
+  display: flex;
+  align-items: center;
+  gap: var(--decho-space-4);
+}
+
+.decho-row--between {
+  justify-content: space-between;
+}
+
+.decho-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--decho-space-4);
+}
+
+.decho-grow {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.decho-scroll {
+  min-height: 0;
+  overflow: auto;
+}
+
+.decho-divider {
+  height: 1px;
+  width: 100%;
+  margin: 0;
+  border: none;
+  background: var(--decho-color-border-subtle);
+}
+
+.decho-muted { color: var(--decho-color-text-muted); }
+.decho-faint { color: var(--decho-color-text-faint); }
+
+.decho-mono {
+  font-family: var(--decho-font-family-mono);
+  font-size: var(--decho-font-size-sm);
+}
+
+.decho-truncate {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.decho-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--decho-space-4);
+  padding: var(--decho-space-7);
+  color: var(--decho-color-text-muted);
+  text-align: center;
+}

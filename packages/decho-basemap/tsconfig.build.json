@@ -1,0 +1,37 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+
+    /* Emit — unlike the app's tsconfig, this one actually produces output. */
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "outDir": "dist",
+    "rootDir": "src",
+
+    /* The byte layer resolves to its BUILT declarations, not its source:
+       source would pull those files into this program and tsc would refuse to
+       emit ("not under rootDir"), and the emitted .d.ts here would reference
+       paths no consumer has. Declarations are never emitted, so this stays a
+       pure type reference and the import specifier survives into dist exactly
+       as written. `npm run build` builds it first. */
+    "baseUrl": ".",
+    "paths": {
+      "@acc/decho-foundry-bytes": ["../decho-foundry-bytes/dist/index.d.ts"]
+    }
+  },
+  "include": ["src"],
+  // Tests are source, not product: they must not be emitted into dist, and
+  // they would pull vitest types into a consumer's type-check.
+  "exclude": ["**/*.test.ts", "**/*.test.tsx"]
+}

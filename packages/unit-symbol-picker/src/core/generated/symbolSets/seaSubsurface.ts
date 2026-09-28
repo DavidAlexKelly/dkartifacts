@@ -1,0 +1,81 @@
+/**
+ * GENERATED FILE — do not edit by hand.
+ *
+ * Source: schemas/Sea_Subsurface.xml
+ * Standard: MIL-STD-2525D / APP-6D, JointMilSyML (http://disa.mil/JointMilSyML.xsd)
+ * Regenerate: npm run generate   (from packages/unit-symbol-picker)
+ */
+
+import type { SymbolSetTable } from "../types";
+
+export const SEA_SUBSURFACE: SymbolSetTable = {
+  code: "35",
+  id: "SS_SEA_SUBSURFACE",
+  label: "Sea Subsurface",
+  icons: [
+    { code: "000000", label: "Unspecified", path: ["Unspecified"], abstract: true },
+    { code: "110000", label: "Military", path: ["Military"] },
+    { code: "110100", label: "Submarine", path: ["Military", "Submarine"] },
+    { code: "110101", label: "Submarine-Surfaced", path: ["Military", "Submarine", "Submarine-Surfaced"] },
+    { code: "110102", label: "Submarine-Snorkeling", path: ["Military", "Submarine", "Submarine-Snorkeling"] },
+    { code: "110103", label: "Submarine-Bottomed", path: ["Military", "Submarine", "Submarine-Bottomed"] },
+    { code: "110200", label: "Other Submersible", path: ["Military", "Other Submersible"] },
+    { code: "110300", label: "Nonsubmarine", path: ["Military", "Nonsubmarine"] },
+    { code: "110400", label: "Autonomous Underwater Vehicle (AUV)/Unmanned Underwater Vehicle (UUV)", path: ["Military", "Autonomous Underwater Vehicle (AUV)/Unmanned Underwater Vehicle (UUV)"] },
+    { code: "110500", label: "Diver", path: ["Military", "Diver"] },
+    { code: "120000", label: "Civilian", path: ["Civilian"] },
+    { code: "120100", label: "Submersible", path: ["Civilian", "Submersible"] },
+    { code: "120200", label: "Autonomous Underwater Vehicle (AUV)/ Underwater Vehicle (UUV)", path: ["Civilian", "Autonomous Underwater Vehicle (AUV)/ Underwater Vehicle (UUV)"] },
+    { code: "120300", label: "Diver", path: ["Civilian", "Diver"] },
+    { code: "130000", label: "Weapon", path: ["Weapon"] },
+    { code: "130100", label: "Torpedo", path: ["Weapon", "Torpedo"] },
+    { code: "130200", label: "Improvised Explosive Device (IED)", path: ["Weapon", "Improvised Explosive Device (IED)"] },
+    { code: "130300", label: "Decoy", path: ["Weapon", "Decoy"] },
+    { code: "140000", label: "Echo Tracker Classifier (ETC) / Possible Contact (POSCON)", path: ["Echo Tracker Classifier (ETC) / Possible Contact (POSCON)"] },
+    { code: "150000", label: "Fused Track", path: ["Fused Track"] },
+    { code: "160000", label: "Manual Track", path: ["Manual Track"] },
+  ],
+  sectorOneModifiers: [
+    { code: "00", label: "Unspecified" },
+    { code: "01", label: "Antisubmarine Warfare" },
+    { code: "02", label: "Auxiliary" },
+    { code: "03", label: "Command and Control" },
+    { code: "04", label: "Intelligence Surveillance Reconnaissance" },
+    { code: "05", label: "Mine Countermeasures" },
+    { code: "06", label: "Mine Warfare" },
+    { code: "07", label: "Surface Warfare" },
+    { code: "08", label: "Attack" },
+    { code: "09", label: "Ballistic Missile" },
+    { code: "10", label: "Guided Missile" },
+    { code: "11", label: "Other Guided Missile" },
+    { code: "12", label: "Special Operations Forces (SOF)" },
+    { code: "13", label: "Possible Submarine Low 1" },
+    { code: "14", label: "Possible Submarine Low 2" },
+    { code: "15", label: "Possible Submarine High 3" },
+    { code: "16", label: "Possible Submarine High 4" },
+    { code: "17", label: "Probable Submarine" },
+    { code: "18", label: "Certain Submarine" },
+    { code: "19", label: "Anti-torpedo Torpedo" },
+    { code: "20", label: "Hijacking/Highjacked" },
+  ],
+  sectorTwoModifiers: [
+    { code: "00", label: "Unspecified" },
+    { code: "01", label: "Air Independent Propulsion" },
+    { code: "02", label: "Diesel Electric General" },
+    { code: "03", label: "Diesel - Type 1" },
+    { code: "04", label: "Diesel - Type 2" },
+    { code: "05", label: "Diesel - Type 3" },
+    { code: "06", label: "Nuclear Powered General" },
+    { code: "07", label: "Nuclear - Type 1" },
+    { code: "08", label: "Nuclear - Type 2" },
+    { code: "09", label: "Nuclear - Type 3" },
+    { code: "10", label: "Nuclear - Type 4" },
+    { code: "11", label: "Nuclear - Type 5" },
+    { code: "12", label: "Nuclear - Type 6" },
+    { code: "13", label: "Nuclear - Type 7" },
+    { code: "14", label: "Autonomous Control" },
+    { code: "15", label: "Remotely Piloted" },
+    { code: "16", label: "Expendable" },
+  ],
+  specialEntitySubTypes: [],
+};

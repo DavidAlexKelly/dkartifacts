@@ -1,0 +1,65 @@
+{
+  "name": "@acc/decho-styling",
+  "version": "1.3.1",
+  "description": "The Decho design tokens: seven themes as values and as CSS custom properties, with helpers for re-tinting a theme and defining your own. No React and no components \u2014 those are @acc/decho-components, which depends on neither this package nor a stylesheet. Ships its own adoption codemod, Blueprint adapter and lint rule.",
+  "license": "UNLICENSED",
+  "private": false,
+  "type": "module",
+  "sideEffects": [
+    "*.css"
+  ],
+  "files": [
+    "dist",
+    "src",
+    "bin",
+    "eslint",
+    "!**/*.test.ts",
+    "!**/*.test.tsx",
+    "!**/*.test.js",
+    "!**/*.test.mjs",
+    "CHANGELOG.md",
+    "README.md"
+  ],
+  "//files": "src is shipped deliberately, for the same reason as the other packages here (source maps point at ../src/*) and for one more: the CSS entry points ARE src files. tsc copies no assets, so exporting them from src is the alternative to adding a bundler to a package whose whole job is not to need one.",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./tokens.css": "./src/css/tokens.css",
+    "./blueprint.css": "./src/css/blueprint.css",
+    "./compat/military.css": "./src/css/compat/military.css",
+    "./tokens.json": "./src/tokens.json",
+    "./eslint": "./eslint/index.js"
+  },
+  "types": "./dist/index.d.ts",
+  "//publishConfig": "A DIFFERENT Artifacts repository from the other five packages here, which publish to ri.artifacts.main.repository.df396b79-*. Deliberate: this one is meant to be installed by widget repositories across the estate rather than only by map consumers. The consequence to remember is that a consumer wanting this package AND a decho map package needs both registries configured.",
+  "publishConfig": {
+    "registry": "https://accenture.palantirfoundry.com/artifacts/api/repositories/ri.artifacts.main.repository.b39ad0fb-63f7-4297-9d23-d029564ce937/contents/release/npm/"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "prepublishOnly": "npm run build",
+    "test": "vitest run",
+    "tokens": "npm run build && node scripts/gen-tokens-css.mjs"
+  },
+  "//peerDependencies": "React is optional and wide. The root entry point is tokens and style objects with no runtime dependency at all \u2014 a non-React widget, a test or a node script can take it \u2014 and only the /react subpath needs React. Pinning it would be the ERESOLVE trap @acc/decho-basemap's note describes, for a package that imports one type and one hook.",
+  "peerDependencies": {
+    "react": "^18.0.0 || ^19.0.0"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/react": "^18",
+    "typescript": "~5.5.4",
+    "vitest": "^3.2.4"
+  },
+  "bin": {
+    "decho": "./bin/decho.mjs"
+  },
+  "//exports": "The .css and .json entries point into src/ rather than dist/: tsc copies no assets, and adding a bundler to a package whose whole point is not needing one would be a poor trade. src is shipped anyway, as the other packages here do.",
+  "//devDependencies": "react-dom is here for the component tests, which render with renderToStaticMarkup rather than pulling in Testing Library. It is deliberately NOT a peer dependency: the package itself renders no DOM, and a consumer using only the tokens should not be asked for it."
+}

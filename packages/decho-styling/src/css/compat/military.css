@@ -1,0 +1,159 @@
+/* ==========================================================================
+   @acc/decho-styling/compat/military.css
+   --------------------------------------------------------------------------
+   The bridge for repositories that grew up on the military-green palette —
+   the one with --bg-panel, --accent-primary, --text-primary, --shadow-card and
+   friends. Two estates in this org started from it, and both hand-wrote this
+   same alias layer before adopting the package. This is that layer, shipped,
+   so the third one does not write it again and the first two can delete
+   theirs.
+
+       import "@acc/decho-styling/styles.css";
+       import "@acc/decho-styling/compat/military.css";
+
+   Every legacy name below resolves to a token, so existing `var(--bg-panel)`
+   call sites keep working AND start following the theme. Adoption becomes a
+   two-line change plus `npx decho migrate` for the hard-coded hexes, instead
+   of a repo-wide rename.
+
+   WHAT IS NOT ALIASED, AND WHY
+   ----------------------------
+   The type scale, the spacing scale and the z-index ladder stay with the
+   consumer. The package counts spacing in 2s from 2px where these repos count
+   in 4s from 4px, and --space-2 meaning 8px in one place and 4px in another is
+   the kind of alias that silently halves every gap in an estate. Keep your own;
+   they are layout conventions, not brand.
+
+   This file declares on :root. An application wants that. A Foundry custom
+   widget does not — it shares a page — so scope it yourself there:
+   `.decho-root { … }` with the same body, or apply the theme class to your own
+   subtree and copy this block under it.
+   ========================================================================== */
+
+:root {
+  /* -- Backgrounds --
+     Opaque in classic; translucent glass in modern and daylight, which is the
+     point of going through tokens. The `-flat` names are kept because app CSS
+     uses them where a background-color is wanted rather than a shorthand. */
+  --bg-base:         var(--decho-color-bg);
+  --bg-base-grad:    var(--decho-gradient-app);
+  --bg-surface:      var(--decho-color-surface);
+  --bg-surface-flat: var(--decho-color-surface);
+  --bg-panel:        var(--decho-color-surface);
+  --bg-panel-flat:   var(--decho-color-surface);
+  --bg-raised:       var(--decho-color-surface-raised);
+  --bg-raised-flat:  var(--decho-color-surface-raised);
+  --bg-hover:        var(--decho-color-surface-raised);
+  --bg-active:       var(--decho-color-accent-soft);
+  --bg-glass:        var(--decho-color-surface-overlay);
+  --bg-glass-hover:  var(--decho-color-surface-raised);
+  --blur-glass:      var(--decho-effect-blur);
+
+  /* -- Borders -- */
+  --border-subtle:  var(--decho-color-border-subtle);
+  --border-default: var(--decho-color-border);
+  --border-strong:  var(--decho-color-border-strong);
+
+  /* -- Accent -- */
+  --accent-primary:       var(--decho-color-accent);
+  --accent-primary-hover: var(--decho-color-accent-hover);
+  /* The pressed state has no token of its own: it is the accent, darkened.
+     Declared twice so browsers without color-mix() keep the first, plain
+     value rather than dropping the property entirely. */
+  --accent-primary-active: var(--decho-color-accent);
+  --accent-primary-active: color-mix(in srgb, var(--decho-color-accent) 78%, #000);
+  --accent-primary-muted: var(--decho-color-accent-soft);
+  --accent-primary-glow:  var(--decho-color-accent-soft);
+  --accent-primary-grad:  var(--decho-gradient-accent);
+  --accent-military:      var(--decho-color-accent);
+
+  --accent-amber:       var(--decho-color-warning);
+  --accent-amber-muted: var(--decho-color-warning-soft);
+  --accent-amber-glow:  var(--decho-color-warning-soft);
+  --accent-red:         var(--decho-color-danger);
+  --accent-red-hover:   var(--decho-color-danger);
+  --accent-red-muted:   var(--decho-color-danger-soft);
+  --accent-blue:        var(--decho-color-info);
+  --accent-blue-muted:  var(--decho-color-info-soft);
+  --accent-ai:          var(--decho-color-ai);
+  --accent-ai-muted:    var(--decho-color-ai-soft);
+
+  /* -- Text -- */
+  --text-primary:   var(--decho-color-text);
+  --text-secondary: var(--decho-color-text-muted);
+  --text-muted:     var(--decho-color-text-faint);
+  --text-disabled:  var(--decho-color-text-faint);
+  --text-on-accent: var(--decho-color-on-accent);
+
+  /* -- Status tones — "how should this look" -- */
+  --status-green:  var(--decho-color-success);
+  --status-amber:  var(--decho-color-warning);
+  --status-red:    var(--decho-color-danger);
+  --status-grey:   var(--decho-color-text-muted);
+  --status-blue:   var(--decho-color-info);
+
+  /* -- RAG — "what state is this item in" --
+     A different question from the tones above, and a different scale: seven
+     fixed states, never a gradient between two. */
+  --rag-critical:     var(--decho-status-critical);
+  --rag-high:         var(--decho-status-high);
+  --rag-at-risk:      var(--decho-status-at-risk);
+  --rag-on-track:     var(--decho-status-on-track);
+  --rag-complete:     var(--decho-status-complete);
+  --rag-not-assessed: var(--decho-status-not-assessed);
+  --rag-no-data:      var(--decho-status-no-data);
+
+  /* -- Chart series -- */
+  --chart-1:  var(--decho-chart-series1);
+  --chart-2:  var(--decho-chart-series2);
+  --chart-3:  var(--decho-chart-series3);
+  --chart-4:  var(--decho-chart-series4);
+  --chart-5:  var(--decho-chart-series5);
+  --chart-6:  var(--decho-chart-series6);
+  --chart-7:  var(--decho-chart-series7);
+  --chart-8:  var(--decho-chart-series8);
+  --chart-9:  var(--decho-chart-series9);
+  --chart-10: var(--decho-chart-series10);
+  --chart-axis: var(--decho-chart-axis);
+  --chart-grid: var(--decho-chart-grid);
+
+  /* -- Typography --
+     Put your own webfont in front if you ship one:
+     --font-sans: "Inter", var(--decho-font-family-sans);
+     In a custom widget you cannot — CSP blocks the request — so the system
+     stack is what you get, and it is what was rendering anyway. */
+  --font-sans: var(--decho-font-family-sans);
+  --font-mono: var(--decho-font-family-mono);
+
+  /* -- Radii -- */
+  --radius-sm:   var(--decho-radius-sm);
+  --radius-md:   var(--decho-radius-md);
+  --radius-lg:   var(--decho-radius-lg);
+  --radius-pill: var(--decho-radius-lg);
+  --radius-full: var(--decho-radius-pill);
+
+  /* -- Shadows -- */
+  --shadow-xs:    var(--decho-shadow-sm);
+  --shadow-sm:    var(--decho-shadow-sm);
+  --shadow-card:  var(--decho-shadow-card);
+  --shadow-panel: var(--decho-shadow-panel);
+  --shadow-modal: var(--decho-shadow-panel);
+  --shadow-hover: var(--decho-shadow-card-hover);
+  --shadow-focus: 0 0 0 2px var(--decho-color-accent-soft);
+  --shadow-glow:  var(--decho-shadow-selected);
+  --shadow-inset: inset 0 1px 3px rgba(0, 0, 0, 0.4);
+
+  /* -- Transitions --
+     The easing curves are part of the legacy vocabulary too: repos on this
+     palette write `transition: transform 0.2s var(--ease-snap)` throughout,
+     and an undefined custom property makes the whole declaration invalid — so
+     the transition silently stops happening. They have no token equivalent,
+     so they are defined here as the literals they always were. */
+  --ease-out:  cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-in:   cubic-bezier(0.4, 0, 1, 1);
+  --ease-snap: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  --transition-fast:   var(--decho-effect-transition);
+  --transition-normal: var(--decho-effect-transition);
+  --transition-slow:   0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}

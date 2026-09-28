@@ -1,0 +1,62 @@
+{
+  "name": "@acc/decho-basemap",
+  "version": "0.11.0",
+  "description": "A MapLibre vector basemap served entirely from Foundry \u2014 PMTiles, glyphs and sprites from datasets or media sets, with no external network calls.",
+  "license": "UNLICENSED",
+  "private": false,
+  "type": "module",
+  "sideEffects": [
+    "*.css"
+  ],
+  "files": [
+    "dist",
+    "src",
+    "!**/*.test.ts",
+    "README.md"
+  ],
+  "//files": "src is shipped deliberately: the .js.map and .d.ts.map files reference ../src/*, so without it every stack trace and go-to-definition in a consumer dead-ends. It also makes the tarball a complete, relocatable copy of the package.",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./react": {
+      "types": "./dist/react/index.d.ts",
+      "import": "./dist/react/index.js"
+    }
+  },
+  "types": "./dist/index.d.ts",
+  "publishConfig": {
+    "registry": "https://accenture.palantirfoundry.com/artifacts/api/repositories/ri.artifacts.main.repository.df396b79-3da5-473f-91c2-7be67d95c46c/contents/release/npm/"
+  },
+  "scripts": {
+    "build:deps": "npm --prefix ../decho-foundry-bytes run build",
+    "build": "npm run build:deps && tsc -p tsconfig.build.json",
+    "prepublishOnly": "npm run build",
+    "test": "vitest run"
+  },
+  "//scripts": "build:deps is a real prerequisite, not ceremony: tsconfig.build.json resolves @acc/decho-foundry-bytes to its BUILT declarations, because source would drag those files into this program and tsc would refuse to emit them from outside rootDir.",
+  "//peerDependencies": "Deliberately wide. 0.1.0 pinned the exact @osdk versions its home repo happened to have (>=2.59.0 etc), which broke installation into an app on ^2.56.0 with an ERESOLVE conflict \u2014 for a package that uses one TYPE from @osdk/client and two stable call sites in the foundry.* packages. Widen rather than force consumers onto --legacy-peer-deps. (This note lives outside the peerDependencies object: a '//' key inside it would be read as a package literally named '//'.)",
+  "peerDependencies": {
+    "@acc/decho-foundry-bytes": ">=0.1.0",
+    "@osdk/client": ">=2.0.0",
+    "@osdk/foundry.datasets": ">=2.0.0",
+    "@osdk/foundry.mediasets": ">=2.0.0",
+    "@protomaps/basemaps": "^5.7.2",
+    "maplibre-gl": "^5.0.0",
+    "pmtiles": "^4.0.0",
+    "react": "^18.0.0 || ^19.0.0"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    },
+    "@protomaps/basemaps": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "typescript": "~5.5.4",
+    "vitest": "^3.2.4"
+  }
+}

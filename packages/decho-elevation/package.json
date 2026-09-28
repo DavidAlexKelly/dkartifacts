@@ -1,0 +1,55 @@
+{
+  "name": "@acc/decho-elevation",
+  "version": "0.2.0",
+  "description": "Elevation from Foundry: chunked DEM cells read, decoded and served to MapLibre as terrain, hillshade, contours and relief tints, plus point sampling, route profiles and line of sight. Usable headless.",
+  "license": "UNLICENSED",
+  "private": false,
+  "type": "module",
+  "files": [
+    "dist",
+    "src",
+    "!**/*.test.ts",
+    "README.md"
+  ],
+  "//files": "src is shipped for the same reason as the sibling packages: the .js.map and .d.ts.map files reference ../src/*, so without it every stack trace and go-to-definition in a consumer dead-ends.",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./react": {
+      "types": "./dist/react/index.d.ts",
+      "import": "./dist/react/index.js"
+    },
+    "./extension": {
+      "types": "./dist/extension/index.d.ts",
+      "import": "./dist/extension/index.js"
+    }
+  },
+  "//exports": "Three surfaces in ascending order of what they assume. \".\" decodes DEM cells and answers questions about heights; it imports no React and no maplibre-gl, so a worker or a Function can use it. \"./react\" adds hooks and a profile chart. \"./extension\" is the plug-in for @acc/decho-basemap and is the only entry point that needs a map at all.",
+  "types": "./dist/index.d.ts",
+  "publishConfig": {
+    "registry": "https://accenture.palantirfoundry.com/artifacts/api/repositories/ri.artifacts.main.repository.df396b79-3da5-473f-91c2-7be67d95c46c/contents/release/npm/"
+  },
+  "scripts": {
+    "build:deps": "npm --prefix ../decho-basemap run build",
+    "build": "npm run build:deps && tsc -p tsconfig.build.json",
+    "prepublishOnly": "npm run build",
+    "test": "vitest run"
+  },
+  "//scripts": "build:deps mirrors @acc/decho-mil-map: tsconfig.build.json resolves the sibling package to its built .d.ts rather than its source, because source would drag those files into this program and tsc would refuse to emit them from outside rootDir. Building it first is a real prerequisite, so the build does it.",
+  "//peerDependencies": "@acc/decho-basemap is depended on for TWO things: its byte layer (src/core/bytes.ts here is the single import site, so it can be repointed at @acc/decho-foundry-bytes in one edit when that lands) and the BasemapExtension contract, which only ./extension uses. maplibre-gl is deliberately NOT a peer: the extension is handed the maplibregl namespace by the basemap and types the Map structurally, so nothing here imports it. Ranges are wide for the reason the siblings learned at 0.1.1, when exact @osdk pins made them uninstallable in an app one minor behind.",
+  "peerDependencies": {
+    "@acc/decho-basemap": ">=0.8.0",
+    "react": "^18.0.0 || ^19.0.0"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "typescript": "~5.5.4",
+    "vitest": "^3.2.4"
+  }
+}

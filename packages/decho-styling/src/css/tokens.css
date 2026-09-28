@@ -1,0 +1,909 @@
+/* ==========================================================================
+   @acc/decho-styling — tokens
+   --------------------------------------------------------------------------
+   GENERATED from src/core/tokens.ts by scripts/gen-tokens-css.mjs.
+   Edit the TypeScript, run the script, commit both.
+
+   src/core/tokens.test.ts fails if the two ever disagree — for every theme —
+   so this file cannot quietly drift from the values the inline recipes use.
+
+   Declared on :root AND on .decho-root. An application wants the defaults on
+   the document; a Foundry custom widget must not write to :root at all, since
+   it shares a page with widgets it does not own. Hosts in that position scope
+   the class to their own subtree and get the same variables.
+
+   Each theme below declares only what it changes. Add the class (or the data
+   attribute) to any element and everything inside it is that theme — nothing
+   else in the stylesheet mentions a theme, because the components read these
+   variables and nothing else.
+
+       <div class="decho-root decho-modern"> … </div>
+       <div class="decho-root" data-decho-skin="accenture-dark"> … </div>
+   ========================================================================== */
+
+
+:root,
+.decho-root {
+  /* -- Colour -- */
+  --decho-color-bg: #0a0c0f;
+  --decho-color-surface: #111318;
+  --decho-color-surface-raised: #171a21;
+  --decho-color-surface-overlay: rgba(17, 19, 24, 0.78);
+  --decho-color-border: #374057;
+  --decho-color-border-subtle: #23293a;
+  --decho-color-border-strong: #4a5470;
+  --decho-color-border-overlay: rgba(255, 255, 255, 0.14);
+  --decho-color-text: #e8ecf4;
+  --decho-color-text-muted: #8b93a7;
+  --decho-color-text-faint: #5a6178;
+  --decho-color-on-accent: #ffffff;
+  --decho-color-accent: #4a7c59;
+  --decho-color-accent-hover: #5d9670;
+  --decho-color-accent-soft: rgba(74, 124, 89, 0.18);
+  --decho-color-accent-over-map: #7fb08c;
+  --decho-color-info: #4a7ca8;
+  --decho-color-info-soft: rgba(74, 124, 168, 0.18);
+  --decho-color-success: #3f8f63;
+  --decho-color-success-soft: rgba(63, 143, 99, 0.18);
+  --decho-color-warning: #b8862f;
+  --decho-color-warning-soft: rgba(184, 134, 47, 0.18);
+  --decho-color-danger: #a4453a;
+  --decho-color-danger-soft: rgba(164, 69, 58, 0.18);
+  --decho-color-neutral-soft: rgba(139, 147, 167, 0.16);
+  --decho-color-ai: #7b5ea7;
+  --decho-color-ai-soft: rgba(123, 94, 167, 0.18);
+  --decho-color-link: #8fb8ff;
+  --decho-color-accent-tint: rgb(27, 38, 36);
+  --decho-color-info-tint: rgb(27, 38, 50);
+  --decho-color-success-tint: rgb(25, 41, 38);
+  --decho-color-warning-tint: rgb(47, 40, 28);
+  --decho-color-danger-tint: rgb(43, 28, 30);
+  --decho-color-neutral-tint: rgb(37, 39, 47);
+  /* -- RAG status — the heatmap scale
+     Each cell is one fixed state, never a gradient between two. `not-assessed`
+     is deliberately not red: "nobody has looked at this" and "this has
+     breached" are different facts. -- */
+  --decho-status-critical: #8e292c;
+  --decho-status-high: #ac2f33;
+  --decho-status-at-risk: #b8862f;
+  --decho-status-on-track: #3f8f63;
+  --decho-status-complete: #2f7a52;
+  --decho-status-not-assessed: #8b93a7;
+  --decho-status-no-data: #5a6178;
+  /* -- Chart series, in order, plus the axis and grid -- */
+  --decho-chart-series1: #1d9e75;
+  --decho-chart-series2: #085041;
+  --decho-chart-series3: #5dcaa5;
+  --decho-chart-series4: #9fe1cb;
+  --decho-chart-series5: #04342c;
+  --decho-chart-series6: #e1f5ee;
+  --decho-chart-series7: #2d6b55;
+  --decho-chart-series8: #4db896;
+  --decho-chart-series9: #0a3d2e;
+  --decho-chart-series10: #c8ede0;
+  --decho-chart-axis: rgba(139, 147, 167, 0.35);
+  --decho-chart-grid: rgba(139, 147, 167, 0.16);
+  /* -- Spacing -- */
+  --decho-space-1: 2px;
+  --decho-space-2: 4px;
+  --decho-space-3: 6px;
+  --decho-space-4: 8px;
+  --decho-space-5: 12px;
+  --decho-space-6: 16px;
+  --decho-space-7: 24px;
+  /* -- Radii -- */
+  --decho-radius-sm: 4px;
+  --decho-radius-md: 6px;
+  --decho-radius-lg: 8px;
+  --decho-radius-pill: 999px;
+  /* -- Type -- */
+  --decho-font-size-xs: 10px;
+  --decho-font-size-sm: 11px;
+  --decho-font-size-md: 12px;
+  --decho-font-size-lg: 13px;
+  --decho-font-size-xl: 15px;
+  --decho-font-size-2xl: 18px;
+  --decho-font-family-sans: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --decho-font-family-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  /* -- Decoration
+     `none` here is load-bearing, not a placeholder: every surface is painted
+     `background-image: var(--hairline), var(--wash)`, and `none, none` is valid
+     CSS that paints nothing. One rule, two skins, no overrides. -- */
+  --decho-gradient-app: none;
+  --decho-gradient-surface: none;
+  --decho-gradient-raised: none;
+  --decho-gradient-accent: none;
+  --decho-gradient-hairline: none;
+  /* -- Shadows -- */
+  --decho-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --decho-shadow-md: 0 2px 10px rgba(0, 0, 0, 0.35);
+  --decho-shadow-lg: 0 8px 28px rgba(0, 0, 0, 0.45);
+  --decho-shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --decho-shadow-card-hover: 0 2px 10px rgba(0, 0, 0, 0.35);
+  --decho-shadow-selected: 0 1px 2px rgba(0, 0, 0, 0.3), 0 0 0 1px #4a7c59;
+  --decho-shadow-panel: 0 2px 10px rgba(0, 0, 0, 0.35);
+  --decho-shadow-dot: none;
+  /* -- Effects -- */
+  --decho-effect-blur: blur(6px);
+  --decho-effect-surface-blur: none;
+  --decho-effect-transition: 120ms ease;
+  --decho-effect-color-scheme: dark;
+}
+
+/* ==========================================================================
+   classic — the default
+   Flat surfaces, military green, opaque. These are the same values :root
+   carries above; the block exists so that classic selects like every other
+   theme, and so a classic subtree can be nested inside a themed app.
+   ========================================================================== */
+
+.decho-classic,
+[data-decho-theme="classic"] {
+
+  --decho-color-bg: #0a0c0f;
+  --decho-color-surface: #111318;
+  --decho-color-surface-raised: #171a21;
+  --decho-color-surface-overlay: rgba(17, 19, 24, 0.78);
+  --decho-color-border: #374057;
+  --decho-color-border-subtle: #23293a;
+  --decho-color-border-strong: #4a5470;
+  --decho-color-border-overlay: rgba(255, 255, 255, 0.14);
+  --decho-color-text: #e8ecf4;
+  --decho-color-text-muted: #8b93a7;
+  --decho-color-text-faint: #5a6178;
+  --decho-color-on-accent: #ffffff;
+  --decho-color-accent: #4a7c59;
+  --decho-color-accent-hover: #5d9670;
+  --decho-color-accent-soft: rgba(74, 124, 89, 0.18);
+  --decho-color-accent-over-map: #7fb08c;
+  --decho-color-info: #4a7ca8;
+  --decho-color-info-soft: rgba(74, 124, 168, 0.18);
+  --decho-color-success: #3f8f63;
+  --decho-color-success-soft: rgba(63, 143, 99, 0.18);
+  --decho-color-warning: #b8862f;
+  --decho-color-warning-soft: rgba(184, 134, 47, 0.18);
+  --decho-color-danger: #a4453a;
+  --decho-color-danger-soft: rgba(164, 69, 58, 0.18);
+  --decho-color-neutral-soft: rgba(139, 147, 167, 0.16);
+  --decho-color-ai: #7b5ea7;
+  --decho-color-ai-soft: rgba(123, 94, 167, 0.18);
+  --decho-color-link: #8fb8ff;
+  --decho-color-accent-tint: rgb(27, 38, 36);
+  --decho-color-info-tint: rgb(27, 38, 50);
+  --decho-color-success-tint: rgb(25, 41, 38);
+  --decho-color-warning-tint: rgb(47, 40, 28);
+  --decho-color-danger-tint: rgb(43, 28, 30);
+  --decho-color-neutral-tint: rgb(37, 39, 47);
+
+  --decho-status-critical: #8e292c;
+  --decho-status-high: #ac2f33;
+  --decho-status-at-risk: #b8862f;
+  --decho-status-on-track: #3f8f63;
+  --decho-status-complete: #2f7a52;
+  --decho-status-not-assessed: #8b93a7;
+  --decho-status-no-data: #5a6178;
+
+  --decho-chart-series1: #1d9e75;
+  --decho-chart-series2: #085041;
+  --decho-chart-series3: #5dcaa5;
+  --decho-chart-series4: #9fe1cb;
+  --decho-chart-series5: #04342c;
+  --decho-chart-series6: #e1f5ee;
+  --decho-chart-series7: #2d6b55;
+  --decho-chart-series8: #4db896;
+  --decho-chart-series9: #0a3d2e;
+  --decho-chart-series10: #c8ede0;
+  --decho-chart-axis: rgba(139, 147, 167, 0.35);
+  --decho-chart-grid: rgba(139, 147, 167, 0.16);
+
+  --decho-space-1: 2px;
+  --decho-space-2: 4px;
+  --decho-space-3: 6px;
+  --decho-space-4: 8px;
+  --decho-space-5: 12px;
+  --decho-space-6: 16px;
+  --decho-space-7: 24px;
+
+  --decho-radius-sm: 4px;
+  --decho-radius-md: 6px;
+  --decho-radius-lg: 8px;
+  --decho-radius-pill: 999px;
+
+  --decho-font-size-xs: 10px;
+  --decho-font-size-sm: 11px;
+  --decho-font-size-md: 12px;
+  --decho-font-size-lg: 13px;
+  --decho-font-size-xl: 15px;
+  --decho-font-size-2xl: 18px;
+  --decho-font-family-sans: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --decho-font-family-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+
+  --decho-gradient-app: none;
+  --decho-gradient-surface: none;
+  --decho-gradient-raised: none;
+  --decho-gradient-accent: none;
+  --decho-gradient-hairline: none;
+
+  --decho-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --decho-shadow-md: 0 2px 10px rgba(0, 0, 0, 0.35);
+  --decho-shadow-lg: 0 8px 28px rgba(0, 0, 0, 0.45);
+  --decho-shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --decho-shadow-card-hover: 0 2px 10px rgba(0, 0, 0, 0.35);
+  --decho-shadow-selected: 0 1px 2px rgba(0, 0, 0, 0.3), 0 0 0 1px #4a7c59;
+  --decho-shadow-panel: 0 2px 10px rgba(0, 0, 0, 0.35);
+  --decho-shadow-dot: none;
+
+  --decho-effect-blur: blur(6px);
+  --decho-effect-surface-blur: none;
+  --decho-effect-transition: 120ms ease;
+  --decho-effect-color-scheme: dark;
+}
+
+/* ==========================================================================
+   modern — the indigo command-centre skin
+   Translucent surfaces over a lit background, a gradient hairline along the top
+   edge of each one, and shadows that carry the accent's colour instead of only
+   darkness.
+
+   Put --decho-gradient-app on the element that fills the widget (or use
+   .decho-root--filled): the surfaces are translucent, and without the light
+   behind them the glass has nothing to be glass against.
+   ========================================================================== */
+
+.decho-modern,
+[data-decho-theme="modern"] {
+
+  --decho-color-bg: #080b16;
+  --decho-color-surface: rgba(19, 23, 42, 0.72);
+  --decho-color-surface-raised: rgba(32, 38, 68, 0.72);
+  --decho-color-surface-overlay: rgba(13, 17, 32, 0.72);
+  --decho-color-border: rgba(255, 255, 255, 0.12);
+  --decho-color-border-subtle: rgba(255, 255, 255, 0.07);
+  --decho-color-border-strong: rgba(139, 124, 246, 0.5);
+  --decho-color-text: #e9ecfb;
+  --decho-color-text-muted: #9aa3c4;
+  --decho-color-text-faint: #6a7292;
+  --decho-color-accent: #6c5ce7;
+  --decho-color-accent-hover: #8b7cf6;
+  --decho-color-accent-soft: rgba(108, 92, 231, 0.2);
+  --decho-color-accent-over-map: #8b7cf6;
+  --decho-color-info: #5b8bf7;
+  --decho-color-info-soft: rgba(91, 139, 247, 0.18);
+  --decho-color-success: #35d07a;
+  --decho-color-success-soft: rgba(53, 208, 122, 0.16);
+  --decho-color-warning: #f0a83c;
+  --decho-color-warning-soft: rgba(240, 168, 60, 0.16);
+  --decho-color-danger: #ef5350;
+  --decho-color-danger-soft: rgba(239, 83, 80, 0.16);
+  --decho-color-link: #a9b8ff;
+  --decho-color-accent-tint: rgb(37, 37, 80);
+  --decho-color-info-tint: rgb(32, 44, 79);
+  --decho-color-success-tint: rgb(24, 53, 55);
+  --decho-color-warning-tint: rgb(54, 46, 45);
+  --decho-color-danger-tint: rgb(54, 33, 48);
+  --decho-color-neutral-tint: rgb(38, 43, 62);
+
+  --decho-status-critical: #ef5350;
+  --decho-status-high: #f0705f;
+  --decho-status-at-risk: #f0a83c;
+  --decho-status-on-track: #35d07a;
+  --decho-status-complete: #1f9d6d;
+  --decho-status-not-assessed: #9aa3c4;
+  --decho-status-no-data: #6a7292;
+
+  --decho-radius-sm: 8px;
+  --decho-radius-md: 10px;
+  --decho-radius-lg: 14px;
+
+  --decho-gradient-app: radial-gradient(120% 90% at 50% -20%, rgba(108, 92, 231, 0.3) 0%, rgba(8, 11, 22, 0) 62%), radial-gradient(80% 70% at 108% 4%, rgba(53, 214, 192, 0.12) 0%, rgba(8, 11, 22, 0) 70%);
+  --decho-gradient-surface: linear-gradient(158deg, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0.015) 42%, rgba(255, 255, 255, 0) 100%);
+  --decho-gradient-raised: linear-gradient(150deg, rgba(255, 255, 255, 0.09) 0%, rgba(255, 255, 255, 0.02) 100%);
+  --decho-gradient-accent: linear-gradient(135deg, #6c5ce7 0%, #8b7cf6 52%, #9d7bf8 100%);
+  --decho-gradient-hairline: linear-gradient(90deg, rgba(108, 92, 231, 0) 0%, rgba(139, 124, 246, 0.7) 32%, rgba(53, 214, 192, 0.45) 68%, rgba(108, 92, 231, 0) 100%);
+
+  --decho-shadow-card: 0 10px 30px rgba(4, 6, 16, 0.5);
+  --decho-shadow-card-hover: 0 16px 40px rgba(4, 6, 16, 0.6), 0 0 22px rgba(108, 92, 231, 0.2);
+  --decho-shadow-selected: 0 16px 40px rgba(4, 6, 16, 0.55), 0 0 0 1px rgba(139, 124, 246, 0.55), 0 0 28px rgba(108, 92, 231, 0.35);
+  --decho-shadow-panel: 0 18px 44px rgba(4, 6, 16, 0.55);
+  --decho-shadow-dot: 0 0 8px currentColor, 0 0 2px currentColor;
+
+  --decho-effect-blur: blur(14px);
+  --decho-effect-surface-blur: blur(14px);
+  --decho-effect-transition: 160ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ==========================================================================
+   daylight — the light theme
+   Not modern with the luminance inverted. On dark, depth comes from a surface
+   being lighter than the page; on white there is nowhere lighter to go, so it
+   comes from shadow. Status colours are darkened well past their dark-theme
+   values, because #35d07a on white is a pastel nobody can read.
+   ========================================================================== */
+
+.decho-daylight,
+[data-decho-theme="daylight"] {
+
+  --decho-color-bg: #f4f6fb;
+  --decho-color-surface: rgba(255, 255, 255, 0.86);
+  --decho-color-surface-raised: rgba(255, 255, 255, 0.96);
+  --decho-color-surface-overlay: rgba(255, 255, 255, 0.9);
+  --decho-color-border: rgba(16, 24, 52, 0.14);
+  --decho-color-border-subtle: rgba(16, 24, 52, 0.09);
+  --decho-color-border-strong: rgba(85, 70, 214, 0.5);
+  --decho-color-border-overlay: rgba(16, 24, 52, 0.12);
+  --decho-color-text: #14192b;
+  --decho-color-text-muted: #4d5573;
+  --decho-color-text-faint: #7c85a3;
+  --decho-color-accent: #5546d6;
+  --decho-color-accent-hover: #6c5ce7;
+  --decho-color-accent-soft: rgba(85, 70, 214, 0.14);
+  --decho-color-accent-over-map: #5546d6;
+  --decho-color-info: #2563eb;
+  --decho-color-info-soft: rgba(37, 99, 235, 0.12);
+  --decho-color-success: #157f4e;
+  --decho-color-success-soft: rgba(21, 127, 78, 0.12);
+  --decho-color-warning: #a86a12;
+  --decho-color-warning-soft: rgba(168, 106, 18, 0.14);
+  --decho-color-danger: #c0392b;
+  --decho-color-danger-soft: rgba(192, 57, 43, 0.12);
+  --decho-color-neutral-soft: rgba(77, 85, 115, 0.12);
+  --decho-color-link: #2f5fe0;
+  --decho-color-accent-tint: rgb(231, 229, 249);
+  --decho-color-info-tint: rgb(229, 236, 253);
+  --decho-color-success-tint: rgb(227, 240, 234);
+  --decho-color-warning-tint: rgb(243, 234, 222);
+  --decho-color-danger-tint: rgb(247, 231, 230);
+  --decho-color-neutral-tint: rgb(234, 235, 238);
+
+  --decho-status-critical: #b3261e;
+  --decho-status-high: #c0392b;
+  --decho-status-at-risk: #a86a12;
+  --decho-status-on-track: #157f4e;
+  --decho-status-complete: #0f5c39;
+  --decho-status-not-assessed: #7c85a3;
+  --decho-status-no-data: #b9c0d0;
+
+  --decho-chart-axis: rgba(20, 25, 43, 0.35);
+  --decho-chart-grid: rgba(20, 25, 43, 0.12);
+
+  --decho-radius-sm: 8px;
+  --decho-radius-md: 10px;
+  --decho-radius-lg: 14px;
+
+  --decho-gradient-app: radial-gradient(120% 90% at 50% -20%, rgba(108, 92, 231, 0.16) 0%, rgba(244, 246, 251, 0) 60%), radial-gradient(80% 70% at 108% 4%, rgba(53, 214, 192, 0.14) 0%, rgba(244, 246, 251, 0) 70%);
+  --decho-gradient-surface: linear-gradient(158deg, rgba(255, 255, 255, 0.75) 0%, rgba(255, 255, 255, 0.25) 100%);
+  --decho-gradient-raised: linear-gradient(150deg, rgba(255, 255, 255, 0.9) 0%, rgba(255, 255, 255, 0.55) 100%);
+  --decho-gradient-accent: linear-gradient(135deg, #5546d6 0%, #6c5ce7 100%);
+  --decho-gradient-hairline: linear-gradient(90deg, rgba(85, 70, 214, 0) 0%, rgba(85, 70, 214, 0.35) 32%, rgba(53, 214, 192, 0.3) 68%, rgba(85, 70, 214, 0) 100%);
+
+  --decho-shadow-card: 0 1px 2px rgba(16, 24, 52, 0.08), 0 8px 24px rgba(16, 24, 52, 0.06);
+  --decho-shadow-card-hover: 0 12px 28px rgba(16, 24, 52, 0.12);
+  --decho-shadow-selected: 0 0 0 1px #5546d6, 0 10px 26px rgba(85, 70, 214, 0.18);
+  --decho-shadow-panel: 0 10px 30px rgba(16, 24, 52, 0.1);
+
+  --decho-effect-blur: blur(10px);
+  --decho-effect-surface-blur: blur(10px);
+  --decho-effect-transition: 140ms cubic-bezier(0.4, 0, 0.2, 1);
+  --decho-effect-color-scheme: light;
+}
+
+/* ==========================================================================
+   command — amber on near-black
+   The night-watch theme, and deliberately the least decorated: opaque surfaces,
+   no backdrop blur, 2px corners. `warning` is deliberately not the accent —
+   when amber is the interface, an amber warning is invisible.
+   ========================================================================== */
+
+.decho-command,
+[data-decho-theme="command"] {
+
+  --decho-color-bg: #07090b;
+  --decho-color-surface: #0f1215;
+  --decho-color-surface-raised: #171b20;
+  --decho-color-surface-overlay: rgba(10, 13, 16, 0.82);
+  --decho-color-border: #2a3138;
+  --decho-color-border-subtle: #1b2126;
+  --decho-color-border-strong: rgba(240, 168, 60, 0.5);
+  --decho-color-border-overlay: rgba(255, 255, 255, 0.1);
+  --decho-color-text: #e8e4dc;
+  --decho-color-text-muted: #a49c8d;
+  --decho-color-text-faint: #6f6a5f;
+  --decho-color-on-accent: #12100c;
+  --decho-color-accent: #f0a83c;
+  --decho-color-accent-hover: #ffc266;
+  --decho-color-accent-soft: rgba(240, 168, 60, 0.16);
+  --decho-color-accent-over-map: #ffc266;
+  --decho-color-info: #57a0d3;
+  --decho-color-info-soft: rgba(87, 160, 211, 0.16);
+  --decho-color-success: #4f9d5d;
+  --decho-color-success-soft: rgba(79, 157, 93, 0.16);
+  --decho-color-warning: #e5a11c;
+  --decho-color-warning-soft: rgba(229, 161, 28, 0.16);
+  --decho-color-danger: #d1453b;
+  --decho-color-danger-soft: rgba(209, 69, 59, 0.16);
+  --decho-color-neutral-soft: rgba(164, 156, 141, 0.14);
+  --decho-color-link: #f0c07a;
+  --decho-color-accent-tint: rgb(51, 42, 27);
+  --decho-color-info-tint: rgb(27, 41, 51);
+  --decho-color-success-tint: rgb(25, 40, 33);
+  --decho-color-warning-tint: rgb(49, 41, 22);
+  --decho-color-danger-tint: rgb(46, 26, 27);
+  --decho-color-neutral-tint: rgb(36, 37, 38);
+
+  --decho-status-critical: #d1453b;
+  --decho-status-high: #e0644f;
+  --decho-status-at-risk: #e5a11c;
+  --decho-status-on-track: #4f9d5d;
+  --decho-status-complete: #3c7a48;
+  --decho-status-not-assessed: #a49c8d;
+  --decho-status-no-data: #6f6a5f;
+
+  --decho-radius-sm: 2px;
+  --decho-radius-md: 3px;
+  --decho-radius-lg: 4px;
+
+  --decho-gradient-app: radial-gradient(110% 80% at 50% -10%, rgba(240, 168, 60, 0.12) 0%, rgba(7, 9, 11, 0) 60%), radial-gradient(70% 60% at 0% 100%, rgba(209, 69, 59, 0.08) 0%, rgba(7, 9, 11, 0) 70%);
+  --decho-gradient-surface: linear-gradient(158deg, rgba(255, 255, 255, 0.04) 0%, rgba(255, 255, 255, 0) 60%);
+  --decho-gradient-raised: linear-gradient(150deg, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0.01) 100%);
+  --decho-gradient-accent: linear-gradient(135deg, #f0a83c 0%, #ffc266 100%);
+  --decho-gradient-hairline: linear-gradient(90deg, rgba(240, 168, 60, 0) 0%, rgba(240, 168, 60, 0.6) 40%, rgba(209, 69, 59, 0.35) 75%, rgba(240, 168, 60, 0) 100%);
+
+  --decho-shadow-card: 0 2px 8px rgba(0, 0, 0, 0.5);
+  --decho-shadow-card-hover: 0 8px 22px rgba(0, 0, 0, 0.6), 0 0 18px rgba(240, 168, 60, 0.14);
+  --decho-shadow-selected: 0 0 0 1px rgba(240, 168, 60, 0.6), 0 0 22px rgba(240, 168, 60, 0.25);
+  --decho-shadow-panel: 0 10px 30px rgba(0, 0, 0, 0.6);
+  --decho-shadow-dot: 0 0 8px currentColor;
+
+  --decho-effect-blur: blur(8px);
+  --decho-effect-transition: 100ms linear;
+}
+
+/* ==========================================================================
+   accenture-light — the corporate palette
+   Blue 3 for primary actions and links, Blue 2 for hover, Blue 4 for focus
+   rings, Blue 5 for tinted backgrounds, Violet 3 for AI, card borders Black at
+   20%. Plain on purpose: no gradients, 2px corners, weightless shadows.
+   ========================================================================== */
+
+.decho-accenture-light,
+[data-decho-theme="accenture-light"] {
+
+  --decho-color-bg: #f6f7f9;
+  --decho-color-surface: #ffffff;
+  --decho-color-surface-raised: #ffffff;
+  --decho-color-surface-overlay: rgba(255, 255, 255, 0.94);
+  --decho-color-border: rgba(17, 20, 24, 0.2);
+  --decho-color-border-subtle: rgba(17, 20, 24, 0.12);
+  --decho-color-border-strong: #2d72d2;
+  --decho-color-border-overlay: rgba(17, 20, 24, 0.16);
+  --decho-color-text: #1c2127;
+  --decho-color-text-muted: #2f343c;
+  --decho-color-text-faint: #8f99a8;
+  --decho-color-accent: #2d72d2;
+  --decho-color-accent-hover: #215db0;
+  --decho-color-accent-soft: rgba(138, 187, 255, 0.35);
+  --decho-color-accent-over-map: #2d72d2;
+  --decho-color-info: #2d72d2;
+  --decho-color-info-soft: rgba(45, 114, 210, 0.12);
+  --decho-color-success: #1c6e42;
+  --decho-color-success-soft: rgba(28, 110, 66, 0.12);
+  --decho-color-warning: #b83211;
+  --decho-color-warning-soft: rgba(184, 50, 17, 0.12);
+  --decho-color-danger: #ac2f33;
+  --decho-color-danger-soft: rgba(172, 47, 51, 0.12);
+  --decho-color-neutral-soft: rgba(143, 153, 168, 0.18);
+  --decho-color-ai: #9d3f9d;
+  --decho-color-ai-soft: rgba(157, 63, 157, 0.14);
+  --decho-color-link: #2d72d2;
+  --decho-color-accent-tint: rgb(214, 231, 255);
+  --decho-color-info-tint: rgb(230, 238, 250);
+  --decho-color-success-tint: rgb(228, 238, 232);
+  --decho-color-warning-tint: rgb(246, 230, 226);
+  --decho-color-danger-tint: rgb(245, 230, 231);
+  --decho-color-neutral-tint: rgb(235, 237, 239);
+
+  --decho-status-at-risk: #b83211;
+  --decho-status-on-track: #1c6e42;
+  --decho-status-complete: #165a36;
+  --decho-status-not-assessed: #8f99a8;
+  --decho-status-no-data: #c5cbd3;
+
+  --decho-chart-axis: rgba(28, 33, 39, 0.35);
+  --decho-chart-grid: rgba(28, 33, 39, 0.12);
+
+  --decho-radius-sm: 2px;
+  --decho-radius-md: 3px;
+  --decho-radius-lg: 4px;
+
+  --decho-shadow-card: 0 1px 2px rgba(17, 20, 24, 0.1);
+  --decho-shadow-card-hover: 0 2px 6px rgba(17, 20, 24, 0.16);
+  --decho-shadow-selected: 0 0 0 2px #4c90f0;
+  --decho-shadow-panel: 0 2px 8px rgba(17, 20, 24, 0.12);
+
+  --decho-effect-blur: blur(4px);
+  --decho-effect-transition: 100ms ease;
+  --decho-effect-color-scheme: light;
+}
+
+/* ==========================================================================
+   accenture-dark — the corporate palette after dark
+   Black, Dark Gray 1 and Dark Gray 3 for the surfaces. Tone colours are
+   lightened where the reference has no dark-legible member (Green Shade 2 on
+   Black is unreadable); the RAG `status` scale is NOT adjusted, because a
+   heatmap that reads differently in dark mode is one you cannot screenshot
+   into a report.
+   ========================================================================== */
+
+.decho-accenture-dark,
+[data-decho-theme="accenture-dark"] {
+
+  --decho-color-bg: #111418;
+  --decho-color-surface: #1c2127;
+  --decho-color-surface-raised: #2f343c;
+  --decho-color-surface-overlay: rgba(28, 33, 39, 0.92);
+  --decho-color-border: rgba(255, 255, 255, 0.16);
+  --decho-color-border-subtle: rgba(255, 255, 255, 0.1);
+  --decho-color-border-strong: #4c90f0;
+  --decho-color-border-overlay: rgba(255, 255, 255, 0.16);
+  --decho-color-text: #f6f7f9;
+  --decho-color-text-muted: #8f99a8;
+  --decho-color-text-faint: #6b7484;
+  --decho-color-accent: #4c90f0;
+  --decho-color-accent-hover: #8abbff;
+  --decho-color-accent-soft: rgba(76, 144, 240, 0.18);
+  --decho-color-accent-over-map: #8abbff;
+  --decho-color-info: #4c90f0;
+  --decho-color-info-soft: rgba(76, 144, 240, 0.18);
+  --decho-color-success: #1d9e75;
+  --decho-color-success-soft: rgba(29, 158, 117, 0.18);
+  --decho-color-warning: #e0733f;
+  --decho-color-warning-soft: rgba(224, 115, 63, 0.18);
+  --decho-color-danger: #e05c60;
+  --decho-color-danger-soft: rgba(224, 92, 96, 0.18);
+  --decho-color-neutral-soft: rgba(143, 153, 168, 0.18);
+  --decho-color-ai: #c67fc6;
+  --decho-color-ai-soft: rgba(198, 127, 198, 0.18);
+  --decho-color-link: #8abbff;
+  --decho-color-accent-tint: rgb(37, 53, 75);
+  --decho-color-info-tint: rgb(37, 53, 75);
+  --decho-color-success-tint: rgb(28, 56, 53);
+  --decho-color-warning-tint: rgb(63, 48, 43);
+  --decho-color-danger-tint: rgb(63, 44, 49);
+  --decho-color-neutral-tint: rgb(49, 55, 62);
+
+  --decho-status-at-risk: #b83211;
+  --decho-status-on-track: #1c6e42;
+  --decho-status-complete: #165a36;
+  --decho-status-not-assessed: #8f99a8;
+  --decho-status-no-data: #c5cbd3;
+
+  --decho-chart-axis: rgba(246, 247, 249, 0.35);
+  --decho-chart-grid: rgba(246, 247, 249, 0.12);
+
+  --decho-radius-sm: 2px;
+  --decho-radius-md: 3px;
+  --decho-radius-lg: 4px;
+
+  --decho-shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --decho-shadow-card-hover: 0 2px 8px rgba(0, 0, 0, 0.5);
+  --decho-shadow-selected: 0 0 0 2px #4c90f0;
+  --decho-shadow-panel: 0 2px 10px rgba(0, 0, 0, 0.5);
+
+  --decho-effect-blur: blur(4px);
+  --decho-effect-transition: 100ms ease;
+}
+
+/* ==========================================================================
+   undefined
+   ========================================================================== */
+
+.decho-accenture-standard,
+[data-decho-theme="accenture-standard"] {
+
+  --decho-color-bg: #f6f7f9;
+  --decho-color-surface: #ffffff;
+  --decho-color-surface-raised: #ffffff;
+  --decho-color-surface-overlay: rgba(255, 255, 255, 0.94);
+  --decho-color-border: rgba(17, 20, 24, 0.2);
+  --decho-color-border-subtle: rgba(17, 20, 24, 0.12);
+  --decho-color-border-strong: #2d72d2;
+  --decho-color-border-overlay: rgba(17, 20, 24, 0.16);
+  --decho-color-text: #1c2127;
+  --decho-color-text-muted: #2f343c;
+  --decho-color-text-faint: #8f99a8;
+  --decho-color-accent: #2d72d2;
+  --decho-color-accent-hover: #215db0;
+  --decho-color-accent-soft: rgba(138, 187, 255, 0.35);
+  --decho-color-accent-over-map: #2d72d2;
+  --decho-color-info: #2d72d2;
+  --decho-color-info-soft: rgba(45, 114, 210, 0.12);
+  --decho-color-success: #1c6e42;
+  --decho-color-success-soft: rgba(28, 110, 66, 0.12);
+  --decho-color-warning: #b83211;
+  --decho-color-warning-soft: rgba(184, 50, 17, 0.12);
+  --decho-color-danger: #ac2f33;
+  --decho-color-danger-soft: rgba(172, 47, 51, 0.12);
+  --decho-color-neutral-soft: rgba(143, 153, 168, 0.18);
+  --decho-color-ai: #9d3f9d;
+  --decho-color-ai-soft: rgba(157, 63, 157, 0.14);
+  --decho-color-link: #2d72d2;
+  --decho-color-accent-tint: rgb(214, 231, 255);
+  --decho-color-info-tint: rgb(230, 238, 250);
+  --decho-color-success-tint: rgb(228, 238, 232);
+  --decho-color-warning-tint: rgb(246, 230, 226);
+  --decho-color-danger-tint: rgb(245, 230, 231);
+  --decho-color-neutral-tint: rgb(235, 237, 239);
+
+  --decho-status-at-risk: #b83211;
+  --decho-status-on-track: #1c6e42;
+  --decho-status-complete: #165a36;
+  --decho-status-not-assessed: #8f99a8;
+  --decho-status-no-data: #c5cbd3;
+
+  --decho-chart-axis: rgba(28, 33, 39, 0.35);
+  --decho-chart-grid: rgba(28, 33, 39, 0.12);
+
+  --decho-radius-sm: 2px;
+  --decho-radius-md: 3px;
+  --decho-radius-lg: 4px;
+
+  --decho-shadow-card: 0 1px 2px rgba(17, 20, 24, 0.1);
+  --decho-shadow-card-hover: 0 2px 6px rgba(17, 20, 24, 0.16);
+  --decho-shadow-selected: 0 0 0 2px #4c90f0;
+  --decho-shadow-panel: 0 2px 8px rgba(17, 20, 24, 0.12);
+
+  --decho-effect-blur: blur(4px);
+  --decho-effect-transition: 100ms ease;
+  --decho-effect-color-scheme: light;
+}
+
+/* ==========================================================================
+   accenture-sap — Accenture purple on white
+   The look the SAP migration estate already draws with: purpleDark #7500c0 for
+   every action and link, the brand purple #a100ff for decoration that holds no
+   text, Zinc greys, 10px cards and 6px controls. Tones are the estate's chip
+   foregrounds — dark enough to read as 10px uppercase on white — and the
+   brighter solids sit in the RAG `status` scale, behind text rather than as it.
+
+   Not the same as accenture-light. That is the corporate palette as specified,
+   in Blue 3; this is what one programme built on top of it, and beside an
+   un-migrated widget the difference is immediately visible.
+   ========================================================================== */
+
+.decho-accenture-sap,
+[data-decho-theme="accenture-sap"] {
+
+  --decho-color-bg: #f4f4f7;
+  --decho-color-surface: #ffffff;
+  --decho-color-surface-raised: #fafafb;
+  --decho-color-surface-overlay: rgba(255, 255, 255, 0.94);
+  --decho-color-border: #d4d4d8;
+  --decho-color-border-subtle: #e4e4e7;
+  --decho-color-border-strong: #a100ff;
+  --decho-color-border-overlay: rgba(24, 24, 27, 0.14);
+  --decho-color-text: #18181b;
+  --decho-color-text-muted: #52525b;
+  --decho-color-text-faint: #8a8a94;
+  --decho-color-accent: #7500c0;
+  --decho-color-accent-hover: #5c1a94;
+  --decho-color-accent-soft: rgba(161, 0, 255, 0.1);
+  --decho-color-accent-over-map: #a100ff;
+  --decho-color-info: #1b4e8f;
+  --decho-color-info-soft: rgba(27, 78, 143, 0.1);
+  --decho-color-success: #0f6e3d;
+  --decho-color-success-soft: rgba(18, 134, 75, 0.1);
+  --decho-color-warning: #8a5300;
+  --decho-color-warning-soft: rgba(208, 135, 0, 0.12);
+  --decho-color-danger: #9b1c1c;
+  --decho-color-danger-soft: rgba(220, 75, 75, 0.1);
+  --decho-color-neutral-soft: rgba(82, 82, 91, 0.07);
+  --decho-color-ai: #155e63;
+  --decho-color-ai-soft: rgba(21, 94, 99, 0.12);
+  --decho-color-link: #7500c0;
+  --decho-color-accent-tint: rgb(246, 230, 255);
+  --decho-color-info-tint: rgb(232, 237, 244);
+  --decho-color-success-tint: rgb(231, 243, 237);
+  --decho-color-warning-tint: rgb(249, 241, 224);
+  --decho-color-danger-tint: rgb(252, 237, 237);
+  --decho-color-neutral-tint: rgb(243, 243, 244);
+
+  --decho-status-critical: #9b1c1c;
+  --decho-status-high: #dc4b4b;
+  --decho-status-at-risk: #d08700;
+  --decho-status-on-track: #12864b;
+  --decho-status-complete: #0f6e3d;
+  --decho-status-not-assessed: #8a8a94;
+  --decho-status-no-data: #c7c7ce;
+
+  --decho-chart-series1: #a100ff;
+  --decho-chart-series2: #7500c0;
+  --decho-chart-series3: #460073;
+  --decho-chart-series4: #c084fc;
+  --decho-chart-series5: #d8b4fe;
+  --decho-chart-series6: #1b4e8f;
+  --decho-chart-series7: #155e63;
+  --decho-chart-series8: #12864b;
+  --decho-chart-series9: #d08700;
+  --decho-chart-series10: #52525b;
+  --decho-chart-axis: rgba(24, 24, 27, 0.35);
+  --decho-chart-grid: rgba(24, 24, 27, 0.12);
+
+  --decho-radius-lg: 10px;
+
+  --decho-font-family-sans: "Graphik", "Segoe UI", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+  --decho-font-family-mono: "SF Mono", "Roboto Mono", Menlo, Consolas, "Liberation Mono", monospace;
+
+  --decho-shadow-sm: 0 1px 2px rgba(24, 24, 27, 0.06);
+  --decho-shadow-md: 0 2px 8px rgba(24, 24, 27, 0.08);
+  --decho-shadow-lg: 0 8px 24px rgba(24, 24, 27, 0.12);
+  --decho-shadow-card: 0 1px 4px rgba(24, 24, 27, 0.06);
+  --decho-shadow-card-hover: 0 3px 12px rgba(70, 0, 115, 0.12);
+  --decho-shadow-selected: 0 0 0 2px #e6d0ff, 0 4px 16px rgba(70, 0, 115, 0.15);
+  --decho-shadow-panel: 0 2px 8px rgba(24, 24, 27, 0.08);
+
+  --decho-effect-blur: blur(4px);
+  --decho-effect-transition: 150ms ease;
+  --decho-effect-color-scheme: light;
+}
+
+/* ==========================================================================
+   accenture-standard — dark mode
+   The same brand, geometry, RAG scale and chart series; a different end of
+   the palette. Applied by applyTheme(theme, { mode: "dark" }) or by adding
+   the decho-dark class.
+   ========================================================================== */
+
+.decho-accenture-standard.decho-dark,
+[data-decho-theme="accenture-standard"][data-decho-mode="dark"] {
+
+  --decho-color-bg: #111418;
+  --decho-color-surface: #1c2127;
+  --decho-color-surface-raised: #2f343c;
+  --decho-color-surface-overlay: rgba(28, 33, 39, 0.92);
+  --decho-color-border: rgba(255, 255, 255, 0.16);
+  --decho-color-border-subtle: rgba(255, 255, 255, 0.1);
+  --decho-color-border-strong: #4c90f0;
+  --decho-color-border-overlay: rgba(255, 255, 255, 0.16);
+  --decho-color-text: #f6f7f9;
+  --decho-color-text-muted: #8f99a8;
+  --decho-color-text-faint: #6b7484;
+  --decho-color-accent: #4c90f0;
+  --decho-color-accent-hover: #8abbff;
+  --decho-color-accent-soft: rgba(76, 144, 240, 0.18);
+  --decho-color-accent-over-map: #8abbff;
+  --decho-color-info: #4c90f0;
+  --decho-color-info-soft: rgba(76, 144, 240, 0.18);
+  --decho-color-success: #1d9e75;
+  --decho-color-success-soft: rgba(29, 158, 117, 0.18);
+  --decho-color-warning: #e0733f;
+  --decho-color-warning-soft: rgba(224, 115, 63, 0.18);
+  --decho-color-danger: #e05c60;
+  --decho-color-danger-soft: rgba(224, 92, 96, 0.18);
+  --decho-color-ai: #c67fc6;
+  --decho-color-ai-soft: rgba(198, 127, 198, 0.18);
+  --decho-color-link: #8abbff;
+  --decho-color-accent-tint: rgb(37, 53, 75);
+  --decho-color-info-tint: rgb(37, 53, 75);
+  --decho-color-success-tint: rgb(28, 56, 53);
+  --decho-color-warning-tint: rgb(63, 48, 43);
+  --decho-color-danger-tint: rgb(63, 44, 49);
+  --decho-color-neutral-tint: rgb(49, 55, 62);
+
+  --decho-chart-axis: rgba(246, 247, 249, 0.35);
+  --decho-chart-grid: rgba(246, 247, 249, 0.12);
+
+  --decho-shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --decho-shadow-card-hover: 0 2px 8px rgba(0, 0, 0, 0.5);
+  --decho-shadow-panel: 0 2px 10px rgba(0, 0, 0, 0.5);
+
+  --decho-effect-color-scheme: dark;
+}
+
+/* ==========================================================================
+   accenture-light — dark mode
+   The same brand, geometry, RAG scale and chart series; a different end of
+   the palette. Applied by applyTheme(theme, { mode: "dark" }) or by adding
+   the decho-dark class.
+   ========================================================================== */
+
+.decho-accenture-light.decho-dark,
+[data-decho-theme="accenture-light"][data-decho-mode="dark"] {
+
+  --decho-color-bg: #111418;
+  --decho-color-surface: #1c2127;
+  --decho-color-surface-raised: #2f343c;
+  --decho-color-surface-overlay: rgba(28, 33, 39, 0.92);
+  --decho-color-border: rgba(255, 255, 255, 0.16);
+  --decho-color-border-subtle: rgba(255, 255, 255, 0.1);
+  --decho-color-border-strong: #4c90f0;
+  --decho-color-border-overlay: rgba(255, 255, 255, 0.16);
+  --decho-color-text: #f6f7f9;
+  --decho-color-text-muted: #8f99a8;
+  --decho-color-text-faint: #6b7484;
+  --decho-color-accent: #4c90f0;
+  --decho-color-accent-hover: #8abbff;
+  --decho-color-accent-soft: rgba(76, 144, 240, 0.18);
+  --decho-color-accent-over-map: #8abbff;
+  --decho-color-info: #4c90f0;
+  --decho-color-info-soft: rgba(76, 144, 240, 0.18);
+  --decho-color-success: #1d9e75;
+  --decho-color-success-soft: rgba(29, 158, 117, 0.18);
+  --decho-color-warning: #e0733f;
+  --decho-color-warning-soft: rgba(224, 115, 63, 0.18);
+  --decho-color-danger: #e05c60;
+  --decho-color-danger-soft: rgba(224, 92, 96, 0.18);
+  --decho-color-ai: #c67fc6;
+  --decho-color-ai-soft: rgba(198, 127, 198, 0.18);
+  --decho-color-link: #8abbff;
+  --decho-color-accent-tint: rgb(37, 53, 75);
+  --decho-color-info-tint: rgb(37, 53, 75);
+  --decho-color-success-tint: rgb(28, 56, 53);
+  --decho-color-warning-tint: rgb(63, 48, 43);
+  --decho-color-danger-tint: rgb(63, 44, 49);
+  --decho-color-neutral-tint: rgb(49, 55, 62);
+
+  --decho-chart-axis: rgba(246, 247, 249, 0.35);
+  --decho-chart-grid: rgba(246, 247, 249, 0.12);
+
+  --decho-shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --decho-shadow-card-hover: 0 2px 8px rgba(0, 0, 0, 0.5);
+  --decho-shadow-panel: 0 2px 10px rgba(0, 0, 0, 0.5);
+
+  --decho-effect-color-scheme: dark;
+}
+
+/* ==========================================================================
+   accenture-sap — dark mode
+   The same brand, geometry, RAG scale and chart series; a different end of
+   the palette. Applied by applyTheme(theme, { mode: "dark" }) or by adding
+   the decho-dark class.
+   ========================================================================== */
+
+.decho-accenture-sap.decho-dark,
+[data-decho-theme="accenture-sap"][data-decho-mode="dark"] {
+
+  --decho-color-bg: #09090b;
+  --decho-color-surface: #18181b;
+  --decho-color-surface-raised: #27272a;
+  --decho-color-surface-overlay: rgba(24, 24, 27, 0.92);
+  --decho-color-border: #3f3f46;
+  --decho-color-border-subtle: #27272a;
+  --decho-color-border-overlay: rgba(255, 255, 255, 0.14);
+  --decho-color-text: #f4f4f5;
+  --decho-color-text-muted: #a1a1aa;
+  --decho-color-text-faint: #71717a;
+  --decho-color-accent: #a100ff;
+  --decho-color-accent-hover: #b95cff;
+  --decho-color-accent-soft: rgba(161, 0, 255, 0.22);
+  --decho-color-info: #7aa9ef;
+  --decho-color-info-soft: rgba(122, 169, 239, 0.18);
+  --decho-color-success: #4ade80;
+  --decho-color-success-soft: rgba(74, 222, 128, 0.18);
+  --decho-color-warning: #fbbf24;
+  --decho-color-warning-soft: rgba(251, 191, 36, 0.18);
+  --decho-color-danger: #f87171;
+  --decho-color-danger-soft: rgba(248, 113, 113, 0.18);
+  --decho-color-neutral-soft: rgba(161, 161, 170, 0.16);
+  --decho-color-ai: #2dd4bf;
+  --decho-color-ai-soft: rgba(45, 212, 191, 0.18);
+  --decho-color-link: #c084fc;
+  --decho-color-accent-tint: rgb(54, 19, 77);
+  --decho-color-info-tint: rgb(42, 50, 65);
+  --decho-color-success-tint: rgb(33, 60, 45);
+  --decho-color-warning-tint: rgb(65, 54, 29);
+  --decho-color-danger-tint: rgb(64, 40, 42);
+  --decho-color-neutral-tint: rgb(46, 46, 50);
+
+  --decho-chart-axis: rgba(244, 244, 245, 0.35);
+  --decho-chart-grid: rgba(244, 244, 245, 0.12);
+
+  --decho-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --decho-shadow-md: 0 2px 8px rgba(0, 0, 0, 0.55);
+  --decho-shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.6);
+  --decho-shadow-card: 0 1px 4px rgba(0, 0, 0, 0.5);
+  --decho-shadow-card-hover: 0 3px 12px rgba(0, 0, 0, 0.6);
+  --decho-shadow-selected: 0 0 0 2px rgba(161, 0, 255, 0.55), 0 4px 16px rgba(0, 0, 0, 0.6);
+  --decho-shadow-panel: 0 2px 8px rgba(0, 0, 0, 0.55);
+
+  --decho-effect-color-scheme: dark;
+}

@@ -1,0 +1,34 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+
+    /* Emit. */
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "outDir": "dist",
+    "rootDir": "src",
+    "declarationDir": "dist"
+
+    /* No `paths`, like the styling package and unlike the map packages: this
+       one compiles against nothing in this repo. @acc/decho-styling is read at
+       *generation* time by scripts/gen-fallbacks.mjs and aliased for *tests*
+       in vitest.config.ts, and neither of those is compiled into dist. If a
+       path mapping appeared here it would mean an import had crept into the
+       product. */
+  },
+  "include": ["src"],
+  /* Tests are source, not product: they must not reach dist, and they would
+     pull vitest types into a consumer's type-check. */
+  "exclude": ["**/*.test.ts", "**/*.test.tsx"]
+}

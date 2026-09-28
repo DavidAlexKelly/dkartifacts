@@ -1,0 +1,209 @@
+/* ==========================================================================
+   @acc/decho-styling/blueprint.css
+   --------------------------------------------------------------------------
+   Blueprint, wearing the design system's palette.
+
+       import "@blueprintjs/core/lib/css/blueprint.css";
+       import "@acc/decho-styling/styles.css";
+       import "@acc/decho-styling/blueprint.css";   // after both
+
+   Blueprint ships its own dark palette, and any app that uses both ends up
+   with two design systems arguing on the same row: a Blueprint button next to
+   a decho one, in different greys, with different corners. Two repositories in
+   this org hand-wrote almost exactly this file before anyone thought to share
+   it — which is the whole argument for it being here.
+
+   Everything below reads tokens, so Blueprint follows the theme too: switch to
+   accenture-light and the buttons and inputs come with it.
+
+   ORDER MATTERS
+   -------------
+   Import this AFTER Blueprint's own stylesheet. Blueprint's rules are equally
+   specific, so the later one wins — and the `!important`s are Blueprint's own
+   habit, matched here because a plain declaration loses to their intent
+   modifiers. This is the one file in the package that uses them.
+
+   Targets Blueprint 5 (.bp5-*). For Blueprint 4, copy this file and swap the
+   prefix; the token names are the same.
+   ========================================================================== */
+
+.bp5-dark {
+  --pt-intent-primary: var(--decho-color-accent);
+  --pt-intent-success: var(--decho-color-success);
+  --pt-intent-warning: var(--decho-color-warning);
+  --pt-intent-danger: var(--decho-color-danger);
+  background-color: transparent;
+}
+
+/* ---- Buttons ---- */
+
+.bp5-button {
+  border-radius: var(--decho-radius-md) !important;
+  font-family: var(--decho-font-family-sans) !important;
+  font-size: var(--decho-font-size-md) !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.04em !important;
+  text-transform: uppercase !important;
+  transition:
+    background-color var(--decho-effect-transition),
+    background var(--decho-effect-transition),
+    box-shadow var(--decho-effect-transition),
+    border-color var(--decho-effect-transition) !important;
+}
+
+.bp5-button:not([class*="bp5-intent"]) {
+  background: var(--decho-color-surface-raised) !important;
+  background-image: var(--decho-gradient-raised) !important;
+  box-shadow: inset 0 0 0 1px var(--decho-color-border) !important;
+  color: var(--decho-color-text) !important;
+}
+
+.bp5-button:not([class*="bp5-intent"]):hover {
+  box-shadow: inset 0 0 0 1px var(--decho-color-border-strong) !important;
+}
+
+.bp5-button.bp5-intent-primary {
+  background: var(--decho-color-accent) !important;
+  background-image: var(--decho-gradient-accent) !important;
+  box-shadow: var(--decho-shadow-card) !important;
+  color: var(--decho-color-on-accent) !important;
+}
+
+.bp5-button.bp5-intent-primary:hover {
+  background: var(--decho-color-accent-hover) !important;
+  box-shadow: var(--decho-shadow-card-hover) !important;
+}
+
+.bp5-button.bp5-intent-success {
+  background: var(--decho-color-success) !important;
+  background-image: none !important;
+  color: var(--decho-color-on-accent) !important;
+}
+
+.bp5-button.bp5-intent-warning {
+  background: var(--decho-color-warning) !important;
+  background-image: none !important;
+  color: var(--decho-color-on-accent) !important;
+}
+
+.bp5-button.bp5-intent-danger {
+  background: var(--decho-color-danger) !important;
+  background-image: none !important;
+  box-shadow: none !important;
+  color: var(--decho-color-on-accent) !important;
+}
+
+.bp5-button:focus-visible {
+  outline: none !important;
+  box-shadow: 0 0 0 2px var(--decho-color-accent-soft) !important;
+}
+
+/* ---- Inputs ---- */
+
+.bp5-input,
+.bp5-html-select select,
+.bp5-text-area {
+  background: var(--decho-color-bg) !important;
+  box-shadow: inset 0 0 0 1px var(--decho-color-border) !important;
+  border-radius: var(--decho-radius-sm) !important;
+  color: var(--decho-color-text) !important;
+  font-family: var(--decho-font-family-sans) !important;
+  font-size: var(--decho-font-size-md) !important;
+}
+
+.bp5-input:focus,
+.bp5-text-area:focus {
+  box-shadow:
+    inset 0 0 0 1px var(--decho-color-accent),
+    0 0 0 2px var(--decho-color-accent-soft) !important;
+}
+
+.bp5-input::placeholder {
+  color: var(--decho-color-text-faint) !important;
+}
+
+/* ---- Surfaces: cards, dialogs, popovers, menus ---- */
+
+.bp5-card,
+.bp5-dialog,
+.bp5-popover .bp5-popover-content,
+.bp5-menu {
+  background-color: var(--decho-color-surface) !important;
+  background-image: var(--decho-gradient-surface) !important;
+  border: 1px solid var(--decho-color-border-subtle) !important;
+  border-radius: var(--decho-radius-lg) !important;
+  box-shadow: var(--decho-shadow-panel) !important;
+  color: var(--decho-color-text) !important;
+}
+
+.bp5-dialog-header {
+  background: transparent !important;
+  border-bottom: 1px solid var(--decho-color-border-subtle) !important;
+  box-shadow: none !important;
+  color: var(--decho-color-text) !important;
+}
+
+.bp5-menu-item:hover {
+  background-color: var(--decho-color-surface-raised) !important;
+  color: var(--decho-color-text) !important;
+}
+
+.bp5-menu-item.bp5-active,
+.bp5-menu-item.bp5-selected {
+  background-color: var(--decho-color-accent-soft) !important;
+  color: var(--decho-color-text) !important;
+}
+
+/* ---- Tags, tabs, dividers ---- */
+
+.bp5-tag {
+  border-radius: var(--decho-radius-pill) !important;
+  font-size: var(--decho-font-size-xs) !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.04em !important;
+  text-transform: uppercase !important;
+}
+
+.bp5-tag:not([class*="bp5-intent"]) {
+  background: var(--decho-color-neutral-soft) !important;
+  color: var(--decho-color-text-muted) !important;
+}
+
+.bp5-tag.bp5-intent-primary { background: var(--decho-color-accent-soft) !important; color: var(--decho-color-accent) !important; }
+.bp5-tag.bp5-intent-success { background: var(--decho-color-success-soft) !important; color: var(--decho-color-success) !important; }
+.bp5-tag.bp5-intent-warning { background: var(--decho-color-warning-soft) !important; color: var(--decho-color-warning) !important; }
+.bp5-tag.bp5-intent-danger  { background: var(--decho-color-danger-soft) !important;  color: var(--decho-color-danger) !important; }
+
+.bp5-tab {
+  color: var(--decho-color-text-muted) !important;
+  font-size: var(--decho-font-size-md) !important;
+}
+
+.bp5-tab[aria-selected="true"] {
+  color: var(--decho-color-text) !important;
+}
+
+.bp5-tab-indicator {
+  background-color: var(--decho-color-accent) !important;
+}
+
+.bp5-divider {
+  border-color: var(--decho-color-border-subtle) !important;
+}
+
+/* ---- Text ---- */
+
+.bp5-heading,
+.bp5-dark .bp5-heading {
+  color: var(--decho-color-text) !important;
+}
+
+.bp5-text-muted,
+.bp5-dark .bp5-text-muted {
+  color: var(--decho-color-text-muted) !important;
+}
+
+a,
+.bp5-dark a {
+  color: var(--decho-color-link);
+}

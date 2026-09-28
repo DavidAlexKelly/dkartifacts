@@ -1,0 +1,31 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+
+    /* Emit — unlike the app's tsconfig, this one actually produces output. */
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "outDir": "dist",
+    "rootDir": "src",
+
+    /* No `paths` here, unlike the other packages: this one depends on nothing
+       in this repo, on purpose. A design system that has to be released after
+       the byte layer is a design system nobody upgrades. */
+    "declarationDir": "dist"
+  },
+  "include": ["src"],
+  /* Tests are source, not product: they must not be emitted into dist, and
+     they would pull vitest types into a consumer's type-check. */
+  "exclude": ["**/*.test.ts", "**/*.test.tsx"]
+}

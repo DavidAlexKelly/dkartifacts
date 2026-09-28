@@ -1,0 +1,55 @@
+{
+  "name": "@acc/decho-pathfinding",
+  "version": "0.1.0",
+  "description": "Terrain-aware routing over tiled pathfinding graphs served from Foundry. Headless \u2014 no map required \u2014 with an optional route layer and a drop-in OrderRouter for @acc/decho-mil-map.",
+  "license": "UNLICENSED",
+  "private": false,
+  "type": "module",
+  "files": [
+    "dist",
+    "src",
+    "!**/*.test.ts",
+    "README.md"
+  ],
+  "//files": "src is shipped for the same reason as the sibling packages: the .js.map and .d.ts.map files reference ../src/*, so without it every stack trace and go-to-definition in a consumer dead-ends.",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./react": {
+      "types": "./dist/react/index.d.ts",
+      "import": "./dist/react/index.js"
+    },
+    "./map": {
+      "types": "./dist/map/index.d.ts",
+      "import": "./dist/map/index.js"
+    }
+  },
+  "//exports": "Three surfaces, in order of how much they assume: \".\" computes paths and imports nothing; \"./react\" adds hooks; \"./map\" adds the glue for a live map. A consumer resolves only what it uses \u2014 which is the point of routing not being a map feature.",
+  "types": "./dist/index.d.ts",
+  "publishConfig": {
+    "registry": "https://accenture.palantirfoundry.com/artifacts/api/repositories/ri.artifacts.main.repository.df396b79-3da5-473f-91c2-7be67d95c46c/contents/release/npm/"
+  },
+  "scripts": {
+    "build:deps": "npm --prefix ../decho-foundry-bytes run build",
+    "build": "npm run build:deps && tsc -p tsconfig.build.json",
+    "prepublishOnly": "npm run build",
+    "test": "vitest run"
+  },
+  "//scripts": "build:deps mirrors @acc/decho-mil-map: tsconfig.build.json resolves the sibling package to its built .d.ts rather than its source, because source would drag those files into this program and tsc would refuse to emit them from outside rootDir. Building it first is a real prerequisite, so the build does it.",
+  "//peerDependencies": "@acc/decho-foundry-bytes, NOT @acc/decho-basemap: this package computes paths and has nothing to do with rendering, so a headless consumer (a worker, a Function, a planner with no map) must not have to install a map renderer and pmtiles to read a file. maplibre-gl is not a peer either \u2014 the optional route layer types the map structurally (see react/routeLayer.ts). Ranges are wide on purpose; the sibling packages learned that at 0.1.1, when exact @osdk pins made them uninstallable in an app one minor behind.",
+  "peerDependencies": {
+    "@acc/decho-foundry-bytes": ">=0.1.0",
+    "react": "^18.0.0 || ^19.0.0"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "typescript": "~5.5.4",
+    "vitest": "^3.2.4"
+  }
+}
