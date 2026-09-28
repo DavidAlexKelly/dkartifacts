@@ -66,6 +66,34 @@ describe("locations", () => {
     }
   });
 
+  it("reads WKT points strictly", () => {
+    expect(parsePoint("point z (-0.12 51.5 30)")).toEqual({ lat: 51.5, lng: -0.12 });
+    expect(parsePoint("POINT(-0.12 51.5)")).toEqual({ lat: 51.5, lng: -0.12 });
+    expect(parsePoint("POINTLESS (1 2)")).toBeNull();
+    expect(parsePoint("POINT (0x10 1)")).toBeNull();
+    expect(parsePoint("POINT (1)")).toBeNull();
+    expect(parsePoint("1, 2, 3")).toBeNull();
+    expect(parsePoint("1., 2")).toBeNull();
+    expect(parseShape("LINESTRING Z (30 10 1, 10 30 1)")?.type).toBe("LineString");
+  });
+
+  it("stays linear on hostile input", () => {
+    // The shape of string a backtracking pattern chokes on: long runs of
+    // whitespace and digits that almost, but never quite, match.
+    const hostile = [
+      `POINT (${" ".repeat(200_000)}1`,
+      `POINT (${"1".repeat(200_000)} `,
+      `${"1".repeat(200_000)},`,
+      `POLYGON ((${"0 0,".repeat(50_000)}`,
+    ];
+    const started = performance.now();
+    for (const value of hostile) {
+      expect(parsePoint(value)).toBeNull();
+      expect(parseShape(value)).toBeNull();
+    }
+    expect(performance.now() - started).toBeLessThan(500);
+  });
+
   it("reads WKT and GeoJSON shapes", () => {
     const polygon = parseShape("POLYGON ((30 10, 40 40, 20 40, 10 20, 30 10))");
     expect(polygon?.type).toBe("Polygon");
