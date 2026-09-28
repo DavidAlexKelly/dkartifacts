@@ -54,8 +54,14 @@ export interface SourcesSectionProps {
   onReload: (key: string) => void;
   /** A column to title the source's events with, or undefined for detected. */
   onTitleChange: (key: string, field: string | undefined) => void;
-  /** Sources came from the URL: say so, since edits will not be remembered. */
-  fromUrl: boolean;
+  /** Why edits here will not be remembered, when they will not. */
+  sessionOnly: "url" | "workshop" | null;
+  /** Sources set by Workshop variables: shown, not removable here. */
+  pinnedKeys: ReadonlySet<string>;
+  /** Workshop variable entries that are not valid for their variable. */
+  workshopProblems: Array<{ variable: string; entry: string; error: string }>;
+  /** Embedded, and Workshop has not sent its variables yet. */
+  waitingForWorkshop: boolean;
 }
 
 export function SourcesSection({
@@ -66,9 +72,12 @@ export function SourcesSection({
   onRemove,
   onReload,
   onTitleChange,
-  fromUrl,
+  sessionOnly,
+  pinnedKeys,
+  workshopProblems,
+  waitingForWorkshop,
 }: SourcesSectionProps): React.ReactElement {
-  const problems = states.filter((state) => state.problem).length;
+  const problems = states.filter((state) => state.problem).length + workshopProblems.length;
   const live = states.some((state) => state.status === "live");
   return (
     <details open style={{ display: "flex", flexDirection: "column", gap: 4 }}>
@@ -94,10 +103,24 @@ export function SourcesSection({
             onRemove={() => onRemove(state.key)}
             onReload={() => onReload(state.key)}
             onTitleChange={(field) => onTitleChange(state.key, field)}
+            pinned={pinnedKeys.has(state.key)}
           />
         ))}
-        {fromUrl && (
+        {waitingForWorkshop && <div style={panelMuted}>Waiting for Workshop's variables…</div>}
+        {workshopProblems.map((problem) => (
+          <div key={`${problem.variable}:${problem.entry}`} style={warningText}>
+            <strong>Ignored in {problem.variable}:</strong>{" "}
+            <span style={{ wordBreak: "break-all" }}>{problem.entry}</span> — {problem.error}
+          </div>
+        ))}
+        {sessionOnly === "url" && (
           <div style={panelMuted}>Sources from the page URL — changes here are not saved.</div>
+        )}
+        {sessionOnly === "workshop" && (
+          <div style={panelMuted}>
+            Embedded in Workshop: sources added here last for this session. Set them in the
+            widget's event-monitor variables to keep them.
+          </div>
         )}
         <AddSourceForm onAdd={onAdd} />
       </div>
@@ -110,11 +133,14 @@ function SourceRow({
   onRemove,
   onReload,
   onTitleChange,
+  pinned,
 }: {
   state: SourceState;
   onRemove: () => void;
   onReload: () => void;
   onTitleChange: (field: string | undefined) => void;
+  /** From a Workshop variable: removed there, not here. */
+  pinned: boolean;
 }): React.ReactElement {
   const { status, problem, fields } = state;
   const title = state.config.item ? `${state.name} · ${state.config.rid}` : state.config.rid;
@@ -132,9 +158,15 @@ function SourceRow({
             ↻
           </button>
         )}
-        <button type="button" style={iconButton} onClick={onRemove} title="Remove" aria-label="Remove source">
-          ×
-        </button>
+        {pinned ? (
+          <span style={kindBadge} title="Set by a Workshop variable — change it in the module">
+            Workshop
+          </span>
+        ) : (
+          <button type="button" style={iconButton} onClick={onRemove} title="Remove" aria-label="Remove source">
+            ×
+          </button>
+        )}
       </div>
 
       {status === "loading" && <div style={panelMuted}>Loading…</div>}

@@ -15,8 +15,9 @@
  * decides what they mean (location, title, category, severity, time, …) and
  * the sources panel shows what it decided. Records located by a point become
  * events; records located by a shape become areas, drawn under the events.
- * Sources come from the URL (`?dataset=…&mediaset=rid::path&stream=…`) or
- * from the panel, which this browser remembers.
+ * Sources come from Workshop's string-list variables when embedded (see
+ * src/workshopConfig.ts), the URL (`?dataset=…&mediaset=rid::path&stream=…`),
+ * or the panel.
  *
  * Three extensions on one stock basemap:
  *
@@ -44,6 +45,7 @@ import { describeBasemapError } from "@acc/decho-basemap";
 import { DechoBasemap } from "@acc/decho-basemap/react";
 import { elevation } from "@acc/decho-elevation/extension";
 import type { DemSourceHandle } from "@acc/decho-elevation";
+import { isInsideIframe } from "@osdk/workshop-iframe-custom-widget";
 import {
   panelCheckbox,
   panelFigures,
@@ -86,7 +88,9 @@ import { SourcesSection } from "./SourcesSection";
 import {
   dedupe,
   loadSavedSources,
+  loadSavedTitles,
   saveSources,
+  saveTitles,
   sourceKey,
   sourcesFromSearch,
   type SourceConfig,
@@ -94,6 +98,7 @@ import {
 import { boundsOf, shapeBounds, type Bounds } from "./sources/geo";
 import type { MonitorArea } from "./sources/interpret";
 import { useEventSources } from "./sources/useEventSources";
+import { useWorkshopEventSources } from "@/workshopConfig";
 import {
   actionButton,
   dot,
@@ -153,16 +158,48 @@ function EventsPage(): React.ReactElement {
   const mockEvents = useMemo(() => generateEvents({ now }), [now]);
 
   // ── Sources ────────────────────────────────────────────────────────────────
+  //
+  // Workshop's variables (pinned), then the URL's or this browser's saved
+  // list (editable here), then chosen title columns over the lot. See
+  // sources/config.ts for which of these are remembered, and where.
+  const workshop = useWorkshopEventSources();
+  const workshopKey = JSON.stringify(workshop.sources);
+  // Keyed on content: the context hands back a fresh array every render, and
+  // a new array here would restart every source.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const pinned = useMemo(() => workshop.sources, [workshopKey]);
+  const pinnedKeys = useMemo(() => new Set(pinned.map(sourceKey)), [pinned]);
+
   const [urlSources] = useState(() => sourcesFromSearch(window.location.search));
-  const fromUrl = urlSources.length > 0;
-  const [configs, setConfigs] = useState<SourceConfig[]>(() =>
-    fromUrl ? urlSources : loadSavedSources(),
+  const [embedded] = useState(() => isInsideIframe());
+  const sessionOnly: "url" | "workshop" | null =
+    urlSources.length > 0 ? "url" : embedded ? "workshop" : null;
+  const [savedSources] = useState(() => (sessionOnly ? [] : loadSavedSources()));
+  const [local, setLocal] = useState<SourceConfig[]>(() =>
+    urlSources.length > 0 ? urlSources : savedSources,
   );
   useEffect(() => {
-    if (!fromUrl) {saveSources(configs);}
-  }, [configs, fromUrl]);
-  // Mock data by default only when there is nothing real to show.
-  const [mock, setMock] = useState(() => configs.length === 0);
+    if (!sessionOnly) {saveSources(local);}
+  }, [local, sessionOnly]);
+
+  const [titles, setTitles] = useState<Record<string, string>>(() => loadSavedTitles(savedSources));
+  useEffect(() => saveTitles(titles), [titles]);
+
+  const configs = useMemo(
+    () =>
+      dedupe([...pinned, ...local]).map((config) => {
+        const titleField = titles[sourceKey(config)];
+        const { titleField: _saved, ...rest } = config;
+        return titleField ? { ...rest, titleField } : rest;
+      }),
+    [pinned, local, titles],
+  );
+  const hasSources = configs.length > 0;
+
+  // Mock data unless something real is configured — and not while Workshop
+  // has yet to say whether it is, so embedded pages never flash it.
+  const [mockChoice, setMockChoice] = useState<boolean | null>(null);
+  const mock = mockChoice ?? (!hasSources && workshop.status === "ready");
   const { states, reload } = useEventSources(configs, now);
 
   const events = useMemo(
@@ -178,10 +215,10 @@ function EventsPage(): React.ReactElement {
     () => new Set(CATEGORY_ORDER),
   );
   const [minSeverity, setMinSeverity] = useState<Severity>("low");
-  // Real data is rarely all from the last week; mock data is.
-  const [windowMs, setWindowMs] = useState<number | null>(() =>
-    configs.length > 0 ? null : 7 * DAY,
-  );
+  // Real data is rarely all from the last week; mock data is. Until someone
+  // picks a window, it follows whether there are real sources.
+  const [windowChoice, setWindowMs] = useState<number | null | undefined>(undefined);
+  const windowMs = windowChoice !== undefined ? windowChoice : hasSources ? null : 7 * DAY;
 
   const [terrain, setTerrain] = useState(true);
   const [globe, setGlobe] = useState(true);
@@ -441,18 +478,21 @@ function EventsPage(): React.ReactElement {
   };
 
   const addSource = (config: SourceConfig) => {
-    setConfigs((previous) => dedupe([...previous, config]));
+    setLocal((previous) => dedupe([...previous, config]));
     // Real data is rarely inside the mock's week.
     setWindowMs(null);
   };
+  // Pinned (Workshop) sources have no remove button; this only ever edits
+  // the local list.
   const removeSource = (key: string) =>
-    setConfigs((previous) => previous.filter((config) => sourceKey(config) !== key));
+    setLocal((previous) => previous.filter((config) => sourceKey(config) !== key));
   const setTitleField = (key: string, titleField: string | undefined) =>
-    setConfigs((previous) =>
-      previous.map((config) =>
-        sourceKey(config) === key ? { ...config, titleField } : config,
-      ),
-    );
+    setTitles((previous) => {
+      const next = { ...previous };
+      if (titleField) {next[key] = titleField;}
+      else {delete next[key];}
+      return next;
+    });
 
   const critical = visible.filter((event) => event.severity === "critical").length;
 
@@ -508,12 +548,15 @@ function EventsPage(): React.ReactElement {
           <SourcesSection
             states={states}
             mock={mock}
-            onMockChange={setMock}
+            onMockChange={setMockChoice}
             onAdd={addSource}
             onRemove={removeSource}
             onReload={reload}
           onTitleChange={setTitleField}
-            fromUrl={fromUrl}
+            sessionOnly={sessionOnly}
+            pinnedKeys={pinnedKeys}
+            workshopProblems={workshop.invalid}
+            waitingForWorkshop={workshop.status === "pending"}
           />
 
           <div style={panelSeparator} />

@@ -10,9 +10,15 @@
  *   mediaset  ri.mio.main.media-set.<uuid>::<path>    e.g. ::incidents.geojson
  *             ri.mio.main.media-set.<uuid>::ri.mio.main.media-item.<uuid>
  *
- * Sources come from the URL when it names any — so a Workshop iframe widget
- * pointed at `/events?dataset=…&stream=…` opens on exactly those, and a link
- * can be shared — and otherwise from what this browser saved last time.
+ * Sources come from three places, combined:
+ *
+ *   Workshop   the event-monitor-* string-list variables (src/workshopConfig.ts)
+ *              when embedded — pinned: changed in the module, not here.
+ *   URL        `?dataset=…&mediaset=…&stream=…`, for a shareable link.
+ *   the panel  added by hand. Remembered in this browser when the page is
+ *              standalone and not driven by the URL; inside a Workshop iframe
+ *              they last for the session, because browser storage is shared
+ *              by every module embedding the app.
  */
 
 import type { EventCategory } from "../mockEvents";
@@ -145,8 +151,45 @@ export function loadSavedSources(): SourceConfig[] {
 
 export function saveSources(configs: SourceConfig[]): void {
   try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(configs));
+    // Titles are kept separately (below), for sources from anywhere.
+    const plain = configs.map(({ titleField: _title, ...config }) => config);
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(plain));
   } catch {
     // Private windows and locked-down browsers: the list just is not remembered.
+  }
+}
+
+const TITLES_KEY = "decho-events:titles";
+
+/**
+ * Chosen title columns, by source key. Separate from the source list because
+ * a title can be chosen for a source this browser did not add — one from
+ * Workshop variables or the URL — and should still be remembered. Seeded
+ * from `titleField`s the saved list carried before titles moved here.
+ */
+export function loadSavedTitles(saved: SourceConfig[] = []): Record<string, string> {
+  const titles: Record<string, string> = {};
+  for (const config of saved) {
+    if (config.titleField) {titles[sourceKey(config)] = config.titleField;}
+  }
+  try {
+    const raw = window.localStorage.getItem(TITLES_KEY);
+    const parsed = raw ? (JSON.parse(raw) as unknown) : null;
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      for (const [key, value] of Object.entries(parsed)) {
+        if (typeof value === "string" && value !== "") {titles[key] = value;}
+      }
+    }
+  } catch {
+    // As above.
+  }
+  return titles;
+}
+
+export function saveTitles(titles: Record<string, string>): void {
+  try {
+    window.localStorage.setItem(TITLES_KEY, JSON.stringify(titles));
+  } catch {
+    // As above.
   }
 }

@@ -17,9 +17,22 @@ import React, { useEffect } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 
 import { EXAMPLE_APPS, appForPath } from "@/PackageApps/apps";
-import { useArtifactSwitching } from "@/workshopConfig";
+import { WorkshopShellProvider, useArtifactSwitching } from "@/workshopConfig";
 
+/**
+ * The provider wraps everything, pages included: the header reads the
+ * switcher flag from it and the event monitor reads its source variables, from
+ * one negotiation with Workshop (see src/workshopConfig.ts).
+ */
 function AppShell(): React.ReactElement {
+  return (
+    <WorkshopShellProvider>
+      <ShellLayout />
+    </WorkshopShellProvider>
+  );
+}
+
+function ShellLayout(): React.ReactElement {
   const location = useLocation();
   const navigate = useNavigate();
   const current = appForPath(location.pathname);

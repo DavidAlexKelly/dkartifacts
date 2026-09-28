@@ -12,6 +12,7 @@ import { describe, expect, it } from "vitest";
 import {
   ARTIFACT_SHELL_CONFIG,
   resolveArtifactSwitching,
+  resolveEventSources,
   type ArtifactShellContext,
 } from "@/workshopConfig";
 
@@ -28,10 +29,22 @@ function loadedWith(value: boolean | undefined): ArtifactShellContext {
 }
 
 describe("the Workshop config", () => {
-  it("declares exactly one field, bound to the name modules will use", () => {
-    expect(ARTIFACT_SHELL_CONFIG).toHaveLength(1);
-    expect(ARTIFACT_SHELL_CONFIG[0].fieldId).toBe("artifactSwitching");
-    expect(ARTIFACT_SHELL_CONFIG[0].field.label).toBe("artifact-switching");
+  it("declares its fields under the names modules will bind to", () => {
+    // Renaming any of these unbinds every module that already bound it.
+    expect(ARTIFACT_SHELL_CONFIG.map((f) => [f.fieldId, f.field.label])).toEqual([
+      ["artifactSwitching", "artifact-switching"],
+      ["eventDatasetRids", "event-monitor-dataset-rids"],
+      ["eventMediaSetInputs", "event-monitor-media-set-inputs"],
+      ["eventStreamRids", "event-monitor-stream-rids"],
+    ]);
+  });
+
+  it("takes the event monitor's sources as string lists, empty by default", () => {
+    for (const field of ARTIFACT_SHELL_CONFIG.slice(1)) {
+      expect(field.field.fieldValue.type, field.fieldId).toBe("inputOutput");
+      expect(field.field.fieldValue.variableType.type, field.fieldId).toBe("string-list");
+      expect(field.field.fieldValue.variableType.defaultValue, field.fieldId).toEqual([]);
+    }
   });
 
   it("is a bidirectional boolean defaulting to true", () => {
@@ -46,7 +59,9 @@ describe("the Workshop config", () => {
   });
 
   it("explains itself to whoever finds it in Workshop", () => {
-    expect(ARTIFACT_SHELL_CONFIG[0].field.helperText.length).toBeGreaterThan(40);
+    for (const field of ARTIFACT_SHELL_CONFIG) {
+      expect(field.field.helperText.length, field.fieldId).toBeGreaterThan(40);
+    }
   });
 });
 
@@ -82,5 +97,67 @@ describe("resolveArtifactSwitching", () => {
         value: { artifactSwitching: { fieldValue: { status: "LOADED", value: true } } },
       } as ArtifactShellContext),
     ).toBe(true);
+  });
+});
+
+const DATASET = "ri.foundry.main.dataset.0f0e6b1a-3c7a-4a52-9d49-0a1b2c3d4e5f";
+const MEDIA_SET = "ri.mio.main.media-set.0f0e6b1a-3c7a-4a52-9d49-0a1b2c3d4e5f";
+
+/** A loaded context carrying these string lists. */
+function withSources(lists: {
+  datasets?: string[];
+  media?: string[];
+  streams?: string[];
+}): ArtifactShellContext {
+  const field = (value: string[] | undefined) => ({ fieldValue: { status: "LOADED", value } });
+  return {
+    status: "LOADED",
+    value: {
+      artifactSwitching: field(undefined),
+      eventDatasetRids: field(lists.datasets),
+      eventMediaSetInputs: field(lists.media),
+      eventStreamRids: field(lists.streams),
+    },
+  } as unknown as ArtifactShellContext;
+}
+
+describe("resolveEventSources", () => {
+  it("reads each variable as its own kind of source", () => {
+    const { status, sources, invalid } = resolveEventSources(
+      withSources({
+        datasets: [DATASET],
+        media: [`${MEDIA_SET}::zones/incidents.geojson`],
+        streams: [DATASET],
+      }),
+    );
+    expect(status).toBe("ready");
+    expect(invalid).toEqual([]);
+    expect(sources).toEqual([
+      { kind: "dataset", rid: DATASET, category: undefined },
+      { kind: "mediaset", rid: MEDIA_SET, item: "zones/incidents.geojson", category: undefined },
+      { kind: "stream", rid: DATASET, category: undefined },
+    ]);
+  });
+
+  it("reports entries that are not valid for their variable, and skips blanks", () => {
+    const { sources, invalid } = resolveEventSources(
+      withSources({ datasets: [DATASET, "", "  ", "not-a-rid"], media: [MEDIA_SET] }),
+    );
+    expect(sources).toHaveLength(1);
+    expect(invalid.map((i) => [i.variable, i.entry])).toEqual([
+      ["event-monitor-dataset-rids", "not-a-rid"],
+      ["event-monitor-media-set-inputs", MEDIA_SET],
+    ]);
+    expect(invalid[1].error).toContain("::");
+  });
+
+  it("treats unset variables as empty", () => {
+    expect(resolveEventSources(withSources({}))).toEqual({ status: "ready", sources: [], invalid: [] });
+  });
+
+  it("is pending while Workshop negotiates, and gives up waiting on a rejection", () => {
+    expect(resolveEventSources({ status: "LOADING" }).status).toBe("pending");
+    expect(resolveEventSources({ status: "NOT_STARTED" }).status).toBe("pending");
+    expect(resolveEventSources({ status: "FAILED", error: "rejected" }).status).toBe("ready");
   });
 });
