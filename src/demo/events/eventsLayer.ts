@@ -50,6 +50,7 @@ export const CATEGORIES: Record<EventCategory, CategoryMeta> = {
   outbreak: { label: "Disease outbreaks", colour: "#5fd08a" },
   cyber: { label: "Cyber incidents", colour: "#38d6d6" },
   infrastructure: { label: "Infrastructure", colour: "#e6d84a" },
+  other: { label: "Other", colour: "#9aa5b1" },
 };
 
 export const CATEGORY_ORDER = Object.keys(CATEGORIES) as EventCategory[];
@@ -80,7 +81,11 @@ export const CLUSTER_MAX_ZOOM = 11;
 export interface EventFilter {
   categories: ReadonlySet<EventCategory>;
   minSeverity: Severity;
-  /** Only events newer than this many ms before `now`; null for all. */
+  /**
+   * Only events newer than this many ms before `now`; null for all. Events
+   * with no time pass every window — a source that does not say when cannot
+   * be said to be old.
+   */
   windowMs: number | null;
   now: number;
 }
@@ -95,7 +100,7 @@ export function filterEvents(
     (event) =>
       filter.categories.has(event.category) &&
       severityRank(event.severity) >= minRank &&
-      event.time >= since,
+      (event.time == null || event.time >= since),
   );
 }
 

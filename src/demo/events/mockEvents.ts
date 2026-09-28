@@ -21,7 +21,9 @@ export type EventCategory =
   | "weather"
   | "outbreak"
   | "cyber"
-  | "infrastructure";
+  | "infrastructure"
+  /** Real sources only: a record whose category matched nothing above. */
+  | "other";
 
 export type Severity = "low" | "moderate" | "high" | "critical";
 
@@ -52,10 +54,16 @@ export interface MonitorEvent {
   country: string;
   lon: number;
   lat: number;
-  /** Epoch milliseconds. */
-  time: number;
+  /** Epoch milliseconds, or null when the source gave no usable time. */
+  time: number | null;
   source: string;
   metrics: EventMetric[];
+  /** Which configured source this came from; absent for mock events. */
+  sourceKey?: string;
+  /** Arrived on a stream after the page loaded. */
+  live?: boolean;
+  /** The record as the source had it, for the details panel. */
+  fields?: Record<string, unknown>;
 }
 
 interface Hotspot {
@@ -69,7 +77,7 @@ interface Hotspot {
   weight: number;
   /** Open water: military activity here is naval, not a column on a road. */
   sea?: boolean;
-  categories: EventCategory[];
+  categories: MockCategory[];
 }
 
 const HOTSPOTS: Hotspot[] = [
@@ -139,7 +147,7 @@ const HOTSPOTS: Hotspot[] = [
   { place: "Gauteng", country: "South Africa", lon: 28.05, lat: -26.2, spread: 0.5, weight: 2, categories: ["infrastructure", "protest"] },
 ];
 
-const SOURCES: Record<EventCategory, string[]> = {
+const SOURCES: Record<Exclude<EventCategory, "other">, string[]> = {
   conflict: ["ACLED (mock)", "Field reporting (mock)", "OSINT aggregation (mock)"],
   protest: ["ACLED (mock)", "Local media (mock)"],
   military: ["ADS-B feed (mock)", "AIS feed (mock)", "Defence ministry statement (mock)"],
@@ -207,7 +215,9 @@ function scaled(rng: Rng, severity: Severity, base: number): number {
   return Math.round(base * severityRank(severity) ** 2 * between(rng, 0.6, 1.4));
 }
 
-function write(rng: Rng, category: EventCategory, severity: Severity, hotspot: Hotspot): Written {
+type MockCategory = Exclude<EventCategory, "other">;
+
+function write(rng: Rng, category: MockCategory, severity: Severity, hotspot: Hotspot): Written {
   const { place } = hotspot;
   switch (category) {
     case "conflict": {
@@ -363,7 +373,12 @@ export function generateEvents({
     });
   }
 
-  return events.sort((a, b) => b.time - a.time);
+  return sortNewestFirst(events);
+}
+
+/** Newest first; events with no time sort after every dated one. */
+export function sortNewestFirst<T extends { time: number | null }>(events: T[]): T[] {
+  return events.sort((a, b) => (b.time ?? -Infinity) - (a.time ?? -Infinity));
 }
 
 function round(value: number, places: number): number {

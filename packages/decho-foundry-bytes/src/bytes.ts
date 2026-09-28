@@ -851,6 +851,65 @@ export function getMediaItem(
 
 const mediaItemInFlight = new Map<string, Promise<ArrayBuffer | null>>();
 
+/**
+ * Fetch a media item by its RID rather than its path — for callers that were
+ * handed a media item RID (a Workshop variable, a link) and have no path.
+ *
+ * The same pipeline as `getMediaItem` minus the path lookup: resident LRU,
+ * then Cache Storage keyed by the (immutable) item RID, then one fetch inside
+ * a concurrency slot. Unlike `getMediaItem`, a missing item is an error rather
+ * than null: a RID names exactly one item, so its absence is not a normal
+ * outcome to branch on. Failures are the typed errors `describeFoundryError`
+ * understands.
+ */
+export function getMediaItemByRid(
+  mediaSetRid: string,
+  mediaItemRid: string,
+): Promise<ArrayBuffer> {
+  const key = cacheKey(mediaSetRid, mediaItemRid);
+
+  const hit = resident.get(key);
+  if (hit) {return Promise.resolve(hit);}
+
+  const existing = mediaItemByRidInFlight.get(key);
+  if (existing) {return existing;}
+
+  const pending = (async () => {
+    const persistentCacheKey = `${CACHE_KEY_ORIGIN}/mediaset/${encodeURIComponent(
+      mediaItemRid,
+    )}`;
+    const persisted = await persistent.read(persistentCacheKey);
+    if (persisted) {
+      resident.set(key, persisted);
+      return persisted;
+    }
+
+    const lane = laneFor(mediaItemRid);
+    await acquireSlot(lane);
+    try {
+      const response = await authorisedFetch(
+        mediaItemContentUrl(mediaSetRid, mediaItemRid),
+        { method: "GET" },
+      );
+      if (!response.ok) {
+        throw errorForResponse(response.status, response.statusText, mediaSetRid, mediaItemRid);
+      }
+      const body = await response.arrayBuffer();
+      resident.set(key, body);
+      void persistent.write(persistentCacheKey, body);
+      return body;
+    } finally {
+      releaseSlot(lane);
+    }
+  })();
+
+  mediaItemByRidInFlight.set(key, pending);
+  void pending.catch(() => {}).finally(() => mediaItemByRidInFlight.delete(key));
+  return pending;
+}
+
+const mediaItemByRidInFlight = new Map<string, Promise<ArrayBuffer>>();
+
 /** Fetch a media set item and parse it as UTF-8 JSON. */
 export async function getMediaItemJson<T>(
   mediaSetRid: string,

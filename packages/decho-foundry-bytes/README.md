@@ -33,6 +33,7 @@ tiers and the lanes, because they share this module.
 | `getRange(rid, path, offset, length, signal?)` | A byte range, transparently faked when the platform ignores `Range` |
 | `getJson(rid, path, signal?)` | A file, parsed as UTF-8 JSON |
 | `getMediaItem(mediaSetRid, path)` | A media set item, path resolved and memoised |
+| `getMediaItemByRid(mediaSetRid, mediaItemRid)` | A media set item by RID, when there is no path |
 
 ## Why it exists as a package
 
