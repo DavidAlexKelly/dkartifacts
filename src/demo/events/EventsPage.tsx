@@ -447,6 +447,12 @@ function EventsPage(): React.ReactElement {
   };
   const removeSource = (key: string) =>
     setConfigs((previous) => previous.filter((config) => sourceKey(config) !== key));
+  const setTitleField = (key: string, titleField: string | undefined) =>
+    setConfigs((previous) =>
+      previous.map((config) =>
+        sourceKey(config) === key ? { ...config, titleField } : config,
+      ),
+    );
 
   const critical = visible.filter((event) => event.severity === "critical").length;
 
@@ -506,6 +512,7 @@ function EventsPage(): React.ReactElement {
             onAdd={addSource}
             onRemove={removeSource}
             onReload={reload}
+          onTitleChange={setTitleField}
             fromUrl={fromUrl}
           />
 

@@ -16,6 +16,8 @@ import {
   parseTime,
   recordsFromJson,
   severityFromText,
+  severityScaleOf,
+  withTitle,
 } from "./interpret";
 import { parseSourceInput, sourceKey, sourcesFromSearch } from "./config";
 
@@ -289,5 +291,50 @@ describe("source configuration", () => {
       `mediaset:${MEDIA_SET}::a.geojson`,
       `stream:${DATASET}`,
     ]);
+  });
+});
+
+describe("a chosen title column", () => {
+  const records = [
+    { callsign: "RCH101", mission: "Tanker orbit", fuel_kg: 12000, lat: 54.5, lng: 18.5 },
+    { callsign: "RCH102", mission: "", fuel_kg: 8000, lat: 54.6, lng: 18.7 },
+  ];
+  const detected = detectFields(Object.keys(records[0]), records);
+
+  it("titles events from that column instead of the detected one", () => {
+    expect(detected.title).toBeUndefined();
+    const auto = interpretRecords(records, detected, ctx).events.map((e) => e.title);
+    expect(auto).toEqual(["Other — RCH101", "Other — RCH102"]);
+    const chosen = interpretRecords(records, withTitle(detected, "mission"), ctx).events;
+    expect(chosen[0].title).toBe("Tanker orbit");
+  });
+
+  it("falls back as usual where the chosen column is empty", () => {
+    const [, second] = interpretRecords(records, withTitle(detected, "mission"), ctx).events;
+    expect(second.title).toBe("Other — RCH102");
+  });
+
+  it("stops treating a numeric column as a metric once it is the title", () => {
+    const withMetric = interpretRecords(records, detected, ctx).events[0].metrics;
+    expect(withMetric.map((m) => m.label)).toContain("Fuel kg");
+    const titled = interpretRecords(records, withTitle(detected, "fuel_kg"), ctx).events[0];
+    expect(titled.title).toBe("12000");
+    expect(titled.metrics.map((m) => m.label)).not.toContain("Fuel kg");
+  });
+
+  it("leaves the mapping alone when nothing is chosen", () => {
+    expect(withTitle(detected, undefined)).toBe(detected);
+  });
+});
+
+describe("severity across batches", () => {
+  it("reads a number on a scale fixed by the caller, not the batch", () => {
+    const records = [{ lat: 1, lng: 1, severity: 3 }];
+    const map = detectFields(["lat", "lng", "severity"], records);
+    // Alone, a batch whose largest value is 3 is read on the 1–4 scale: high.
+    expect(interpretRecords(records, map, ctx).events[0].severity).toBe("high");
+    // On a 1–5 scale seen across the whole stream, 3 is moderate.
+    expect(interpretRecords(records, map, { ...ctx, severityMax: 5 }).events[0].severity).toBe("moderate");
+    expect(severityScaleOf([...records, { severity: "5" }], map)).toBe(5);
   });
 });
