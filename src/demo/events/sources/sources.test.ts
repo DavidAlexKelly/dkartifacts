@@ -125,19 +125,19 @@ describe("values", () => {
   });
 
   it("maps source vocabularies onto the categories", () => {
-    expect(categoryFrom("Battles")).toBe("conflict");
-    expect(categoryFrom("Explosions/Remote violence")).toBe("conflict");
-    expect(categoryFrom("Protests")).toBe("protest");
-    expect(categoryFrom("Riots")).toBe("protest");
-    expect(categoryFrom("Strategic developments")).toBe("military");
-    expect(categoryFrom("earthquake")).toBe("earthquake");
-    expect(categoryFrom("Flash flood")).toBe("weather");
-    expect(categoryFrom("Airstrike")).toBe("conflict");
-    expect(categoryFrom("Labour strike")).toBe("protest");
-    expect(categoryFrom("Ransomware")).toBe("cyber");
-    expect(categoryFrom("Disease outbreaks")).toBe("outbreak");
-    expect(categoryFrom("something else")).toBeNull();
-    expect(categoryFrom("", "Wildfire near Attica")).toBe("wildfire");
+    expect(categoryFrom(["Battles"])).toBe("conflict");
+    expect(categoryFrom(["Explosions/Remote violence"])).toBe("conflict");
+    expect(categoryFrom(["Protests"])).toBe("protest");
+    expect(categoryFrom(["Riots"])).toBe("protest");
+    expect(categoryFrom(["Strategic developments"])).toBe("military");
+    expect(categoryFrom(["earthquake"])).toBe("earthquake");
+    expect(categoryFrom(["Flash flood"])).toBe("weather");
+    expect(categoryFrom(["Airstrike"])).toBe("conflict");
+    expect(categoryFrom(["Labour strike"])).toBe("protest");
+    expect(categoryFrom(["Ransomware"])).toBe("cyber");
+    expect(categoryFrom(["Disease outbreaks"])).toBe("outbreak");
+    expect(categoryFrom(["something else"])).toBeNull();
+    expect(categoryFrom(["", "Wildfire near Attica"])).toBe("wildfire");
   });
 
   it("maps severity words", () => {

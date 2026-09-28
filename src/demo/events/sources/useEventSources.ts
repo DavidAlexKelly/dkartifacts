@@ -14,6 +14,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { BUILTIN_REGISTRY, type CategoryRegistry } from "../categories";
 import type { MonitorEvent } from "../mockEvents";
 import { sourceKey, type SourceConfig } from "./config";
 import {
@@ -87,7 +88,11 @@ export interface UseEventSources {
   reload: (key: string) => void;
 }
 
-export function useEventSources(configs: SourceConfig[], now: number): UseEventSources {
+export function useEventSources(
+  configs: SourceConfig[],
+  now: number,
+  categories: CategoryRegistry = BUILTIN_REGISTRY,
+): UseEventSources {
   const [states, setStates] = useState<Record<string, SourceState>>({});
   // Bumped to restart one source's load without touching the others.
   const [generation, setGeneration] = useState<Record<string, number>>({});
@@ -96,6 +101,11 @@ export function useEventSources(configs: SourceConfig[], now: number): UseEventS
   // the title column — reaches a run that is already going.
   const latest = useRef(new Map<string, SourceConfig>());
   latest.current = new Map(configs.map((config) => [sourceKey(config), config]));
+  // Likewise the categories: custom ones can arrive (from Workshop) after a
+  // source has loaded, and their keywords change what records sort into.
+  const registry = useRef(categories);
+  registry.current = categories;
+  const getRegistry = useCallback(() => registry.current, []);
 
   const update = useCallback((key: string, patch: (state: SourceState) => SourceState) => {
     setStates((previous) => (previous[key] ? { ...previous, [key]: patch(previous[key]) } : previous));
@@ -134,8 +144,8 @@ export function useEventSources(configs: SourceConfig[], now: number): UseEventS
       const getConfig = () => latest.current.get(key) ?? config;
       const started =
         config.kind === "stream"
-          ? runStream(getConfig, key, now, update)
-          : runOnce(getConfig, key, now, update);
+          ? runStream(getConfig, getRegistry, key, now, update)
+          : runOnce(getConfig, getRegistry, key, now, update);
       running.current.set(key, {
         ...started,
         generation: generation[key] ?? 0,
@@ -143,6 +153,11 @@ export function useEventSources(configs: SourceConfig[], now: number): UseEventS
       });
     }
   }, [configs, generation, now, update]);
+
+  // New categories: everything loaded is read again against them.
+  useEffect(() => {
+    for (const run of running.current.values()) {run.reinterpret();}
+  }, [categories]);
 
   // Stop everything on unmount.
   useEffect(() => {
@@ -183,6 +198,7 @@ interface Run {
 
 function interpret(
   config: SourceConfig,
+  categories: CategoryRegistry,
   key: string,
   name: string,
   records: Row[],
@@ -194,6 +210,7 @@ function interpret(
     sourceKey: key,
     sourceLabel: name,
     defaultCategory: config.category,
+    categories,
     now,
     ...options,
   });
@@ -207,14 +224,16 @@ function fieldNames(records: Row[]): string[] {
   return [...names];
 }
 
-/** Columns worth offering as a title: not the GeoJSON plumbing. */
-function titleCandidates(records: Row[]): string[] {
-  return fieldNames(records).filter((name) => !name.startsWith("__"));
+/** Columns worth offering as a title: not the GeoJSON plumbing, not media. */
+function titleCandidates(records: Row[], fields: FieldMap | null): string[] {
+  const media = new Set(fields?.media ?? []);
+  return fieldNames(records).filter((name) => !name.startsWith("__") && !media.has(name));
 }
 
 /** Datasets and media set items: one read, re-interpretable. */
 function runOnce(
   getConfig: () => SourceConfig,
+  getRegistry: () => CategoryRegistry,
   key: string,
   now: number,
   update: Update,
@@ -226,8 +245,16 @@ function runOnce(
     if (!loaded || cancelled) {return;}
     const config = getConfig();
     const fields = withTitle(loaded.detected, config.titleField);
-    const { events, areas, skipped } = interpret(config, key, loaded.name, loaded.records, now, fields);
-    const columns = titleCandidates(loaded.records);
+    const { events, areas, skipped } = interpret(
+      config,
+      getRegistry(),
+      key,
+      loaded.name,
+      loaded.records,
+      now,
+      fields,
+    );
+    const columns = titleCandidates(loaded.records, loaded.detected);
     update(key, (state) => ({
       ...state,
       status: "ready",
@@ -286,6 +313,7 @@ function runOnce(
 /** Streams: tail on open, then poll. */
 function runStream(
   getConfig: () => SourceConfig,
+  getRegistry: () => CategoryRegistry,
   key: string,
   now: number,
   update: Update,
@@ -328,13 +356,13 @@ function runStream(
       detected = detectFields(fieldNames(seen), seen);
     }
     const fields = effective();
-    const found = interpret(getConfig(), key, stream!.name, records, now, fields, {
+    const found = interpret(getConfig(), getRegistry(), key, stream!.name, records, now, fields, {
       live,
       firstIndex: ingested,
       severityMax: severityScaleOf(seen, fields),
     });
     ingested += records.length;
-    const columns = titleCandidates(seen);
+    const columns = titleCandidates(seen, detected);
     update(key, (state) => {
       // Records carrying an id replace the earlier version of themselves: a
       // stream of updates to one incident is one event that moves or changes.
@@ -366,12 +394,13 @@ function runStream(
     const fields = effective();
     const severityMax = severityScaleOf(seen, fields);
     const first = ingested - seen.length;
-    const tail = interpret(config, key, stream.name, seen.slice(0, backfilled), now, fields, {
+    const categories = getRegistry();
+    const tail = interpret(config, categories, key, stream.name, seen.slice(0, backfilled), now, fields, {
       live: false,
       firstIndex: first,
       severityMax,
     });
-    const live = interpret(config, key, stream.name, seen.slice(backfilled), now, fields, {
+    const live = interpret(config, categories, key, stream.name, seen.slice(backfilled), now, fields, {
       live: true,
       firstIndex: first + backfilled,
       severityMax,

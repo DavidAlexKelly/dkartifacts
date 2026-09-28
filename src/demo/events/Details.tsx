@@ -8,9 +8,12 @@
 
 import React from "react";
 import { panelFigures, panelMuted, panelSeparator, surface } from "@/components/mapPanel";
-import { CATEGORIES, SEVERITY_COLOURS } from "./eventsLayer";
+import { SEVERITY_COLOURS } from "./eventsLayer";
+import { categoryMeta, type CategoryRegistry } from "./categories";
+import { MediaPreview } from "./MediaPreview";
 import type { MonitorEvent } from "./mockEvents";
 import type { MonitorArea } from "./sources/interpret";
+import type { MediaRef } from "./sources/media";
 import { absoluteTime, capitalise, displayValue, relativeTime } from "./format";
 import {
   actionButton,
@@ -26,13 +29,25 @@ import {
   liveBadge,
   metricTile,
   metricsGrid,
+  select,
 } from "./styles";
+
+/** What the category picker needs: the choices, and what "Automatic" would give. */
+export interface CategoryChoice {
+  registry: CategoryRegistry;
+  /** The category chosen for this item by hand, if any. */
+  chosen: string | undefined;
+  /** The category it gets without that choice: the data's, or a source setting's. */
+  automatic: string;
+  onChange: (category: string | undefined) => void;
+}
 
 export function EventDetails({
   event,
   now,
   groundHeight,
   demReady,
+  categoryChoice,
   onZoom,
   onClose,
 }: {
@@ -40,10 +55,11 @@ export function EventDetails({
   now: number;
   groundHeight: number | null | "loading";
   demReady: boolean;
+  categoryChoice: CategoryChoice;
   onZoom: () => void;
   onClose: () => void;
 }): React.ReactElement {
-  const category = CATEGORIES[event.category];
+  const category = categoryMeta(categoryChoice.registry, event.category);
   const location = [event.place, event.country].filter(Boolean).join(", ");
   return (
     <div style={detailsPanel} role="dialog" aria-label={event.title}>
@@ -64,6 +80,8 @@ export function EventDetails({
       </div>
 
       {event.summary && <p style={{ margin: "8px 0 4px", lineHeight: 1.5 }}>{event.summary}</p>}
+
+      {event.media && event.media.length > 0 && <MediaSection media={event.media} />}
 
       {event.metrics.length > 0 && (
         <div style={{ ...metricsGrid, marginTop: 6 }}>
@@ -103,6 +121,10 @@ export function EventDetails({
         <dd style={factValue}>{event.source}</dd>
         <dt style={panelMuted}>Event id</dt>
         <dd style={{ ...factValue, ...panelFigures, wordBreak: "break-all" }}>{event.id}</dd>
+        <dt style={panelMuted}>Category</dt>
+        <dd style={factValue}>
+          <CategoryPicker choice={categoryChoice} />
+        </dd>
       </dl>
 
       {event.fields && <RawFields fields={event.fields} />}
@@ -116,14 +138,16 @@ export function EventDetails({
 
 export function AreaDetails({
   area,
+  categoryChoice,
   onZoom,
   onClose,
 }: {
   area: MonitorArea;
+  categoryChoice: CategoryChoice;
   onZoom: () => void;
   onClose: () => void;
 }): React.ReactElement {
-  const category = CATEGORIES[area.category];
+  const category = categoryMeta(categoryChoice.registry, area.category);
   return (
     <div style={detailsPanel} role="dialog" aria-label={area.name}>
       <div style={{ ...detailsStripe, background: category.colour }} />
@@ -136,11 +160,47 @@ export function AreaDetails({
       </div>
       <div style={{ font: "600 15px/1.35 sans-serif", marginTop: 6 }}>{area.name}</div>
       <div style={panelMuted}>Area · {area.source}</div>
+      <label style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6 }}>
+        <span style={panelMuted}>Category</span>
+        <CategoryPicker choice={categoryChoice} />
+      </label>
+      {area.media && area.media.length > 0 && <MediaSection media={area.media} />}
       <RawFields fields={area.fields} open />
       <button type="button" style={{ ...actionButton, marginTop: 8 }} onClick={onZoom}>
         Zoom to area
       </button>
     </div>
+  );
+}
+
+/** Every media item the record references. */
+function MediaSection({ media }: { media: MediaRef[] }): React.ReactElement {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 8 }}>
+      {media.map((item) => (
+        <MediaPreview key={`${item.field}:${item.mediaItemRid}`} media={item} />
+      ))}
+    </div>
+  );
+}
+
+/** "Automatic (what it would be)", then every category. */
+function CategoryPicker({ choice }: { choice: CategoryChoice }): React.ReactElement {
+  const { registry, chosen, automatic, onChange } = choice;
+  return (
+    <select
+      value={chosen ?? ""}
+      onChange={(event) => onChange(event.target.value || undefined)}
+      style={{ ...select, width: "100%" }}
+      aria-label="Category"
+    >
+      <option value="">Automatic ({categoryMeta(registry, automatic).label})</option>
+      {registry.order.map((id) => (
+        <option key={id} value={id}>
+          {registry.byId[id].label}
+        </option>
+      ))}
+    </select>
   );
 }
 

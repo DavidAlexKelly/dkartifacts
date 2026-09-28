@@ -7,11 +7,10 @@
 import { describe, expect, it } from "vitest";
 import type { ExtensionContext } from "@acc/decho-basemap";
 import {
-  CATEGORY_ORDER,
   CLUSTER_MAX_ZOOM,
   EVENTS_SOURCE,
   EVENT_LAYERS,
-  categoryCountProperty,
+  categoryColour,
   clusterBreakdown,
   eventsExtension,
   filterEvents,
@@ -20,6 +19,9 @@ import {
 } from "./eventsLayer";
 import { SEVERITIES, generateEvents, severityRank } from "./mockEvents";
 import { relativeTime } from "./format";
+import { BUILTIN_REGISTRY, buildRegistry, parseCustomCategory } from "./categories";
+
+const CATEGORY_ORDER = BUILTIN_REGISTRY.order;
 
 const NOW = Date.UTC(2026, 8, 28, 12);
 const DAY = 24 * 60 * 60 * 1000;
@@ -69,17 +71,15 @@ describe("the mock events", () => {
 });
 
 describe("filtering", () => {
-  const all = new Set(CATEGORY_ORDER);
-
   it("keeps everything with no restriction", () => {
     expect(
-      filterEvents(events, { categories: all, minSeverity: "low", windowMs: null, now: NOW }),
+      filterEvents(events, { hidden: new Set(), minSeverity: "low", windowMs: null, now: NOW }),
     ).toHaveLength(events.length);
   });
 
   it("applies category, severity and window together", () => {
     const result = filterEvents(events, {
-      categories: new Set(["conflict"] as const),
+      hidden: new Set(CATEGORY_ORDER.filter((c) => c !== "conflict")),
       minSeverity: "high",
       windowMs: 7 * DAY,
       now: NOW,
@@ -94,7 +94,7 @@ describe("filtering", () => {
 
   it("returns nothing when every category is off", () => {
     expect(
-      filterEvents(events, { categories: new Set(), minSeverity: "low", windowMs: null, now: NOW }),
+      filterEvents(events, { hidden: new Set(CATEGORY_ORDER), minSeverity: "low", windowMs: null, now: NOW }),
     ).toEqual([]);
   });
 });
@@ -118,13 +118,20 @@ describe("the extension", () => {
     }
   });
 
-  it("aggregates severity and a count per category on clusters", async () => {
+  it("aggregates only severity on clusters, so categories can change at runtime", async () => {
     const contribution = await eventsExtension(events).style!(ctx);
     const properties = contribution.sources![EVENTS_SOURCE].clusterProperties;
-    expect(properties.maxSeverity).toEqual(["max", ["get", "severity"]]);
-    for (const category of CATEGORY_ORDER) {
-      expect(properties[categoryCountProperty(category)], category).toBeDefined();
-    }
+    expect(properties).toEqual({ maxSeverity: ["max", ["get", "severity"]] });
+  });
+
+  it("colours points by the registry it is given, custom categories included", async () => {
+    const custom = parseCustomCategory("Border incidents|#ff8800");
+    if (!custom.ok) {throw new Error(custom.error);}
+    const registry = buildRegistry([custom.def]);
+    const contribution = await eventsExtension(events, registry).style!(ctx);
+    const point = contribution.layers!.find((layer) => layer.id === EVENT_LAYERS.point);
+    expect(JSON.stringify(point.paint["circle-color"])).toContain('"custom:border-incidents","#ff8800"');
+    expect(categoryColour(registry)).toEqual(point.paint["circle-color"]);
   });
 
   it("draws on top rather than under the labels", async () => {
@@ -150,16 +157,16 @@ describe("features", () => {
 });
 
 describe("cluster hover", () => {
-  it("lists non-zero categories, largest first", () => {
-    const breakdown = clusterBreakdown({
-      point_count: 9,
-      [categoryCountProperty("conflict")]: 5,
-      [categoryCountProperty("cyber")]: 0,
-      [categoryCountProperty("protest")]: 4,
-    });
+  it("counts a cluster's events by category, largest first", () => {
+    const leaf = (category: string) => ({ properties: { category } });
+    const breakdown = clusterBreakdown([
+      leaf("conflict"), leaf("protest"), leaf("conflict"), leaf("custom:x"), leaf("conflict"),
+      { properties: null },
+    ]);
     expect(breakdown).toEqual([
-      { category: "conflict", count: 5 },
-      { category: "protest", count: 4 },
+      { category: "conflict", count: 3 },
+      { category: "protest", count: 1 },
+      { category: "custom:x", count: 1 },
     ]);
   });
 });

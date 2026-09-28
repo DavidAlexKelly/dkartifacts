@@ -5,7 +5,8 @@
 
 import React, { useState } from "react";
 import { panelCheckbox, panelFigures, panelMuted, panelToggle } from "@/components/mapPanel";
-import { CATEGORIES, CATEGORY_ORDER } from "./eventsLayer";
+import { categoryMeta, type CategoryRegistry } from "./categories";
+import type { CategoryOverrides } from "./categoryOverrides";
 import type { EventCategory } from "./mockEvents";
 import { describeFieldMap } from "./format";
 import {
@@ -54,6 +55,12 @@ export interface SourcesSectionProps {
   onReload: (key: string) => void;
   /** A column to title the source's events with, or undefined for detected. */
   onTitleChange: (key: string, field: string | undefined) => void;
+  registry: CategoryRegistry;
+  overrides: CategoryOverrides;
+  /** Put a whole source into a category, or undefined to detect again. */
+  onSourceCategory: (key: string, category: string | undefined) => void;
+  /** Put every record of a source whose category value is `value` into a category. */
+  onValueCategory: (key: string, value: string, category: string | undefined) => void;
   /** Why edits here will not be remembered, when they will not. */
   sessionOnly: "url" | "workshop" | null;
   /** Sources set by Workshop variables: shown, not removable here. */
@@ -76,6 +83,10 @@ export function SourcesSection({
   pinnedKeys,
   workshopProblems,
   waitingForWorkshop,
+  registry,
+  overrides,
+  onSourceCategory,
+  onValueCategory,
 }: SourcesSectionProps): React.ReactElement {
   const problems = states.filter((state) => state.problem).length + workshopProblems.length;
   const live = states.some((state) => state.status === "live");
@@ -104,6 +115,11 @@ export function SourcesSection({
             onReload={() => onReload(state.key)}
             onTitleChange={(field) => onTitleChange(state.key, field)}
             pinned={pinnedKeys.has(state.key)}
+            registry={registry}
+            forced={overrides.sources[state.key]}
+            valueOverrides={overrides.values[state.key] ?? {}}
+            onSourceCategory={(category) => onSourceCategory(state.key, category)}
+            onValueCategory={(value, category) => onValueCategory(state.key, value, category)}
           />
         ))}
         {waitingForWorkshop && <div style={panelMuted}>Waiting for Workshop's variables…</div>}
@@ -122,7 +138,7 @@ export function SourcesSection({
             widget's event-monitor variables to keep them.
           </div>
         )}
-        <AddSourceForm onAdd={onAdd} />
+        <AddSourceForm onAdd={onAdd} registry={registry} />
       </div>
     </details>
   );
@@ -134,6 +150,11 @@ function SourceRow({
   onReload,
   onTitleChange,
   pinned,
+  registry,
+  forced,
+  valueOverrides,
+  onSourceCategory,
+  onValueCategory,
 }: {
   state: SourceState;
   onRemove: () => void;
@@ -141,6 +162,12 @@ function SourceRow({
   onTitleChange: (field: string | undefined) => void;
   /** From a Workshop variable: removed there, not here. */
   pinned: boolean;
+  registry: CategoryRegistry;
+  /** The category everything in this source was put into, if any. */
+  forced: string | undefined;
+  valueOverrides: Record<string, string>;
+  onSourceCategory: (category: string | undefined) => void;
+  onValueCategory: (value: string, category: string | undefined) => void;
 }): React.ReactElement {
   const { status, problem, fields } = state;
   const title = state.config.item ? `${state.name} · ${state.config.rid}` : state.config.rid;
@@ -191,7 +218,19 @@ function SourceRow({
       )}
       {fields?.geo && <div style={{ ...panelMuted, wordBreak: "break-word" }}>{describeFieldMap(fields)}</div>}
       {state.config.category && (
-        <div style={panelMuted}>Default category: {CATEGORIES[state.config.category].label}</div>
+        <div style={panelMuted}>
+          Default category: {categoryMeta(registry, state.config.category).label}
+        </div>
+      )}
+      {status !== "loading" && status !== "error" && state.events.length + state.areas.length > 0 && (
+        <CategoryControls
+          state={state}
+          registry={registry}
+          forced={forced}
+          valueOverrides={valueOverrides}
+          onSourceCategory={onSourceCategory}
+          onValueCategory={onValueCategory}
+        />
       )}
 
       {problem && (
@@ -244,7 +283,105 @@ function TitlePicker({
   );
 }
 
-function AddSourceForm({ onAdd }: { onAdd: (config: SourceConfig) => void }): React.ReactElement {
+/** How many distinct values the mapping list shows before summarising the rest. */
+const VALUE_LIMIT = 40;
+
+/**
+ * "Category: Detect / <category>" for the whole source, and — while it is not
+ * forced into one — a category for each value of its category column.
+ */
+function CategoryControls({
+  state,
+  registry,
+  forced,
+  valueOverrides,
+  onSourceCategory,
+  onValueCategory,
+}: {
+  state: SourceState;
+  registry: CategoryRegistry;
+  forced: string | undefined;
+  valueOverrides: Record<string, string>;
+  onSourceCategory: (category: string | undefined) => void;
+  onValueCategory: (value: string, category: string | undefined) => void;
+}): React.ReactElement {
+  // Distinct values as interpreted, before any override: how many records
+  // say each, and the category detection gave them.
+  const values = new Map<string, { count: number; detected: string }>();
+  for (const item of [...state.events, ...state.areas]) {
+    if (!item.categoryValue) {continue;}
+    const entry = values.get(item.categoryValue);
+    if (entry) {entry.count++;}
+    else {values.set(item.categoryValue, { count: 1, detected: item.category });}
+  }
+  const sorted = [...values].sort((a, b) => b[1].count - a[1].count);
+  const mapped = Object.keys(valueOverrides).filter((value) => registry.byId[valueOverrides[value]]).length;
+
+  return (
+    <>
+      <label style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <span style={{ ...panelMuted, flex: "none" }}>Category</span>
+        <select
+          value={forced && registry.byId[forced] ? forced : ""}
+          onChange={(event) => onSourceCategory(event.target.value || undefined)}
+          style={{ ...select, flex: 1, minWidth: 0 }}
+          aria-label="Source category"
+        >
+          <option value="">Detect from the data</option>
+          {registry.order.map((id) => (
+            <option key={id} value={id}>
+              All as {registry.byId[id].label}
+            </option>
+          ))}
+        </select>
+      </label>
+      {!forced && sorted.length > 0 && (
+        <details>
+          <summary style={{ ...panelMuted, cursor: "pointer" }}>
+            Map values ({sorted.length}
+            {mapped > 0 ? `, ${mapped} mapped` : ""})
+          </summary>
+          <div style={{ display: "flex", flexDirection: "column", gap: 3, marginTop: 4 }}>
+            {sorted.slice(0, VALUE_LIMIT).map(([value, { count, detected }]) => (
+              <label key={value} style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ ...panelMuted, flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={value}>
+                  {value} <span style={panelFigures}>{count}</span>
+                </span>
+                <select
+                  value={valueOverrides[value] && registry.byId[valueOverrides[value]] ? valueOverrides[value] : ""}
+                  onChange={(event) => onValueCategory(value, event.target.value || undefined)}
+                  style={{ ...select, width: 130, flex: "none" }}
+                  aria-label={`Category for ${value}`}
+                >
+                  <option value="">{categoryMeta(registry, detected).label}</option>
+                  {registry.order.map((id) => (
+                    <option key={id} value={id}>
+                      → {registry.byId[id].label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ))}
+            {sorted.length > VALUE_LIMIT && (
+              <div style={panelMuted}>
+                …and {sorted.length - VALUE_LIMIT} rarer values. Put the whole source into a
+                category, or single events from their details panel.
+              </div>
+            )}
+          </div>
+        </details>
+      )}
+    </>
+  );
+}
+
+function AddSourceForm({
+  onAdd,
+  registry,
+}: {
+  onAdd: (config: SourceConfig) => void;
+  registry: CategoryRegistry;
+}): React.ReactElement {
   const [kind, setKind] = useState<SourceKind>("dataset");
   const [text, setText] = useState("");
   const [category, setCategory] = useState<EventCategory | "">("");
@@ -297,9 +434,9 @@ function AddSourceForm({ onAdd }: { onAdd: (config: SourceConfig) => void }): Re
           title="Category for records that do not say"
         >
           <option value="">Category: detect</option>
-          {CATEGORY_ORDER.map((key) => (
+          {registry.order.map((key) => (
             <option key={key} value={key}>
-              {CATEGORIES[key].label}
+              {registry.byId[key].label}
             </option>
           ))}
         </select>

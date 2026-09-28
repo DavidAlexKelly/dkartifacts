@@ -7,7 +7,8 @@
  */
 
 import type { BasemapExtension } from "@acc/decho-basemap";
-import { CATEGORIES, CATEGORY_ORDER } from "./eventsLayer";
+import { BUILTIN_REGISTRY, type CategoryRegistry } from "./categories";
+import { categoryColour } from "./eventsLayer";
 import type { MonitorArea } from "./sources/interpret";
 
 export const AREAS_SOURCE = "event-areas";
@@ -31,15 +32,6 @@ export function areasToFeatureCollection(areas: readonly MonitorArea[]) {
   };
 }
 
-function categoryColour(): unknown[] {
-  return [
-    "match",
-    ["get", "category"],
-    ...CATEGORY_ORDER.flatMap((category) => [category, CATEGORIES[category].colour]),
-    "#9aa5b1",
-  ];
-}
-
 const IS_POLYGON = ["match", ["geometry-type"], ["Polygon", "MultiPolygon"], true, false];
 const IS_LINE = ["match", ["geometry-type"], ["LineString", "MultiLineString"], true, false];
 
@@ -49,14 +41,14 @@ export function areaSelectionFilter(id: string | null): unknown[] {
 
 /* eslint-disable @typescript-eslint/no-explicit-any --
    Layer specifications, validated by MapLibre; see eventsLayer.ts. */
-export function areaLayers(): any[] {
+export function areaLayers(registry: CategoryRegistry = BUILTIN_REGISTRY): any[] {
   return [
     {
       id: AREA_LAYERS.fill,
       type: "fill",
       source: AREAS_SOURCE,
       filter: IS_POLYGON,
-      paint: { "fill-color": categoryColour(), "fill-opacity": 0.16 },
+      paint: { "fill-color": categoryColour(registry), "fill-opacity": 0.16 },
     },
     {
       id: AREA_LAYERS.outline,
@@ -64,7 +56,7 @@ export function areaLayers(): any[] {
       source: AREAS_SOURCE,
       filter: IS_POLYGON,
       paint: {
-        "line-color": categoryColour(),
+        "line-color": categoryColour(registry),
         "line-width": 1.5,
         "line-opacity": 0.85,
         "line-dasharray": [3, 2],
@@ -76,7 +68,7 @@ export function areaLayers(): any[] {
       source: AREAS_SOURCE,
       filter: IS_LINE,
       layout: { "line-cap": "round", "line-join": "round" },
-      paint: { "line-color": categoryColour(), "line-width": 3, "line-opacity": 0.85 },
+      paint: { "line-color": categoryColour(registry), "line-width": 3, "line-opacity": 0.85 },
     },
     {
       id: AREA_LAYERS.selected,
@@ -89,14 +81,17 @@ export function areaLayers(): any[] {
 }
 /* eslint-enable @typescript-eslint/no-explicit-any */
 
-export function areasExtension(initial: readonly MonitorArea[]): BasemapExtension {
+export function areasExtension(
+  initial: readonly MonitorArea[],
+  registry: CategoryRegistry = BUILTIN_REGISTRY,
+): BasemapExtension {
   return {
     id: "event-areas",
     style: () => ({
       sources: {
         [AREAS_SOURCE]: { type: "geojson", data: areasToFeatureCollection(initial) },
       },
-      layers: areaLayers(),
+      layers: areaLayers(registry),
       before: "labels",
     }),
   };
@@ -110,4 +105,23 @@ export function setAreaData(
     | { setData(data: ReturnType<typeof areasToFeatureCollection>): unknown }
     | undefined;
   source?.setData(areasToFeatureCollection(areas));
+}
+
+/** Area colours for a registry that changed after the map was built. */
+export function setAreaCategoryColours(
+  map: {
+    getLayer(id: string): unknown;
+    setPaintProperty(layer: string, name: string, value: unknown): unknown;
+  },
+  registry: CategoryRegistry,
+): void {
+  const colour = categoryColour(registry);
+  const paint: Array<[string, string]> = [
+    [AREA_LAYERS.fill, "fill-color"],
+    [AREA_LAYERS.outline, "line-color"],
+    [AREA_LAYERS.line, "line-color"],
+  ];
+  for (const [layer, property] of paint) {
+    if (map.getLayer(layer)) {map.setPaintProperty(layer, property, colour);}
+  }
 }

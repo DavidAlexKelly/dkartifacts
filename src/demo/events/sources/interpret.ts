@@ -19,7 +19,7 @@
  * it guessed rather than leaving someone to wonder why nothing appeared.
  */
 
-import { CATEGORIES } from "../eventsLayer";
+import { BUILTIN_REGISTRY, categoryMeta, matchCategory, type CategoryRegistry } from "../categories";
 import {
   SEVERITIES,
   type EventCategory,
@@ -28,6 +28,13 @@ import {
   type Severity,
 } from "../mockEvents";
 import { parsePoint, parseShape, isValidLatLng, type LatLng, type Shape } from "./geo";
+import {
+  isMediaReferenceObject,
+  mediaRefsIn,
+  parseMediaRef,
+  recordMediaSet,
+  type MediaRef,
+} from "./media";
 
 export type GeoMapping =
   | { kind: "latlng"; lat: string; lng: string }
@@ -49,6 +56,8 @@ export interface FieldMap {
   source?: string;
   magnitude?: string;
   casualties?: string;
+  /** Columns holding media item references, previewed in the details panel. */
+  media?: string[];
 }
 
 export interface MonitorArea {
@@ -56,9 +65,12 @@ export interface MonitorArea {
   sourceKey: string;
   name: string;
   category: EventCategory;
+  /** The source's own word for the category, for mapping values to categories. */
+  categoryValue?: string;
   geometry: Shape;
   source: string;
   fields: Record<string, unknown>;
+  media?: MediaRef[];
 }
 
 export interface InterpretContext {
@@ -69,6 +81,8 @@ export interface InterpretContext {
   defaultCategory?: EventCategory;
   /** For sanity-checking times: anything more than a year ahead is rejected. */
   now: number;
+  /** Categories to sort into, custom ones included. Built-ins when absent. */
+  categories?: CategoryRegistry;
   live?: boolean;
   /**
    * Position of the first record in the source, for records with no id of
@@ -270,6 +284,17 @@ export function detectFields(
   // it is known not to be the geo column, and "name" is a title before it is
   // anything else.
   const map: FieldMap = { geo };
+  // Media columns first: a media reference is JSON or a RID, and would
+  // otherwise be offered up as a title or an id.
+  const media = fields.filter(
+    (field) =>
+      !used.has(field) &&
+      sample.some((row) => parseMediaRef(row[field], field, recordMediaSet(row)) != null),
+  );
+  if (media.length > 0) {
+    map.media = media;
+    for (const field of media) {used.add(field);}
+  }
   map.time = take("time", (v) => parseTime(v, Date.now()) != null);
   map.id = take("id", isText);
   map.title = take("title", isText);
@@ -316,31 +341,18 @@ export function parseTime(value: unknown, now: number): number | null {
   return ms;
 }
 
-const CATEGORY_KEYWORDS: Array<[Exclude<EventCategory, "other">, RegExp]> = [
-  ["earthquake", /\b(earthquakes?|quakes?|seismic|tremors?|tsunami)\b/],
-  ["wildfire", /\b(wild ?fires?|bush ?fires?|forest fires?|fires?|blaze|burn(ing|ed)?|thermal anomal)/],
-  ["weather", /\b(floods?|flooding|storms?|cyclones?|hurricanes?|typhoons?|tornado(es)?|landslides?|avalanches?|drought|heat ?waves?|weather|volcan\w*|blizzard)\b/],
-  ["outbreak", /\b(outbreaks?|disease|epidemic|pandemic|cholera|ebola|measles|mpox|dengue|virus|covid|health emergency)\b/],
-  ["cyber", /\b(cyber\w*|ransomware|ddos|malware|phishing|data breach|breach|hack(ed|ing)?)\b/],
-  // Before protest: "airstrike" and "drone strike" are violence, and a bare
-  // "strike" further down is a labour one.
-  ["conflict", /\b(battles?|clash(es)?|attacks?|armed|violence|explosions?|remote violence|shelling|air ?strikes?|drone strikes?|bombing|conflict|war|fighting|ambush|terror\w*|shooting|killing|abduction)\b/],
-  ["protest", /\b(protests?|riots?|demonstrations?|strikes?|unrest|rall(y|ies)|march(es)?|civil disorder)\b/],
-  ["infrastructure", /\b(outages?|power cut|blackout|cables?|pipelines?|ports?|rail|bridges?|infrastructure|grid|telecoms?|disruption)\b/],
-  ["military", /\b(military|naval|navy|army|exercises?|troops?|deployments?|patrol|warships?|carrier|missile test|strategic developments?|air defen[cs]e|isr)\b/],
-];
-
-export function categoryFrom(...texts: Array<unknown>): EventCategory | null {
+/**
+ * The first of `texts` that names a category: exactly (an id or a label), or
+ * by a keyword — see categories.ts, which also decides the order custom and
+ * built-in keywords are tried in.
+ */
+export function categoryFrom(
+  texts: unknown[],
+  registry: CategoryRegistry = BUILTIN_REGISTRY,
+): EventCategory | null {
   for (const text of texts) {
-    if (text == null || text === "") {continue;}
-    const lower = String(text).toLowerCase().trim();
-    // A source that already uses these category names, or their labels.
-    for (const [key, meta] of Object.entries(CATEGORIES)) {
-      if (lower === key || lower === meta.label.toLowerCase()) {return key as EventCategory;}
-    }
-    for (const [category, pattern] of CATEGORY_KEYWORDS) {
-      if (pattern.test(lower)) {return category;}
-    }
+    const match = matchCategory(registry, text);
+    if (match) {return match;}
   }
   return null;
 }
@@ -458,6 +470,8 @@ export function interpretRecords(
   } else {
     mapped.add(map.geo.field);
   }
+  for (const field of map.media ?? []) {mapped.add(field);}
+  const registry = context.categories ?? BUILTIN_REGISTRY;
 
   records.forEach((record, index) => {
     const located = locate(record, map.geo!, geohash);
@@ -469,11 +483,17 @@ export function interpretRecords(
     const title = text(map.title && record[map.title]);
     const summary = text(map.summary && record[map.summary]);
     const categoryText = text(map.category && record[map.category]);
+    const alternates = (map.categoryAlternates ?? []).map((f) => record[f]);
     const category =
-      categoryFrom(categoryText, ...(map.categoryAlternates ?? []).map((f) => record[f])) ??
+      categoryFrom([categoryText, ...alternates], registry) ??
       context.defaultCategory ??
-      categoryFrom(title, summary) ??
+      categoryFrom([title, summary], registry) ??
       "other";
+    // The value a person would map to a category by hand: the category
+    // column's, or the first alternate that has one.
+    const categoryValue =
+      categoryText || alternates.map(text).find((value) => value !== "") || undefined;
+    const media = mediaRefsIn(record, map.media ?? []);
     const place = text(map.place && record[map.place]);
     const country = text(map.country && record[map.country]);
     const ownId = text(map.id && record[map.id]);
@@ -486,9 +506,11 @@ export function interpretRecords(
         sourceKey: context.sourceKey,
         name: title || place || categoryText || `Area ${index + 1}`,
         category,
+        categoryValue,
         geometry: located.shape,
         source,
         fields: record,
+        ...(media.length > 0 ? { media } : {}),
       });
       return;
     }
@@ -500,7 +522,7 @@ export function interpretRecords(
     // Pokrovsk", "ISR flight — RCH101"), which reads better in a feed than
     // the first line of a note.
     const where = place || ownId;
-    const label = CATEGORIES[category].label;
+    const label = categoryMeta(registry, category).label;
     const fallbackTitle =
       categoryText && where
         ? `${categoryText.charAt(0).toUpperCase()}${categoryText.slice(1)} — ${where}`
@@ -521,6 +543,8 @@ export function interpretRecords(
       sourceKey: context.sourceKey,
       live: context.live,
       fields: record,
+      categoryValue,
+      ...(media.length > 0 ? { media } : {}),
     });
   });
 
@@ -592,6 +616,8 @@ export function flattenRecord(record: Record<string, unknown>): Record<string, u
     }
     if (typeof value !== "object" || value === null || Array.isArray(value)) {continue;}
     if (isGeoJson(value as Record<string, unknown>)) {continue;}
+    // A media reference is one value, previewed whole — not three columns.
+    if (isMediaReferenceObject(value)) {continue;}
     for (const [inner, innerValue] of Object.entries(value as Record<string, unknown>)) {
       if (!(inner in flat)) {flat[inner] = innerValue;}
     }

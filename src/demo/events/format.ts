@@ -29,6 +29,7 @@ export function describeFieldMap(map: {
   magnitude?: string;
   casualties?: string;
   title?: string;
+  media?: string[];
 }): string {
   const parts: string[] = [];
   if (map.geo) {
@@ -41,6 +42,7 @@ export function describeFieldMap(map: {
   if (map.category) {parts.push(`category ← ${map.category}`);}
   const severity = map.severity ?? map.magnitude ?? map.casualties;
   if (severity) {parts.push(`severity ← ${severity}`);}
+  if (map.media && map.media.length > 0) {parts.push(`media ← ${map.media.join(", ")}`);}
   return parts.join(" · ");
 }
 

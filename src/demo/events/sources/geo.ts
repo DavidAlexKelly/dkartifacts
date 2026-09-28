@@ -107,14 +107,14 @@ function isPlainDecimal(text: string): boolean {
 }
 
 /** A WKT ordinate: digits, sign, point and exponent only — never hex or "Infinity". */
-function toOrdinate(token: string): number | null {
-  if (token === "") {return null;}
-  for (const ch of token) {
+function toOrdinate(part: string): number | null {
+  if (part.length === 0) {return null;}
+  for (const ch of part) {
     if (!((ch >= "0" && ch <= "9") || ch === "." || ch === "-" || ch === "+" || ch === "e" || ch === "E")) {
       return null;
     }
   }
-  const n = Number(token);
+  const n = Number(part);
   return Number.isFinite(n) ? n : null;
 }
 
