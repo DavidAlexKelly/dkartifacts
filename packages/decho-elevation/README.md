@@ -530,9 +530,11 @@ node and could qualify this later.
    appears broken, and it is why each extension logs and contributes nothing
    rather than failing the whole map — a missing Resource costs you the relief,
    or the contours, not the map.
-3. **Peers:** `@acc/decho-basemap@>=0.8`. `react` only for `./react`. There is
-   **no** maplibre-gl peer: the extension is handed the `maplibregl` namespace
-   by the basemap and types the map structurally.
+3. **Peers:** `@acc/decho-foundry-bytes@^0.1` for everything.
+   `@acc/decho-basemap@>=0.8 <0.12` only for `./extension`, and `react` only
+   for `./react`; both are optional peers. There is **no** maplibre-gl peer:
+   the extension is handed the `maplibregl` namespace by the basemap and types
+   the map structurally.
 
 ## Memory, and two budgets that add up
 
@@ -544,8 +546,8 @@ narrowed: its usual nodata sentinel is 65535, which would wrap to −1 and put a
 one-pixel trench through the map.
 
 
-A cell in view costs its **file bytes** in the basemap byte layer's 128 MB
-resident LRU *plus* its **decoded grid** here (11.5 MB for a 2° Int16 cell,
+A cell in view costs its **file bytes** in `@acc/decho-foundry-bytes`' 128 MB
+resident LRU (shared with the basemap and anything else built on it) *plus* its **decoded grid** here (11.5 MB for a 2° Int16 cell,
 23 MB as Float32). This package's own budget is therefore in bytes, not cells —
 "four cells" is 46 MB or 92 MB depending on a dtype, which is not a budget — and
 defaults to 96 MB. Tune with `cellBudgetBytes`; `source.stats()` reports what is
@@ -557,10 +559,8 @@ reason.
 ## Notes and limits
 
 - **Terrain and the tactical graphics overlay agree** — checked, not assumed.
-  An earlier draft of this note warned that `@acc/app6d`'s overlay
-  would drift with `terrain` on, because it positions graphics with
-  `map.project()`. That was wrong: since MapLibre 3, `project()` and
-  `unproject()` both take terrain into account (`locationToScreenPoint(…,
+  `@acc/app6d`'s overlay positions graphics with `map.project()`, and since
+  MapLibre 3 `project()` and `unproject()` both take terrain into account (`locationToScreenPoint(…,
   this.terrain)`), so they agree with `maplibregl.Marker`, which is what the
   same adapter uses for unit icons. Symbols and units sit on the hillside
   together.
@@ -583,12 +583,24 @@ reason.
   aborted tile cancel it would throw away work the next tile needs. The transfer
   underneath is de-duplicated by the byte layer either way.
 
+## Package notes
+
+Why the manifest and build are the way they are.
+
+- **`src/` is shipped** in the tarball: the `.js.map` and `.d.ts.map` files point at `../src/*`, so without it every stack trace and go-to-definition in a consumer dead-ends. It also makes the tarball a complete, relocatable copy of the package.
+- **Three entry points, in ascending order of what they assume.** `.` decodes DEM cells and answers questions about heights; it imports no React and no maplibre-gl, so a worker or a Function can use it. `./react` adds hooks and a profile chart. `./extension` is the plug-in for `@acc/decho-basemap` and is the only entry point that needs a map at all.
+- **Peers follow the entry points.** `@acc/decho-foundry-bytes` is required: every read goes through it (`src/core/bytes.ts` is the single import site). `@acc/decho-basemap` is optional and only `./extension` uses it, for the `BasemapExtension` contract and `createTileSource`. maplibre-gl is deliberately not a peer: the extension is handed the `maplibregl` namespace by the basemap and types the map structurally.
+- **Sibling `@acc/*` peers are bounded at the next version allowed to break.** For a `0.x` package that is the next minor, so `^0.1.0` rather than `>=0.1.0`: an open range would accept a breaking release this package was never tested against. Widen the range in a release of this package once it has been checked against the new sibling. The basemap range starts at 0.8.0, the oldest release this package supports, and stops before 0.12.0, the next basemap minor.
+- **React is `^18.0.0 || ^19.0.0`**, the same range across every package in this repo. It is optional: only `./react` needs it.
+- **`"sideEffects": false`:** no module here does anything at import time beyond defining module-level caches, so bundlers may drop whatever a consumer does not import.
+
 ## Development
 
 Built and tested from the repository root; see the [root
-README](../../README.md). `npm run build` here builds `@acc/decho-basemap`
-first, because this package's build resolves it to its emitted declarations
-rather than its source.
+README](../../README.md). `npm run build` is `tsc -b`: the build config
+references `@acc/decho-foundry-bytes` and `@acc/decho-basemap`, so it builds
+whichever of them is out of date first and compiles against their emitted
+declarations rather than their source.
 
 The GeoTIFF reader is tested against TIFFs written by
 `src/core/testing/tiff.ts` — endianness, strips against tiles, tile padding,

@@ -626,6 +626,17 @@ if you were previously relying on the built-in symbol set.
 
 See `CHANGELOG.md` for the full version history.
 
+## Package notes
+
+Why the manifest and build are the way they are.
+
+- **`src/` is shipped** in the tarball: the `.js.map` and `.d.ts.map` files point at `../src/*`, so without it every stack trace and go-to-definition in a consumer dead-ends. It also makes the tarball a complete, relocatable copy of the package. (An old `.npmignore` listed `src` as excluded; `files` wins over `.npmignore`.)
+- **Why this package differs from its siblings.** It is also published to the public npm registry, so it is MIT-licensed, and it ships CommonJS alongside ESM (via tsup) for consumers outside Foundry. The sibling packages are Foundry-only, UNLICENSED and ESM-only, built with plain `tsc`.
+- **Peers are optional and bounded by major:** `maplibre-gl` `^3 || ^4 || ^5` (only `./maplibre` and `./extension`), `milsymbol` `^3` (only `./milsymbol`), `react` `^18 || ^19` (only `./react`).
+- **`"sideEffects": false`:** no module registers anything at import time — catalogs are built by calling functions — so a consumer importing one symbol does not pay for the whole catalog.
+- **Tests:** `OrderHandleController.test.ts` needs `jsdom` (via a `// @vitest-environment jsdom` docblock); the rest of the suite runs in node. Without it that one file fails to load while the others still pass, so keep it when pruning dev dependencies.
+- **No `lint` script:** the repository's flat eslint config at the root lints `packages/*/src` with the same rules as everything else.
+
 ## Development
 
 Install once at the **repository root** — this directory has no

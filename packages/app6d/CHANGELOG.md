@@ -2,6 +2,23 @@
 
 All notable changes to this project are documented here.
 
+## Unreleased
+
+### Breaking
+
+- Peers are bounded by major instead of open-ended: `maplibre-gl`
+  `^3.0.0 || ^4.0.0 || ^5.0.0` (was `>=3.0.0`), `milsymbol` `^3.0.0` (was
+  `>=3.0.0`), `react` `^18.0.0 || ^19.0.0` (was `>=18.0.0`). No version that
+  was ever tested is excluded; an untested future major now is.
+
+### Changed
+
+- `"sideEffects": false` (was `true`). Nothing in the package runs at import
+  time, so bundlers can now drop the parts of the catalog a consumer does not
+  import.
+- Doc comments in `./orders` no longer describe the deprecated
+  `@acc/decho-mil-map` as if it were current.
+
 ## 3.7.0
 
 **Graphics that are in the world, not on the glass.** `createMaplibreTacticGraphics`

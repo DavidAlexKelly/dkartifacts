@@ -14,8 +14,8 @@ the concurrency lanes with anything else built on it — `@acc/decho-basemap`
 included, when both are present. Like the basemap, it makes no external network
 calls.
 
-It is also the router `@acc/decho-mil-map` declares and deliberately does not
-implement.
+It is also the `OrderRouter` that `@acc/app6d/orders` declares and deliberately
+does not implement.
 
 ## Quick start
 
@@ -44,13 +44,15 @@ const pathfinder = createPathfinder({ profile: WHEELED });
 const { waypoints, distanceM, etaS } = await pathfinder.route(from, to);
 ```
 
-## Composing with the military map
+## Composing with military orders
 
-`@acc/decho-mil-map` accepts an injected `OrderRouter` and draws a straight line
-when there is none. This package produces one, and neither package imports the
-other — the shapes match structurally, and the app is what wires them together:
+`@acc/app6d/orders` accepts an injected `OrderRouter` and draws a straight line
+when there is none (`resolveRoute(router, request)`, with `router` undefined).
+This package produces one, and neither package imports the other — the shapes
+match structurally, and the app is what wires them together:
 
 ```tsx
+import { resolveRoute } from "@acc/app6d/orders";
 import { useOrderRouter } from "@acc/decho-pathfinding/react";
 
 const { router } = useOrderRouter({
@@ -58,11 +60,13 @@ const { router } = useOrderRouter({
   onError: (err) => toast(String(err)),
 });
 
-<DechoMilMap router={router} units={units} orders={orders} … />;
+// wherever the app assigns an order:
+const { route, fallback } = await resolveRoute(router, { from, to, unit, order });
 ```
 
-Assigned orders now follow terrain. Remove the prop and everything still works,
-with straight lines.
+Assigned orders now follow terrain. Pass no router and everything still works,
+with straight lines. The harness app's `src/mil/useMilMap.ts` is a complete
+example of an order workflow that takes a router this way.
 
 ## Three layers, pick your altitude
 
@@ -225,6 +229,17 @@ archive. Parsed, it becomes columnar typed arrays in CSR form; the graph source
 keeps 24 of them (96 MB) by default, which is a budget separate from the byte
 layer's own resident cache of raw bodies.
 
+## Package notes
+
+Why the manifest and build are the way they are.
+
+- **`src/` is shipped** in the tarball: the `.js.map` and `.d.ts.map` files point at `../src/*`, so without it every stack trace and go-to-definition in a consumer dead-ends. It also makes the tarball a complete, relocatable copy of the package.
+- **Build:** `npm run build` is `tsc -b tsconfig.build.json`. The build config references `@acc/decho-foundry-bytes`, so `tsc -b` builds it first when it is out of date and compiles against its emitted declarations rather than its source. The build info file is written into `dist/` (so deleting `dist` always forces a rebuild) and excluded from the tarball.
+- **`@acc/decho-foundry-bytes`, not `@acc/decho-basemap`, is the peer:** this package computes paths and has nothing to do with rendering, so a headless consumer must not have to install a map renderer and pmtiles to read a file. maplibre-gl is not a peer either — the optional route layer types the map structurally.
+- **Sibling `@acc/*` peers are bounded at the next version allowed to break.** For a `0.x` package that is the next minor, so `^0.1.0` rather than `>=0.1.0`: an open range would accept a breaking release this package was never tested against. Widen the range in a release of this package once it has been checked against the new sibling.
+- **React is `^18.0.0 || ^19.0.0`**, the same range across every package in this repo. It is optional: only `./react` needs it.
+- **`"sideEffects": false`:** no module here does anything at import time beyond defining module-level caches, so bundlers may drop whatever a consumer does not import.
+
 ## Publishing
 
 Identical to the sibling packages — see `@acc/decho-basemap`'s README for the
@@ -232,6 +247,6 @@ Code Workspace token dance, which is not the one the Artifacts UI prints.
 
 ```bash
 cd packages/decho-pathfinding
-npm run build      # builds @acc/decho-basemap first; see the note in package.json
+npm run build      # tsc -b: builds @acc/decho-foundry-bytes first if it is out of date
 npm publish --registry "$REG/repositories/ri.artifacts.main.repository.df396b79-3da5-473f-91c2-7be67d95c46c/contents/release/npm/"
 ```

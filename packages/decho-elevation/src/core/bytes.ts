@@ -1,25 +1,21 @@
 /**
  * The one place this package reads bytes out of Foundry.
  *
- * WHY AN INDIRECTION MODULE FOR THREE RE-EXPORTS
- * ----------------------------------------------
- * The byte layer — token, retry-on-401, resident LRU, Cache Storage keyed by
- * dataset transaction RID, request de-duplication with refcounted
- * cancellation, concurrency lanes — currently lives inside
- * `@acc/decho-basemap` and is exported from it deliberately: "any Foundry app
- * streaming large dataset files gets [it] for free".
+ * Everything in src/core reads through `@acc/decho-foundry-bytes` via this
+ * module and never imports it directly, so the byte layer is one mock away in
+ * tests (see demSource.test.ts and store.test.ts) and one edit away if it
+ * moves.
  *
- * It is being extracted into `@acc/decho-foundry-bytes` so that a headless
- * consumer (a routing worker, a Function, a planner with no map) does not have
- * to install a map renderer and pmtiles to read a file. That extraction is in
- * flight on another branch.
+ * The core deliberately does not import `@acc/decho-basemap`: a headless
+ * consumer (a worker, a Function, a planner with no map) must be able to read
+ * DEM cells without installing a map renderer and pmtiles. Only ./extension
+ * depends on the basemap.
  *
- * Importing it through this module means the day it lands, moving this package
- * onto it is ONE edit here — and `@acc/decho-basemap` stops being a dependency
- * of anything but ./extension, which is the only part of this package that has
- * anything to do with a map.
- *
- * Nothing else in src/core imports @acc/decho-basemap.
+ * There is one byte layer per application: `configureBasemap` in
+ * `@acc/decho-basemap` is `configureFoundryBytes` under another name, so either
+ * configure call serves this package too, provided the application has a
+ * single copy of `@acc/decho-foundry-bytes` installed — which is why it is a
+ * peer dependency rather than a dependency.
  */
 
 export {
@@ -27,4 +23,4 @@ export {
   getLaneStats,
   isConfigured,
   settleRangeMode,
-} from "@acc/decho-basemap";
+} from "@acc/decho-foundry-bytes";

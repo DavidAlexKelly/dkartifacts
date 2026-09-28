@@ -18,20 +18,29 @@
     "sourceMap": true,
     "outDir": "dist",
     "rootDir": "src",
+    /* composite: this config can be referenced by (and can reference) the
+       sibling packages' build configs, so `tsc -b` builds them in dependency
+       order and skips whatever is up to date. The build info lives in dist so
+       that deleting dist always forces a rebuild; files[] keeps it out of the
+       tarball. */
+    "composite": true,
+    "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo",
 
-    /* The byte layer resolves to its BUILT declarations, not its source:
-       source would pull those files into this program and tsc would refuse to
-       emit ("not under rootDir"), and the emitted .d.ts here would reference
-       paths no consumer has. Declarations are never emitted, so this stays a
-       pure type reference and the import specifier survives into dist exactly
-       as written. `npm run build` builds it first. */
+    /* Sibling packages resolve to their SOURCE here, and the "references"
+       below make that safe: in build mode tsc swaps every file of a referenced
+       project for the declaration it emits, so nothing outside rootDir enters
+       this program and the import specifier survives into dist exactly as
+       written. `tsc -b` builds the references first. */
     "baseUrl": ".",
     "paths": {
-      "@acc/decho-foundry-bytes": ["../decho-foundry-bytes/dist/index.d.ts"]
+      "@acc/decho-foundry-bytes": ["../decho-foundry-bytes/src/index.ts"]
     }
   },
   "include": ["src"],
   // Tests are source, not product: they must not be emitted into dist, and
   // they would pull vitest types into a consumer's type-check.
-  "exclude": ["**/*.test.ts", "**/*.test.tsx"]
+  "exclude": ["**/*.test.ts", "**/*.test.tsx"],
+  "references": [
+    { "path": "../decho-foundry-bytes/tsconfig.build.json" }
+  ]
 }

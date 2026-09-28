@@ -551,6 +551,15 @@ does so silently.
 The components, the recipes and their class stylesheet are
 `@acc/decho-components`.
 
+## Package notes
+
+Why the manifest and build are the way they are.
+
+- **`src/` is shipped** in the tarball, for the source maps (they point at `../src/*`) and because the CSS and JSON entry points *are* `src` files: tsc copies no assets, and adding a bundler to a package whose whole job is not to need one would be a poor trade.
+- **Build:** `npm run build` is `tsc -b tsconfig.build.json`. It references nothing in this repo, on purpose: a design system that has to be released after the byte layer is a design system nobody upgrades. The build info file is written into `dist/` (so deleting `dist` always forces a rebuild) and excluded from the tarball.
+- **React is an optional peer** (`^18.0.0 || ^19.0.0`, the same range as every package here). The entry point is tokens and style objects with no runtime dependency at all; a non-React widget, a test or a node script can use it.
+- **Registry:** this package and `@acc/decho-components` publish to a different Artifacts repository (`ri.artifacts.main.repository.b39ad0fb-…`) from the map packages (`…df396b79-…`), because they are meant for widget repositories across the estate, not only map consumers. A consumer that also wants a map package needs both repositories configured as backing repositories of its Libraries panel.
+
 ## Tests
 
 `npm test` from this directory, or from the repo root with everything else.

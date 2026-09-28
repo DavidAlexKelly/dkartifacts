@@ -1,11 +1,11 @@
 /**
- * useOrderRouter — one line to give @acc/decho-mil-map terrain-aware orders.
+ * useOrderRouter — one line to give @acc/app6d/orders terrain-aware orders.
  *
  *   const { router } = useOrderRouter({ profileFor: profileForUnit });
- *   <DechoMilMap router={router} units={units} orders={orders} ... />
+ *   const { route, fallback } = await resolveRoute(router, request); // app6d
  *
- * The router identity is stable for the life of the component: mil-map keeps it
- * in state while an order is being assigned, and handing it a new object on
+ * The router identity is stable for the life of the component: an order
+ * workflow typically keeps it in state while an order is being assigned, and handing it a new object on
  * every render would be a needless source of re-subscription. Callbacks are
  * read through a ref so a caller can pass inline arrow functions — the usual
  * shape — without destabilising it.
@@ -34,7 +34,7 @@ export interface UseOrderRouterOptions extends OrderRouterOptions {
 }
 
 export interface UseOrderRouterResult {
-  /** Pass straight to <DechoMilMap router={...} /> or useMilMap. */
+  /** Pass straight to `resolveRoute` from @acc/app6d/orders, or anything else that takes an `OrderRouter`. */
   router: OrderRouterLike;
   pathfinder: Pathfinder;
 }

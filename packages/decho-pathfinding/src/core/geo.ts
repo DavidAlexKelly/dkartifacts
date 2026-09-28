@@ -5,8 +5,8 @@
  * A* heuristic, and an OVERESTIMATE breaks admissibility, which silently
  * returns a route that is not the cheapest. So this uses real great-circle
  * distance rather than the degrees-as-metres shortcut used for symbol
- * placement in @acc/decho-mil-map — that one is fine for screen work and
- * would be wrong here.
+ * placement in @acc/app6d — that one is fine for screen work and would be
+ * wrong here.
  */
 
 /** IUGG mean Earth radius, the same figure the graph generator's distances assume. */

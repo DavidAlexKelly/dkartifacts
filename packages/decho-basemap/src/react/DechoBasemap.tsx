@@ -106,8 +106,8 @@ export interface DechoBasemapRef {
  * toolbar without them is a guessing game.
  *
  * Colours come from DEFAULT_SURFACE_THEME and can be overridden per map with
- * the `drawingToolbarTheme` prop — the same pattern as
- * @acc/decho-mil-map's `menuTheme`. Replace the toolbar entirely by dropping to
+ * the `drawingToolbarTheme` prop — the same pattern as the mil menus'
+ * `menuTheme`. Replace the toolbar entirely by dropping to
  * `useBasemap` and rendering your own controls against the `drawing` state.
  */
 function MapToolbar({

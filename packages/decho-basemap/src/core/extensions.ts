@@ -3,16 +3,15 @@
  *
  * WHY THIS EXISTS
  * ---------------
- * The first add-on, @acc/decho-mil-map, extended the basemap by WRAPPING it:
- * its own component renders <DechoBasemap/>, re-declares every basemap prop and
- * passes them through. That works for one add-on and collapses at two. A
- * consumer who wants elevation *and* mil graphics has no package to install,
- * because the mil map owns the Map and knows nothing about elevation, and the
- * elevation package would have to re-declare the union of both prop surfaces.
+ * An add-on that extends the basemap by WRAPPING it — rendering <DechoBasemap/>
+ * itself, re-declaring every basemap prop and passing them through — works for
+ * one add-on and collapses at two. A consumer who wants elevation *and*
+ * tactical graphics would need a wrapper that owns the Map and knows about
+ * both, re-declaring the union of both prop surfaces.
  *
- * So add-ons stop being wrappers and become plug-ins:
+ * So add-ons are plug-ins rather than wrappers:
  *
- *   <DechoBasemap extensions={[elevation({ terrain: true }), milGraphics({...})]} />
+ *   <DechoBasemap extensions={[elevation({ terrain: true }), tacticGraphics({...})]} />
  *
  * WHY TWO PHASES AND NOT JUST onMapReady
  * --------------------------------------
