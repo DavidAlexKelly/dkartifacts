@@ -76,6 +76,13 @@ export interface InterpretContext {
    * keeps one id however it arrived.
    */
   firstIndex?: number;
+  /**
+   * The largest value in the severity column, which sets the scale a number
+   * is read on. Computed from `records` when absent; a stream read in batches
+   * passes one computed over everything it has seen, so "3" means the same
+   * in every batch.
+   */
+  severityMax?: number;
 }
 
 export interface Interpreted {
@@ -403,6 +410,26 @@ function formatNumber(n: number): string {
 
 // ── Interpretation ──────────────────────────────────────────────────────────
 
+/** The largest numeric value in the severity column, or -Infinity. */
+export function severityScaleOf(records: Record<string, unknown>[], map: FieldMap): number {
+  if (!map.severity) {return -Infinity;}
+  let max = -Infinity;
+  for (const record of records) {
+    const n = toNumber(record[map.severity]);
+    if (n != null && n > max) {max = n;}
+  }
+  return max;
+}
+
+/**
+ * The detected mapping with a chosen title column in place of the detected
+ * one. The chosen column also stops counting as a metric or anything else,
+ * since `mapped` is built from the map's values.
+ */
+export function withTitle(map: FieldMap, titleField: string | undefined): FieldMap {
+  return titleField ? { ...map, title: titleField } : map;
+}
+
 const METRIC_LIMIT = 4;
 
 export function interpretRecords(
@@ -417,12 +444,7 @@ export function interpretRecords(
     return { events, areas, skipped: records.length };
   }
 
-  const severityMax = map.severity
-    ? Math.max(
-        ...records.map((r) => toNumber(r[map.severity!]) ?? -Infinity),
-        -Infinity,
-      )
-    : -Infinity;
+  const severityMax = context.severityMax ?? severityScaleOf(records, map);
   const geohash =
     map.geo.kind === "point" &&
     POINT_NAME_HINTS.some((h) => norm((map.geo as { field: string }).field).includes(h));

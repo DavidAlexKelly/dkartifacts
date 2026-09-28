@@ -26,6 +26,12 @@ export interface SourceConfig {
   item?: string;
   /** Category for records whose own fields do not say. */
   category?: EventCategory;
+  /**
+   * The column to title events with, chosen from the source's columns once
+   * it has loaded. Absent means detected. Not part of the source's identity:
+   * changing it re-titles what is loaded rather than reading it again.
+   */
+  titleField?: string;
 }
 
 export const SOURCE_KINDS: Array<{ kind: SourceKind; label: string; placeholder: string }> = [
@@ -117,14 +123,19 @@ export function loadSavedSources(): SourceConfig[] {
     return dedupe(
       parsed.flatMap((entry) => {
         if (typeof entry !== "object" || entry === null) {return [];}
-        const { kind, rid, item, category } = entry as Record<string, unknown>;
+        const { kind, rid, item, category, titleField } = entry as Record<string, unknown>;
         if (kind !== "dataset" && kind !== "mediaset" && kind !== "stream") {return [];}
         const result = parseSourceInput(
           kind,
           kind === "mediaset" ? `${String(rid)}::${String(item ?? "")}` : String(rid),
           typeof category === "string" ? (category as EventCategory) : undefined,
         );
-        return result.ok ? [result.config] : [];
+        if (!result.ok) {return [];}
+        return [
+          typeof titleField === "string" && titleField !== ""
+            ? { ...result.config, titleField }
+            : result.config,
+        ];
       }),
     );
   } catch {

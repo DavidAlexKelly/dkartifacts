@@ -31,6 +31,8 @@ import {
 import {
   detectFields,
   interpretRecords,
+  severityScaleOf,
+  withTitle,
   type FieldMap,
   type MonitorArea,
 } from "./interpret";
@@ -52,7 +54,12 @@ export interface SourceState {
   records: number;
   skipped: number;
   truncated: boolean;
+  /** The mapping in use: detected, with the chosen title column applied. */
   fields: FieldMap | null;
+  /** Every column the source has shown so far, for choosing a title from. */
+  columns: string[];
+  /** The title column detection chose, whatever is in use now. */
+  detectedTitle?: string;
   problem?: SourceProblem;
   updatedAt?: number;
 }
@@ -71,6 +78,7 @@ function initialState(config: SourceConfig): SourceState {
     skipped: 0,
     truncated: false,
     fields: null,
+    columns: [],
   };
 }
 
@@ -83,7 +91,11 @@ export function useEventSources(configs: SourceConfig[], now: number): UseEventS
   const [states, setStates] = useState<Record<string, SourceState>>({});
   // Bumped to restart one source's load without touching the others.
   const [generation, setGeneration] = useState<Record<string, number>>({});
-  const running = useRef(new Map<string, { generation: number; stop: () => void }>());
+  const running = useRef(new Map<string, Run & { generation: number; titleField?: string }>());
+  // Runs read their config through this, so a change that is not a reload —
+  // the title column — reaches a run that is already going.
+  const latest = useRef(new Map<string, SourceConfig>());
+  latest.current = new Map(configs.map((config) => [sourceKey(config), config]));
 
   const update = useCallback((key: string, patch: (state: SourceState) => SourceState) => {
     setStates((previous) => (previous[key] ? { ...previous, [key]: patch(previous[key]) } : previous));
@@ -107,15 +119,28 @@ export function useEventSources(configs: SourceConfig[], now: number): UseEventS
       }
     }
 
-    // Start what is configured and not running.
+    // Start what is configured and not running; re-title what is running
+    // and has had its title column changed.
     for (const [key, config] of wanted) {
-      if (running.current.has(key)) {continue;}
+      const run = running.current.get(key);
+      if (run) {
+        if (run.titleField !== config.titleField) {
+          run.titleField = config.titleField;
+          run.reinterpret();
+        }
+        continue;
+      }
       setStates((previous) => ({ ...previous, [key]: initialState(config) }));
-      const stop =
+      const getConfig = () => latest.current.get(key) ?? config;
+      const started =
         config.kind === "stream"
-          ? runStream(config, key, now, update)
-          : runOnce(config, key, now, update);
-      running.current.set(key, { generation: generation[key] ?? 0, stop });
+          ? runStream(getConfig, key, now, update)
+          : runOnce(getConfig, key, now, update);
+      running.current.set(key, {
+        ...started,
+        generation: generation[key] ?? 0,
+        titleField: config.titleField,
+      });
     }
   }, [configs, generation, now, update]);
 
@@ -134,8 +159,14 @@ export function useEventSources(configs: SourceConfig[], now: number): UseEventS
 
   // Memoised so the page's derived event list — and the map data behind it —
   // only changes when a source does, not on every render.
+  // Each carries the current config, not the one it was started with: the
+  // title column can change without restarting the source.
   const list = useMemo(
-    () => configs.map((config) => states[sourceKey(config)] ?? initialState(config)),
+    () =>
+      configs.map((config) => {
+        const state = states[sourceKey(config)];
+        return state ? { ...state, config } : initialState(config);
+      }),
     [configs, states],
   );
 
@@ -144,6 +175,12 @@ export function useEventSources(configs: SourceConfig[], now: number): UseEventS
 
 type Update = (key: string, patch: (state: SourceState) => SourceState) => void;
 
+/** A running source: stop it, or re-read what it holds with the current config. */
+interface Run {
+  stop: () => void;
+  reinterpret: () => void;
+}
+
 function interpret(
   config: SourceConfig,
   key: string,
@@ -151,7 +188,7 @@ function interpret(
   records: Row[],
   now: number,
   fields: FieldMap,
-  options: { live?: boolean; firstIndex?: number } = {},
+  options: { live?: boolean; firstIndex?: number; severityMax?: number } = {},
 ) {
   return interpretRecords(records, fields, {
     sourceKey: key,
@@ -170,37 +207,63 @@ function fieldNames(records: Row[]): string[] {
   return [...names];
 }
 
-/** Datasets and media set items: one read. */
-function runOnce(config: SourceConfig, key: string, now: number, update: Update): () => void {
+/** Columns worth offering as a title: not the GeoJSON plumbing. */
+function titleCandidates(records: Row[]): string[] {
+  return fieldNames(records).filter((name) => !name.startsWith("__"));
+}
+
+/** Datasets and media set items: one read, re-interpretable. */
+function runOnce(
+  getConfig: () => SourceConfig,
+  key: string,
+  now: number,
+  update: Update,
+): Run {
   let cancelled = false;
+  let loaded: { name: string; records: Row[]; truncated: boolean; detected: FieldMap } | null = null;
+
+  const publish = () => {
+    if (!loaded || cancelled) {return;}
+    const config = getConfig();
+    const fields = withTitle(loaded.detected, config.titleField);
+    const { events, areas, skipped } = interpret(config, key, loaded.name, loaded.records, now, fields);
+    const columns = titleCandidates(loaded.records);
+    update(key, (state) => ({
+      ...state,
+      status: "ready",
+      name: loaded!.name,
+      events,
+      areas,
+      records: loaded!.records.length,
+      skipped,
+      truncated: loaded!.truncated,
+      fields,
+      columns,
+      detectedTitle: loaded!.detected.title,
+      problem: fields.geo
+        ? undefined
+        : {
+            title: "No location found",
+            detail: `None of ${columns.length} columns held coordinates, a geopoint, GeoJSON or WKT.`,
+            remediation: "Add latitude/longitude columns, or a geopoint or geometry column.",
+          },
+      updatedAt: Date.now(),
+    }));
+  };
+
   void (async () => {
+    const config = getConfig();
     try {
       const result =
         config.kind === "dataset"
           ? await readDataset(config.rid)
           : await readMediaSetItem(config.rid, config.item ?? "");
       if (cancelled) {return;}
-      const fields = detectFields(fieldNames(result.records), result.records);
-      const { events, areas, skipped } = interpret(config, key, result.name, result.records, now, fields);
-      update(key, (state) => ({
-        ...state,
-        status: "ready",
-        name: result.name,
-        events,
-        areas,
-        records: result.records.length,
-        skipped,
-        truncated: result.truncated,
-        fields,
-        problem: fields.geo
-          ? undefined
-          : {
-              title: "No location found",
-              detail: `None of ${fieldNames(result.records).length} columns held coordinates, a geopoint, GeoJSON or WKT.`,
-              remediation: "Add latitude/longitude columns, or a geopoint or geometry column.",
-            },
-        updatedAt: Date.now(),
-      }));
+      loaded = {
+        ...result,
+        detected: detectFields(fieldNames(result.records), result.records),
+      };
+      publish();
     } catch (err) {
       if (cancelled) {return;}
       console.warn(`[events] ${key} failed to load:`, err);
@@ -211,36 +274,67 @@ function runOnce(config: SourceConfig, key: string, now: number, update: Update)
       }));
     }
   })();
-  return () => {
-    cancelled = true;
+
+  return {
+    stop: () => {
+      cancelled = true;
+    },
+    reinterpret: publish,
   };
 }
 
 /** Streams: tail on open, then poll. */
-function runStream(config: SourceConfig, key: string, now: number, update: Update): () => void {
+function runStream(
+  getConfig: () => SourceConfig,
+  key: string,
+  now: number,
+  update: Update,
+): Run {
   let cancelled = false;
   let timer: ReturnType<typeof setTimeout> | undefined;
   let stream: StreamHandle | undefined;
   let offsets: Offsets = {};
-  let fields: FieldMap | null = null;
-  // Every record seen, newest last, for re-detecting the columns while none
-  // located anything: a stream opened before its first record has nothing
-  // to detect from.
+  let detected: FieldMap | null = null;
+  // Every record kept, oldest first: for re-detecting the columns while none
+  // has located anything (a stream opened before its first record has nothing
+  // to detect from), and for re-reading them all when the title changes.
   const seen: Row[] = [];
+  // How many of `seen`, from the front, came from the tail read on open
+  // rather than arriving live.
+  let backfilled = 0;
+  // Records ever ingested; `seen` holds the last `seen.length` of them.
   let ingested = 0;
+
+  const effective = () => withTitle(detected!, getConfig().titleField);
+
+  const problemFor = (fields: FieldMap) =>
+    fields.geo
+      ? undefined
+      : {
+          title: "No location found yet",
+          detail: "No record so far has held coordinates, a geopoint, GeoJSON or WKT.",
+        };
 
   const ingest = (records: Row[], live: boolean) => {
     if (records.length === 0) {return;}
     seen.push(...records);
-    if (seen.length > STREAM_EVENT_CAP) {seen.splice(0, seen.length - STREAM_EVENT_CAP);}
-    if (!fields?.geo) {
-      fields = detectFields(fieldNames(seen), seen);
+    if (!live) {backfilled += records.length;}
+    if (seen.length > STREAM_EVENT_CAP) {
+      const dropped = seen.length - STREAM_EVENT_CAP;
+      seen.splice(0, dropped);
+      backfilled = Math.max(0, backfilled - dropped);
     }
-    const found = interpret(config, key, stream!.name, records, now, fields, {
+    if (!detected?.geo) {
+      detected = detectFields(fieldNames(seen), seen);
+    }
+    const fields = effective();
+    const found = interpret(getConfig(), key, stream!.name, records, now, fields, {
       live,
       firstIndex: ingested,
+      severityMax: severityScaleOf(seen, fields),
     });
     ingested += records.length;
+    const columns = titleCandidates(seen);
     update(key, (state) => {
       // Records carrying an id replace the earlier version of themselves: a
       // stream of updates to one incident is one event that moves or changes.
@@ -248,27 +342,49 @@ function runStream(config: SourceConfig, key: string, now: number, update: Updat
       for (const event of found.events) {byId.set(event.id, event);}
       const areasById = new Map(state.areas.map((area) => [area.id, area]));
       for (const area of found.areas) {areasById.set(area.id, area);}
-      const events = [...byId.values()]
-        .sort((a, b) => (b.time ?? 0) - (a.time ?? 0))
-        .slice(0, STREAM_EVENT_CAP);
       return {
         ...state,
         status: "live",
         name: stream!.name,
-        events,
+        events: newestFirst([...byId.values()]),
         areas: [...areasById.values()],
         records: state.records + records.length,
         skipped: state.skipped + found.skipped,
         fields,
-        problem: fields?.geo
-          ? undefined
-          : {
-              title: "No location found yet",
-              detail: "No record so far has held coordinates, a geopoint, GeoJSON or WKT.",
-            },
+        columns,
+        detectedTitle: detected?.title,
+        problem: problemFor(fields),
         updatedAt: Date.now(),
       };
     });
+  };
+
+  /** Everything kept, read again from scratch with the current config. */
+  const reinterpret = () => {
+    if (cancelled || !stream || !detected) {return;}
+    const config = getConfig();
+    const fields = effective();
+    const severityMax = severityScaleOf(seen, fields);
+    const first = ingested - seen.length;
+    const tail = interpret(config, key, stream.name, seen.slice(0, backfilled), now, fields, {
+      live: false,
+      firstIndex: first,
+      severityMax,
+    });
+    const live = interpret(config, key, stream.name, seen.slice(backfilled), now, fields, {
+      live: true,
+      firstIndex: first + backfilled,
+      severityMax,
+    });
+    const byId = new Map([...tail.events, ...live.events].map((event) => [event.id, event]));
+    const areasById = new Map([...tail.areas, ...live.areas].map((area) => [area.id, area]));
+    update(key, (state) => ({
+      ...state,
+      events: newestFirst([...byId.values()]),
+      areas: [...areasById.values()],
+      fields,
+      problem: problemFor(fields),
+    }));
   };
 
   const poll = async () => {
@@ -279,7 +395,7 @@ function runStream(config: SourceConfig, key: string, now: number, update: Updat
       offsets = result.offsets;
       ingest(result.records, true);
     } catch (err) {
-      // One failed poll is not a dead stream; say so and keep trying.
+      // One failed poll is not a dead stream; keep trying.
       console.warn(`[events] ${key} poll failed:`, err);
     }
     if (!cancelled) {timer = setTimeout(poll, POLL_INTERVAL_MS);}
@@ -287,7 +403,7 @@ function runStream(config: SourceConfig, key: string, now: number, update: Updat
 
   void (async () => {
     try {
-      stream = await openStream(config.rid);
+      stream = await openStream(getConfig().rid);
       if (cancelled) {return;}
       const tail = await readStreamTail(stream);
       if (cancelled) {return;}
@@ -306,8 +422,15 @@ function runStream(config: SourceConfig, key: string, now: number, update: Updat
     }
   })();
 
-  return () => {
-    cancelled = true;
-    if (timer) {clearTimeout(timer);}
+  return {
+    stop: () => {
+      cancelled = true;
+      if (timer) {clearTimeout(timer);}
+    },
+    reinterpret,
   };
+}
+
+function newestFirst(events: MonitorEvent[]): MonitorEvent[] {
+  return events.sort((a, b) => (b.time ?? 0) - (a.time ?? 0)).slice(0, STREAM_EVENT_CAP);
 }

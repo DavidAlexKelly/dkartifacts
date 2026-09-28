@@ -52,6 +52,8 @@ export interface SourcesSectionProps {
   onAdd: (config: SourceConfig) => void;
   onRemove: (key: string) => void;
   onReload: (key: string) => void;
+  /** A column to title the source's events with, or undefined for detected. */
+  onTitleChange: (key: string, field: string | undefined) => void;
   /** Sources came from the URL: say so, since edits will not be remembered. */
   fromUrl: boolean;
 }
@@ -63,6 +65,7 @@ export function SourcesSection({
   onAdd,
   onRemove,
   onReload,
+  onTitleChange,
   fromUrl,
 }: SourcesSectionProps): React.ReactElement {
   const problems = states.filter((state) => state.problem).length;
@@ -90,6 +93,7 @@ export function SourcesSection({
             state={state}
             onRemove={() => onRemove(state.key)}
             onReload={() => onReload(state.key)}
+            onTitleChange={(field) => onTitleChange(state.key, field)}
           />
         ))}
         {fromUrl && (
@@ -105,10 +109,12 @@ function SourceRow({
   state,
   onRemove,
   onReload,
+  onTitleChange,
 }: {
   state: SourceState;
   onRemove: () => void;
   onReload: () => void;
+  onTitleChange: (field: string | undefined) => void;
 }): React.ReactElement {
   const { status, problem, fields } = state;
   const title = state.config.item ? `${state.name} · ${state.config.rid}` : state.config.rid;
@@ -143,6 +149,14 @@ function SourceRow({
       {state.truncated && (
         <div style={warningText}>Only the first {MAX_ROWS.toLocaleString("en-GB")} rows were read.</div>
       )}
+      {state.columns.length > 0 && status !== "error" && (
+        <TitlePicker
+          columns={state.columns}
+          value={state.config.titleField}
+          detected={state.detectedTitle}
+          onChange={onTitleChange}
+        />
+      )}
       {fields?.geo && <div style={{ ...panelMuted, wordBreak: "break-word" }}>{describeFieldMap(fields)}</div>}
       {state.config.category && (
         <div style={panelMuted}>Default category: {CATEGORIES[state.config.category].label}</div>
@@ -155,6 +169,46 @@ function SourceRow({
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * Which column titles this source's events. "Auto" is whatever detection
+ * chose (named, so it is clear what choosing a column replaces); a column
+ * chosen here is kept with the source and applied to what is already loaded.
+ */
+function TitlePicker({
+  columns,
+  value,
+  detected,
+  onChange,
+}: {
+  columns: string[];
+  value: string | undefined;
+  detected: string | undefined;
+  onChange: (field: string | undefined) => void;
+}): React.ReactElement {
+  // A saved choice the source no longer has (a renamed column) is still shown
+  // rather than silently reading as "Auto".
+  const options = value && !columns.includes(value) ? [value, ...columns] : columns;
+  return (
+    <label style={{ display: "flex", alignItems: "center", gap: 6 }}>
+      <span style={{ ...panelMuted, flex: "none" }}>Title</span>
+      <select
+        value={value ?? ""}
+        onChange={(event) => onChange(event.target.value || undefined)}
+        style={{ ...select, flex: 1, minWidth: 0 }}
+        aria-label="Title column"
+      >
+        <option value="">Auto{detected ? ` (${detected})` : " (none found)"}</option>
+        {options.map((column) => (
+          <option key={column} value={column}>
+            {column}
+            {value === column && !columns.includes(column) ? " (missing)" : ""}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }
 
