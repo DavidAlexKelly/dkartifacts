@@ -31,14 +31,38 @@
  * apart from "embedded and switched off" needs `isInsideIframe()` from this
  * package, which deliberately reports false inside a Foundry container so a
  * Code Workspace preview counts as standalone.
+ *
+ *  eventDatasetRids, eventMediaSetInputs, eventStreamRids
+ *                    — string lists, read by the event monitor (/events) only.
+ *                      The same shapes as the davebettermap widget's
+ *                      datasetRids / mediaSetInputs / streamRids, so a module
+ *                      can feed both from one set of variables:
+ *
+ *      dataset   ri.foundry.main.dataset.<uuid>
+ *      mediaset  ri.mio.main.media-set.<uuid>::<path or media item RID>
+ *      stream    ri.foundry.main.dataset.<uuid>   (a streaming dataset)
+ *
+ * ── One context for the whole app ────────────────────────────────────────────
+ *
+ * An iframe widget has ONE config, whatever route it shows, so every field
+ * lives in the one definition below. And `useWorkshopContext` is called once,
+ * by `WorkshopShellProvider` at the top of the shell: each call negotiates
+ * with Workshop on its own and keeps its own copy of the values, so a second
+ * call would be a second, drifting copy. Everything else reads the provider.
  */
 
+import React, { createContext, useContext } from "react";
 import {
   useWorkshopContext,
   type IAsyncValue,
   type IConfigDefinition,
   type IWorkshopContext,
 } from "@osdk/workshop-iframe-custom-widget";
+import {
+  parseSourceInput,
+  type SourceConfig,
+  type SourceKind,
+} from "@/demo/events/sources/config";
 
 export const ARTIFACT_SHELL_CONFIG = [
   {
@@ -53,6 +77,51 @@ export const ARTIFACT_SHELL_CONFIG = [
       fieldValue: {
         type: "inputOutput" as const,
         variableType: { type: "boolean" as const, defaultValue: true },
+      },
+    },
+  },
+  {
+    fieldId: "eventDatasetRids",
+    field: {
+      type: "single" as const,
+      label: "event-monitor-dataset-rids",
+      helperText:
+        "Event monitor (/events): dataset RIDs to load events from, one per " +
+        "entry — ri.foundry.main.dataset.…. Each needs to be a Resource on " +
+        "the application in Developer Console.",
+      fieldValue: {
+        type: "inputOutput" as const,
+        variableType: { type: "string-list" as const, defaultValue: [] as string[] },
+      },
+    },
+  },
+  {
+    fieldId: "eventMediaSetInputs",
+    field: {
+      type: "single" as const,
+      label: "event-monitor-media-set-inputs",
+      helperText:
+        "Event monitor (/events): media set items to load, one per entry, as " +
+        "mediaSetRid::path (e.g. ::zones.geojson) or " +
+        "mediaSetRid::mediaItemRid. GeoJSON, a JSON array of records, or CSV.",
+      fieldValue: {
+        type: "inputOutput" as const,
+        variableType: { type: "string-list" as const, defaultValue: [] as string[] },
+      },
+    },
+  },
+  {
+    fieldId: "eventStreamRids",
+    field: {
+      type: "single" as const,
+      label: "event-monitor-stream-rids",
+      helperText:
+        "Event monitor (/events): streaming dataset RIDs to follow live, one " +
+        "per entry — ri.foundry.main.dataset.…. Read on open, then polled " +
+        "every few seconds.",
+      fieldValue: {
+        type: "inputOutput" as const,
+        variableType: { type: "string-list" as const, defaultValue: [] as string[] },
       },
     },
   },
@@ -82,9 +151,88 @@ export function resolveArtifactSwitching(context: ArtifactShellContext): boolean
   return field.status === "LOADED" ? field.value ?? true : true;
 }
 
+// ── The one context ─────────────────────────────────────────────────────────
+
+/**
+ * What a page outside the provider sees — a render test, say: exactly what an
+ * unembedded app gets from the hook, the declared defaults, already loaded.
+ */
+const STANDALONE: ArtifactShellContext = {
+  status: "LOADED",
+  value: {
+    artifactSwitching: { fieldValue: { status: "LOADED", value: true } },
+    eventDatasetRids: { fieldValue: { status: "LOADED", value: [] } },
+    eventMediaSetInputs: { fieldValue: { status: "LOADED", value: [] } },
+    eventStreamRids: { fieldValue: { status: "LOADED", value: [] } },
+  },
+} as unknown as ArtifactShellContext;
+
+const ShellWorkshopContext = createContext<ArtifactShellContext>(STANDALONE);
+
+/** Negotiates with Workshop once, for everything under it. */
+export function WorkshopShellProvider({
+  children,
+}: {
+  children: React.ReactNode;
+}): React.ReactElement {
+  const context = useWorkshopContext<typeof ARTIFACT_SHELL_CONFIG>(ARTIFACT_SHELL_CONFIG);
+  return React.createElement(ShellWorkshopContext.Provider, { value: context }, children);
+}
+
 /** Whether the header should offer the example switcher. */
 export function useArtifactSwitching(): boolean {
-  return resolveArtifactSwitching(
-    useWorkshopContext<typeof ARTIFACT_SHELL_CONFIG>(ARTIFACT_SHELL_CONFIG),
-  );
+  return resolveArtifactSwitching(useContext(ShellWorkshopContext));
+}
+
+// ── Event monitor sources ───────────────────────────────────────────────────
+
+export interface WorkshopEventSources {
+  /**
+   * "pending" while an embedding Workshop has not answered yet — the page
+   * should neither show its mock data nor load anything until it has.
+   */
+  status: "pending" | "ready";
+  sources: SourceConfig[];
+  /** Entries that are not a valid RID for their variable, and why. */
+  invalid: Array<{ variable: string; entry: string; error: string }>;
+}
+
+const EVENT_SOURCE_FIELDS: Array<{
+  fieldId: "eventDatasetRids" | "eventMediaSetInputs" | "eventStreamRids";
+  kind: SourceKind;
+  label: string;
+}> = [
+  { fieldId: "eventDatasetRids", kind: "dataset", label: "event-monitor-dataset-rids" },
+  { fieldId: "eventMediaSetInputs", kind: "mediaset", label: "event-monitor-media-set-inputs" },
+  { fieldId: "eventStreamRids", kind: "stream", label: "event-monitor-stream-rids" },
+];
+
+/** The event monitor's sources, as a plain function of the context. */
+export function resolveEventSources(context: ArtifactShellContext): WorkshopEventSources {
+  if (context.status !== "LOADED" && context.status !== "RELOADING") {
+    return {
+      // A rejected config will not get better by waiting: carry on without.
+      status: context.status === "FAILED" ? "ready" : "pending",
+      sources: [],
+      invalid: [],
+    };
+  }
+  const sources: SourceConfig[] = [];
+  const invalid: WorkshopEventSources["invalid"] = [];
+  for (const { fieldId, kind, label } of EVENT_SOURCE_FIELDS) {
+    const field = context.value[fieldId].fieldValue;
+    const entries =
+      field.status === "LOADED" || field.status === "RELOADING" ? field.value ?? [] : [];
+    for (const entry of entries) {
+      if (typeof entry !== "string" || entry.trim() === "") {continue;}
+      const parsed = parseSourceInput(kind, entry);
+      if (parsed.ok) {sources.push(parsed.config);}
+      else {invalid.push({ variable: label, entry, error: parsed.error });}
+    }
+  }
+  return { status: "ready", sources, invalid };
+}
+
+export function useWorkshopEventSources(): WorkshopEventSources {
+  return resolveEventSources(useContext(ShellWorkshopContext));
 }

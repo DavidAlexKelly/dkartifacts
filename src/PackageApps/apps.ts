@@ -50,7 +50,7 @@ export const EXAMPLE_APPS: ExampleApp[] = [
     label: "Event monitor",
     packageName: "basemap + elevation",
     blurb:
-      "The events side of a world-monitor dashboard, on the Foundry basemap and DEM: incidents on a globe that group into clusters when zoomed out and split apart as you zoom in. Load them from Foundry datasets, media sets (GeoJSON, JSON or CSV) and live streams — or the built-in mock data — and the page works out which columns hold the location, time, category and severity. Click a cluster to expand it, an event or zone for its details, and filter by category, severity and time window. Sources can be passed in the URL: ?dataset=…&mediaset=rid::path&stream=….",
+      "The events side of a world-monitor dashboard, on the Foundry basemap and DEM: incidents on a globe that group into clusters when zoomed out and split apart as you zoom in. Load them from Foundry datasets, media sets (GeoJSON, JSON or CSV) and live streams — or the built-in mock data — and the page works out which columns hold the location, time, category and severity. Click a cluster to expand it, an event or zone for its details, and filter by category, severity and time window. Sources can also be set as the Workshop widget's event-monitor-* string-list variables, or passed in the URL: ?dataset=…&mediaset=rid::path&stream=….",
   },
   {
     path: "/symbol-picker",
