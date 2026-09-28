@@ -16,7 +16,14 @@
     "declarationMap": true,
     "sourceMap": true,
     "outDir": "dist",
-    "rootDir": "src"
+    "rootDir": "src",
+    /* composite: this config can be referenced by (and can reference) the
+       sibling packages' build configs, so `tsc -b` builds them in dependency
+       order and skips whatever is up to date. The build info lives in dist so
+       that deleting dist always forces a rebuild; files[] keeps it out of the
+       tarball. */
+    "composite": true,
+    "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo"
 
     /* No "paths": nothing in this repo is above this package. */
   },

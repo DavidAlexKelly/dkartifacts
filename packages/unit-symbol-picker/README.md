@@ -143,3 +143,13 @@ not "Armour"; `160600` is Combat Service Support, not "Engineer". Armour is
 Nothing about the wrong ones looked wrong. That is the entire argument for
 generating the table, and the starter list is now checked against it by a test
 rather than trusted.
+
+## Package notes
+
+Why the manifest and build are the way they are.
+
+- **`schemas/` is shipped:** it is the JointMilSyML XML everything in `src/core/generated` is derived from — about 2 MB, and it makes the tarball self-contained, so a consumer can re-run `scripts/generate-tables.mjs` and check the tables against the standard rather than trusting them. `src/` is shipped too, for the source maps.
+- **`./tables` is opt-in** so the parser entry stays small, and `./tables/*` reaches one symbol set without the barrel that pulls all 24 — a barrel re-export defeats tree-shaking in most bundlers, so the subpath is the only way to get it.
+- **`npm run generate` is not part of the build.** `src/core/generated` is committed, so a diff shows exactly what changed when the symbology data is updated, and the build stays a plain `tsc -b`. Run it by hand after touching `schemas/`; the coherence test fails if the two drift.
+- **Peers:** milsymbol is a hard peer (`^2.0.0 || ^3.0.0`): this package's whole job is to put a SIDC in front of it, and bundling a second copy is how two versions of the icon set end up on one map. React (`^18.0.0 || ^19.0.0`) is a peer for the component only — `src/core` has no React in it.
+- **`"sideEffects": false`:** no module here does anything at import time beyond defining module-level caches, so bundlers may drop whatever a consumer does not import.

@@ -3,12 +3,11 @@
 //
 // WHY THIS IS HERE AND NOT IN A PACKAGE OF ITS OWN
 // ------------------------------------------------
-// It used to be the core of @acc/decho-mil-map, which existed to compose this
-// package with a Foundry basemap. Once `/extension` made tactical graphics an
-// add-on any map can take, what was left of that package split cleanly in two:
-// a right-click workflow, which is a product decision and belongs in the
-// application that made it, and this — which is doctrine and geometry, and
-// belongs beside the symbols it drives.
+// Orders split cleanly in two: a right-click workflow, which is a product
+// decision and belongs in the application that makes it (the harness app's is
+// src/mil/), and this — which is doctrine and geometry, and belongs beside the
+// symbols it drives. (It absorbed the core of the deprecated
+// @acc/decho-mil-map; see CHANGELOG 3.3.0.)
 //
 // It sits naturally here because the neighbouring modules already carry half of
 // it: `PlacedOrder` and `OrderHandleController` in /maplibre, `unitAttachment`,
@@ -18,8 +17,8 @@
 // that reimplements that transform drifts from the renderer, and nobody notices
 // until a symbol draws a hundred metres from where it was placed.
 //
-// This entry point is framework-free. The React workflow that used to sit on
-// top of it is not here, deliberately.
+// This entry point is framework-free. The React workflow on top of it is not
+// here, deliberately.
 
 export type {
   LatLng,

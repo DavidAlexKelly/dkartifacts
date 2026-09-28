@@ -121,6 +121,16 @@ failure means.
   mean two token holders, two LRUs and two sets of lanes — which is why the
   harness aliases it explicitly in both `tsconfig.json` and `vite.config.ts`.
 
+## Package notes
+
+Why the manifest and build are the way they are.
+
+- **`src/` is shipped** in the tarball: the `.js.map` and `.d.ts.map` files point at `../src/*`, so without it every stack trace and go-to-definition in a consumer dead-ends. It also makes the tarball a complete, relocatable copy of the package.
+- **Build:** `npm run build` is `tsc -b tsconfig.build.json`. This package sits at the bottom of the stack and references nothing in this repo — that is the point of it being a separate package. The build info file is written into `dist/` (so deleting `dist` always forces a rebuild) and excluded from the tarball.
+- **`@osdk/*` peers are `^2.0.0`**, never the exact minors this repo happens to have: pinning those (as basemap 0.1.0 did) made the package uninstallable, with an ERESOLVE conflict, in an app one minor behind. The upper bound is the next major, which is allowed to break.
+- **No maplibre-gl, pmtiles or react peer:** this package has nothing to do with maps. `@osdk/foundry.mediasets` is optional; only media-set reads need it.
+- **`"sideEffects": false`:** no module here does anything at import time beyond defining module-level caches, so bundlers may drop whatever a consumer does not import.
+
 ## Publishing
 
 Same as the sibling packages, including the Code Workspace token dance that the

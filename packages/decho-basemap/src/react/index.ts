@@ -18,8 +18,8 @@ export {
 
 // The toolbar's colours and metrics. Exported so a host's own map panels and
 // toolbar controls match the library's rather than approximating them — one
-// palette across the estate, shared with @acc/decho-mil-map's
-// DEFAULT_MENU_THEME.
+// palette across the estate, shared with the mil menus' DEFAULT_MENU_THEME
+// (src/mil/theme.ts in the harness app).
 export {
   DEFAULT_SURFACE_THEME,
   toolbarButton,

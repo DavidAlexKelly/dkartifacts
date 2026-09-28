@@ -1,16 +1,15 @@
 /**
  * Surface colours for anything this package draws over the map.
  *
- * A separate module rather than a constant in DechoBasemap.tsx, for the reason
- * @acc/decho-mil-map's theme.ts gives: a file exporting both components and an
- * object breaks React Fast Refresh, and the lint rule that catches it is right
+ * A separate module rather than a constant in DechoBasemap.tsx: a file
+ * exporting both components and an object breaks React Fast Refresh, and the lint rule that catches it is right
  * to. Hosts import DEFAULT_SURFACE_THEME, spread it, and override the two or
  * three values their design system cares about.
  *
- * THE PALETTE IS THE MIL MAP'S
- * ----------------------------
- * Same hues as DEFAULT_MENU_THEME next door, so a map showing this toolbar and
- * that package's unit menus looks like one product rather than two libraries
+ * THE PALETTE IS SHARED WITH THE MIL MENUS
+ * ----------------------------------------
+ * Same hues as the harness app's DEFAULT_MENU_THEME (src/mil/theme.ts), so a
+ * map showing this toolbar and the unit menus looks like one product rather than two libraries
  * that happen to be on screen together. The background is translucent here
  * because this floats over the map rather than over a click: a solid slab
  * hides exactly the terrain you are drawing on.

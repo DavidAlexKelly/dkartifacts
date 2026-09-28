@@ -5,13 +5,15 @@
   "license": "UNLICENSED",
   "private": false,
   "type": "module",
+  "sideEffects": false,
   "files": [
     "dist",
     "src",
     "!**/*.test.ts",
-    "README.md"
+    "README.md",
+    "CHANGELOG.md",
+    "!**/*.tsbuildinfo"
   ],
-  "//files": "src is shipped for the same reason as the sibling packages: the .js.map and .d.ts.map files reference ../src/*, so without it every stack trace and go-to-definition in a consumer dead-ends.",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -23,16 +25,14 @@
     "registry": "https://accenture.palantirfoundry.com/artifacts/api/repositories/ri.artifacts.main.repository.df396b79-3da5-473f-91c2-7be67d95c46c/contents/release/npm/"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
-    "prepublishOnly": "npm run build",
+    "build": "tsc -b tsconfig.build.json",
+    "prepublishOnly": "npm test && npm run build",
     "test": "vitest run"
   },
-  "//scripts": "No build:deps: this package sits at the bottom of the stack and depends on nothing in this repo. That is the point of extracting it.",
-  "//peerDependencies": "Deliberately wide, for the reason @acc/decho-basemap learned at 0.1.1: exact @osdk pins made it uninstallable in an app one minor behind. Note there is no maplibre-gl, no pmtiles and no react here \u2014 this package has nothing to do with maps.",
   "peerDependencies": {
-    "@osdk/client": ">=2.0.0",
-    "@osdk/foundry.datasets": ">=2.0.0",
-    "@osdk/foundry.mediasets": ">=2.0.0"
+    "@osdk/client": "^2.0.0",
+    "@osdk/foundry.datasets": "^2.0.0",
+    "@osdk/foundry.mediasets": "^2.0.0"
   },
   "peerDependenciesMeta": {
     "@osdk/foundry.mediasets": {

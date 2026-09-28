@@ -25,6 +25,18 @@ Two rules that hold regardless of version:
 
 ---
 
+## Unreleased
+
+### Internal
+
+- Built with `tsc -b` (composite project) so the sibling packages' builds can
+  reference it; the build info file is excluded from the tarball.
+  `prepublishOnly` now runs the tests before building. Nothing published
+  changes.
+- The notes that lived in `"//"` keys of `package.json` moved to the README's
+  *Package notes* section; the stale ones (a `/react` subpath and a `react-dom`
+  dev dependency that no longer exist) were dropped.
+
 ## 1.3.1
 
 ### Fixed

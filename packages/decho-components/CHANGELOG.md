@@ -18,6 +18,16 @@ decides to be a different theme.
 
 ---
 
+## Unreleased
+
+### Internal
+
+- Built with `tsc -b` (composite project); the build info file is excluded from
+  the tarball. `prepublishOnly` now runs the tests before building. Nothing
+  published changes.
+- The notes that lived in `"//"` keys of `package.json` moved to the README's
+  *Package notes* section.
+
 ## 0.4.0
 
 The heavyweight components: the ones with a data engine behind them. Eight

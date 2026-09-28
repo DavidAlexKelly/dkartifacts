@@ -205,12 +205,11 @@ async function probeRangeSupport(
 
 // ── Tier 1: in-memory LRU ───────────────────────────────────────────────────
 //
-// The cache, the lanes and the refcounted in-flight map all used to live here
-// as module-level variables and private functions, which meant the three
-// trickiest pieces of arithmetic in the package — eviction, queue release and
-// waiter counting — could not be tested without a network and a browser. They
-// are now separate modules with their own tests; this file wires them
-// together and owns the Foundry-specific parts.
+// The cache, the lanes and the refcounted in-flight map are separate modules
+// (lru.ts, lanes.ts, inflight.ts) so that the three trickiest pieces of
+// arithmetic in the package — eviction, queue release and waiter counting —
+// are testable without a network or a browser. This file wires them together
+// and owns the Foundry-specific parts.
 
 const resident = createResidentCache(MEMORY_BUDGET_BYTES);
 const inFlight = createInFlightMap<ArrayBuffer | null>();

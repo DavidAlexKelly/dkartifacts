@@ -63,7 +63,7 @@ export {
   type VehicleProfile,
 } from "./core/profiles";
 
-// The adapter that plugs this into @acc/decho-mil-map's injected OrderRouter.
+// The adapter that satisfies @acc/app6d/orders' injected OrderRouter.
 export {
   createOrderRouter,
   type LatLngLike,

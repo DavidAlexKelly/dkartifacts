@@ -1,7 +1,7 @@
 {
   "name": "@acc/decho-components",
   "version": "0.4.0",
-  "description": "The Decho component library: cards, tags, buttons, panels, nav items, an application shell, progress bars, metric tiles, dependency-free SVG charts and the rest of the pieces every operational front-end redraws. Styled from CSS custom properties with built-in fallbacks, so it looks right with no stylesheet, no provider and no dependency \u2014 and follows @acc/decho-styling's themes when they are present.",
+  "description": "The Decho component library: cards, tags, buttons, panels, nav items, an application shell, progress bars, metric tiles, dependency-free SVG charts and the rest of the pieces every operational front-end redraws. Styled from CSS custom properties with built-in fallbacks, so it looks right with no stylesheet, no provider and no dependency — and follows @acc/decho-styling's themes when they are present.",
   "license": "UNLICENSED",
   "private": false,
   "type": "module",
@@ -15,9 +15,9 @@
     "!**/*.test.tsx",
     "!**/scripts/**",
     "CHANGELOG.md",
-    "README.md"
+    "README.md",
+    "!**/*.tsbuildinfo"
   ],
-  "//files": "src is shipped for the same two reasons as @acc/decho-styling's: source maps point at ../src/*, and the CSS entry point IS a src file \u2014 tsc copies no assets, and adding a bundler to a package whose selling point is not needing one would be a poor trade.",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -26,7 +26,6 @@
     "./styles.css": "./src/css/components.css"
   },
   "types": "./dist/index.d.ts",
-  "//peerDependencies": "React is REQUIRED here, unlike in @acc/decho-styling where it is optional \u2014 a component library with an optional view layer would be a pretence. @acc/decho-styling is deliberately absent: not a dependency, not a peer, not optional-peer. The components read `var(--decho-*, <fallback>)`, so they are themed by it when it is present and correct when it is not. See README, 'Why there is no dependency on the styling package'.",
   "peerDependencies": {
     "react": "^18.0.0 || ^19.0.0"
   },
@@ -37,14 +36,12 @@
     "typescript": "~5.5.4",
     "vitest": "^3.2.4"
   },
-  "//devDependencies": "react-dom is for the render tests, which use renderToStaticMarkup rather than Testing Library \u2014 the same choice, for the same reason, as the styling package. @acc/decho-styling is not listed: the fallback generator and the parity test read the sibling package's source directly out of this monorepo (see scripts/gen-fallbacks.mjs), which keeps `npm install` from needing a version of it that may not be published yet.",
   "publishConfig": {
     "registry": "https://accenture.palantirfoundry.com/artifacts/api/repositories/ri.artifacts.main.repository.b39ad0fb-63f7-4297-9d23-d029564ce937/contents/release/npm/"
   },
-  "//publishConfig": "The SAME Artifacts repository as @acc/decho-styling, and not the one the five map packages use. Deliberate: a scope can only point at one registry, and tokens + components is the pair almost every consumer installs together. One registry line in a widget repo's .npmrc, not two. This URL is the public host, which does not resolve from a Code Workspace \u2014 publish from there with the --registry override documented in the root README.",
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
-    "prepublishOnly": "npm run build",
+    "build": "tsc -b tsconfig.build.json",
+    "prepublishOnly": "npm test && npm run build",
     "test": "vitest run",
     "fallbacks": "node scripts/gen-fallbacks.mjs"
   }

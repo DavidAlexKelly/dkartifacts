@@ -309,6 +309,15 @@ The interesting ones are not "does it render":
 - `react/components.test.tsx` — the theming contract, including the nesting bug
   this design cannot have.
 
+## Package notes
+
+Why the manifest and build are the way they are.
+
+- **`src/` is shipped** in the tarball, for the source maps (they point at `../src/*`) and because the CSS entry point *is* a `src` file: tsc copies no assets, and adding a bundler to a package whose selling point is not needing one would be a poor trade.
+- **Build:** `npm run build` is `tsc -b tsconfig.build.json`. It references nothing in this repo: see below. The build info file is written into `dist/` (so deleting `dist` always forces a rebuild) and excluded from the tarball.
+- **React is a required peer** (`^18.0.0 || ^19.0.0`) — a component library with an optional view layer would be a pretence. `@acc/decho-styling` is deliberately not a dependency, a peer or an optional peer; see *Why there is no dependency on the styling package*.
+- **Dev-only use of the styling package:** the fallback generator (`scripts/gen-fallbacks.mjs`) and the parity test read `@acc/decho-styling`'s source directly out of this repository (aliased in `vitest.config.ts`), which keeps `npm install` from needing a version of it that may not be published yet. `react-dom` is a dev dependency for the render tests, which use `renderToStaticMarkup` rather than Testing Library.
+
 ## Publishing
 
 To the same Artifacts repository as `@acc/decho-styling`

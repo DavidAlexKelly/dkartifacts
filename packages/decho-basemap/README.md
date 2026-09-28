@@ -189,8 +189,8 @@ icon.
 The surface is **dark and translucent**, frosted with `backdrop-filter` — a
 solid slab hides the terrain you are drawing on, and an unblurred translucent
 one has road labels running through its text. Colours come from
-`DEFAULT_SURFACE_THEME`, which is the same palette as
-`@acc/decho-mil-map`'s menus so a map showing both looks like one product:
+`DEFAULT_SURFACE_THEME`, which is the same palette as the military unit
+menus, so a map showing both looks like one product:
 
 ```tsx
 <DechoBasemap drawingTools drawingToolbarTheme={{ accent: "#c8a94a" }} />
@@ -557,6 +557,17 @@ whole whole-file path stops being used, with no code change.
    the single most common setup failure.
 3. **Peers:** `maplibre-gl@^5` (the protocol handler must receive an
    `AbortController`), `pmtiles@^4`, `@protomaps/basemaps@^5`.
+
+## Package notes
+
+Why the manifest and build are the way they are.
+
+- **`src/` is shipped** in the tarball: the `.js.map` and `.d.ts.map` files point at `../src/*`, so without it every stack trace and go-to-definition in a consumer dead-ends. It also makes the tarball a complete, relocatable copy of the package.
+- **Build:** `npm run build` is `tsc -b tsconfig.build.json`. The build config references `@acc/decho-foundry-bytes`, so `tsc -b` builds it first when it is out of date and compiles against its emitted declarations rather than its source. The build info file is written into `dist/` (so deleting `dist` always forces a rebuild) and excluded from the tarball.
+- **`@osdk/*` peers are `^2.0.0`**, never the exact minors this repo happens to have: pinning those (as basemap 0.1.0 did) made the package uninstallable, with an ERESOLVE conflict, in an app one minor behind. The upper bound is the next major, which is allowed to break.
+- **Sibling `@acc/*` peers are bounded at the next version allowed to break.** For a `0.x` package that is the next minor, so `^0.1.0` rather than `>=0.1.0`: an open range would accept a breaking release this package was never tested against. Widen the range in a release of this package once it has been checked against the new sibling.
+- **React is `^18.0.0 || ^19.0.0`**, the same range across every package in this repo. It is optional: only `./react` needs it.
+- **`"sideEffects": ["*.css"]`:** `./react` imports MapLibre's stylesheet.
 
 ## Publishing a new version
 

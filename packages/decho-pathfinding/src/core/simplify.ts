@@ -20,7 +20,7 @@
 
 import { metresPerLatDegree, metresPerLonDegree } from "./geo";
 
-/** Waypoints are [lat, lon] — the shape @acc/decho-mil-map's OrderRoute uses. */
+/** Waypoints are [lat, lon] — the shape @acc/app6d/orders' OrderRoute uses. */
 export type Waypoint = [number, number];
 
 export function simplifyPath(

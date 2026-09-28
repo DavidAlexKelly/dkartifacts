@@ -5,14 +5,16 @@
   "license": "UNLICENSED",
   "private": false,
   "type": "module",
+  "sideEffects": false,
   "files": [
     "dist",
     "src",
     "schemas",
     "!**/*.test.ts",
-    "!**/*.test.tsx"
+    "!**/*.test.tsx",
+    "CHANGELOG.md",
+    "!**/*.tsbuildinfo"
   ],
-  "//files": "schemas/ is the JointMilSyML XML everything in src/core/generated is derived from — ~2 MB, which is nothing next to what it settles, and it makes the tarball self-contained: a consumer can re-run scripts/generate-tables.mjs and check the tables against the standard rather than trusting them. src is shipped for the same reason as the sibling packages: the .js.map and .d.ts.map files reference ../src/*.",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -31,25 +33,22 @@
       "import": "./dist/core/generated/symbolSets/*.js"
     }
   },
-  "//exports": "./tables is the generated symbology data, opt-in so the parser entry stays small. ./tables/* reaches one symbol set without the barrel that pulls all 24 — the subpath is the only way a consumer can get tree-shaking here, since a barrel re-export defeats it for most bundlers.",
   "types": "./dist/index.d.ts",
   "publishConfig": {
     "registry": "https://accenture.palantirfoundry.com/artifacts/api/repositories/ri.artifacts.main.repository.df396b79-3da5-473f-91c2-7be67d95c46c/contents/release/npm/"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "build": "tsc -b tsconfig.build.json",
     "generate": "node scripts/generate-tables.mjs",
-    "prepublishOnly": "npm run build",
+    "prepublishOnly": "npm test && npm run build",
     "test": "vitest run"
   },
-  "//scripts": "generate is deliberately NOT part of build. src/core/generated is committed, so a diff shows exactly what changed when the symbology data is updated, and the build stays a plain tsc with nothing to go wrong in CI. Run it by hand after touching schemas/; the coherence test will fail if the two drift.",
   "peerDependencies": {
-    "milsymbol": ">=2.0.0",
-    "react": ">=18"
+    "milsymbol": "^2.0.0 || ^3.0.0",
+    "react": "^18.0.0 || ^19.0.0"
   },
-  "//peerDependencies": "milsymbol is a hard peer: this package's whole job is to put a SIDC in front of it, and bundling a second copy in an app that already has one is how two versions of the icon set end up on one map. React is a peer for the usual reason — the core (src/core) has no React in it at all and can be used on its own, which is why the model and the component are separate entry points.",
   "devDependencies": {
-    "typescript": "^5.6.0",
+    "typescript": "~5.5.4",
     "vitest": "^3.2.4"
   }
 }

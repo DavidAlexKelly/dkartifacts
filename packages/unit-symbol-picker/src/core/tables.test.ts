@@ -240,8 +240,8 @@ describe("the 2525C legacy table", () => {
     }
   });
 
-  it("converts the unit codes the mil-map harness ships", () => {
-    // These are the SIDCs in src/PackageApps/dechoMilMap/MilMapPage.tsx, the
+  it("converts the unit codes the mil harness ships", () => {
+    // These are the SIDCs in src/mil/MilMapPage.tsx, the
     // closest thing this repository has to real data. Before the table existed
     // every one of them came back with its icon unconverted.
     const cases: Array<[string, string]> = [

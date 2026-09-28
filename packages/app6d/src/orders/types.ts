@@ -1,11 +1,12 @@
 /**
- * The shapes a host application exchanges with <DechoMilMap/>.
+ * The shapes a host application exchanges with an order workflow built on
+ * this module.
  *
  * All of them are plain serialisable data: no class instances, no MapLibre
  * types, no library types leaking through. That is deliberate — a host stores
  * these in its own state, persists them to Foundry objects or a phase document,
  * and hands them straight back. `MilOrder` is converted to the tactical
- * graphics library's `PlacedOrder` internally (see core/orders.ts), so the host
+ * graphics library's `PlacedOrder` internally (see orders.ts), so the host
  * never has to know the library's tuple order or field names.
  */
 
