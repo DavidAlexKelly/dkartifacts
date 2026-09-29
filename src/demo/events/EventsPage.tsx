@@ -46,7 +46,7 @@
  */
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import type maplibregl from "maplibre-gl";
+import maplibregl from "maplibre-gl";
 import { describeBasemapError } from "@acc/decho-basemap";
 import { DechoBasemap } from "@acc/decho-basemap/react";
 import { elevation } from "@acc/decho-elevation/extension";
@@ -135,8 +135,11 @@ import {
   sectionLabel,
   segment,
   segmented,
-  sidePanel,
+  settingsButton,
+  settingsPanel,
   sidePanelContent,
+  statusChip,
+  toolbar,
 } from "./styles";
 
 const BASEMAP_RID = "ri.foundry.main.dataset.c7e99de1-90a4-4e22-bd26-b42316d70fe4";
@@ -377,6 +380,9 @@ function EventsPage(): React.ReactElement {
   const spawn = useMemo(() => viewRef.current, [signature]);
 
   const onMapReady = (instance: maplibregl.Map) => {
+    // The top-right corner is the settings button's, so zoom and compass
+    // sit above the scale bar instead.
+    instance.addControl(new maplibregl.NavigationControl(), "bottom-right");
     setMap(instance);
     setZoom(instance.getZoom());
   };
@@ -655,6 +661,29 @@ function EventsPage(): React.ReactElement {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedPk, workshopSelection.status]);
 
+  // Settings live in a drop-down behind the top-right button; a click
+  // anywhere else, or Escape, puts them away.
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const settingsRef = useRef<HTMLDivElement>(null);
+  const settingsToggleRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!settingsOpen) {return;}
+    const onPointerDown = (event: PointerEvent) => {
+      const target = event.target as Node;
+      if (settingsRef.current?.contains(target) || settingsToggleRef.current?.contains(target)) {return;}
+      setSettingsOpen(false);
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {setSettingsOpen(false);}
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [settingsOpen]);
+
   const toggleCategory = (category: EventCategory) => {
     setHidden((previous) => {
       const next = new Set(previous);
@@ -694,6 +723,7 @@ function EventsPage(): React.ReactElement {
         spawnLong={spawn.lon}
         spawnZoom={spawn.zoom}
         globe={globe}
+        navigationControl={false}
         extensions={extensions}
         onMapReady={onMapReady}
         style={{ height: "100%" }}
@@ -715,146 +745,165 @@ function EventsPage(): React.ReactElement {
         }}
       />
 
-      {/* ── Filters, sources and feed ────────────────────────────────────── */}
-      <div style={sidePanel}>
-        <div style={sidePanelContent}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span style={panelHeading}>Event monitor</span>
-            {mock && <span style={mockBadge}>MOCK DATA</span>}
-          </div>
-          <div style={panelFigures}>
+      {/* ── Status and the settings button ───────────────────────────────── */}
+      <div style={toolbar} ref={settingsToggleRef}>
+        <div style={statusChip}>
+          <span style={panelHeading}>Event monitor</span>
+          {mock && <span style={mockBadge}>MOCK DATA</span>}
+          <span style={panelFigures}>
             {visible.length.toLocaleString("en-GB")} of {events.length.toLocaleString("en-GB")} events
             {visibleAreas.length > 0 && ` · ${visibleAreas.length} areas`}
             {critical > 0 && (
               <span style={{ color: SEVERITY_COLOURS.critical }}> · {critical} critical</span>
             )}
-          </div>
+          </span>
+        </div>
+        <button
+          type="button"
+          style={settingsButton(settingsOpen)}
+          aria-expanded={settingsOpen}
+          aria-controls="event-monitor-settings"
+          onClick={() => setSettingsOpen((open) => !open)}
+        >
+          <span aria-hidden="true" style={{ fontSize: 14, lineHeight: 1 }}>⚙</span>
+          Settings
+        </button>
+      </div>
 
-          <div style={panelSeparator} />
+      {/* ── Settings: sources, filters and feed ──────────────────────────── */}
+      {settingsOpen && (
+        <div
+          style={settingsPanel}
+          ref={settingsRef}
+          id="event-monitor-settings"
+          role="dialog"
+          aria-label="Settings"
+        >
+          <div style={sidePanelContent}>
+            <SourcesSection
+              states={states}
+              mock={mock}
+              onMockChange={setMockChoice}
+              onAdd={addSource}
+              onRemove={removeSource}
+              onReload={reload}
+              onTitleChange={setTitleField}
+              sessionOnly={sessionOnly}
+              pinnedKeys={pinnedKeys}
+              workshopProblems={[...workshop.invalid, ...workshopCategories.invalid]}
+              registry={registry}
+              overrides={overrides}
+              onSourceCategory={(key, category) =>
+                setOverrides((previous) => withOverride(previous, { kind: "source", sourceKey: key }, category))
+              }
+              onValueCategory={(key, value, category) =>
+                setOverrides((previous) =>
+                  withOverride(previous, { kind: "value", sourceKey: key, value }, category),
+                )
+              }
+              waitingForWorkshop={workshop.status === "pending"}
+            />
 
-          <SourcesSection
-            states={states}
-            mock={mock}
-            onMockChange={setMockChoice}
-            onAdd={addSource}
-            onRemove={removeSource}
-            onReload={reload}
-          onTitleChange={setTitleField}
-            sessionOnly={sessionOnly}
-            pinnedKeys={pinnedKeys}
-            workshopProblems={[...workshop.invalid, ...workshopCategories.invalid]}
-            registry={registry}
-            overrides={overrides}
-            onSourceCategory={(key, category) =>
-              setOverrides((previous) => withOverride(previous, { kind: "source", sourceKey: key }, category))
-            }
-            onValueCategory={(key, value, category) =>
-              setOverrides((previous) =>
-                withOverride(previous, { kind: "value", sourceKey: key, value }, category),
-              )
-            }
-            waitingForWorkshop={workshop.status === "pending"}
-          />
+            <div style={panelSeparator} />
 
-          <div style={panelSeparator} />
+            <div style={sectionLabel}>Time window</div>
+            <div style={segmented}>
+              {WINDOWS.map((option) => (
+                <button
+                  key={option.label}
+                  type="button"
+                  style={segment(windowMs === option.ms)}
+                  aria-pressed={windowMs === option.ms}
+                  onClick={() => setWindowMs(option.ms)}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
 
-          <div style={sectionLabel}>Time window</div>
-          <div style={segmented}>
-            {WINDOWS.map((option) => (
-              <button
-                key={option.label}
-                type="button"
-                style={segment(windowMs === option.ms)}
-                aria-pressed={windowMs === option.ms}
-                onClick={() => setWindowMs(option.ms)}
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
+            <div style={sectionLabel}>Minimum severity</div>
+            <div style={segmented}>
+              {SEVERITIES.map((severity) => (
+                <button
+                  key={severity}
+                  type="button"
+                  style={segment(minSeverity === severity, SEVERITY_COLOURS[severity])}
+                  aria-pressed={minSeverity === severity}
+                  onClick={() => setMinSeverity(severity)}
+                >
+                  {capitalise(severity)}
+                </button>
+              ))}
+            </div>
 
-          <div style={sectionLabel}>Minimum severity</div>
-          <div style={segmented}>
-            {SEVERITIES.map((severity) => (
-              <button
-                key={severity}
-                type="button"
-                style={segment(minSeverity === severity, SEVERITY_COLOURS[severity])}
-                aria-pressed={minSeverity === severity}
-                onClick={() => setMinSeverity(severity)}
-              >
-                {capitalise(severity)}
-              </button>
-            ))}
-          </div>
-
-          <div style={sectionLabel}>Categories</div>
-          {shownCategories.map((category) => (
-            <label key={category} style={{ ...panelToggle, justifyContent: "space-between" }}>
-              <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <input
-                  type="checkbox"
-                  checked={!hidden.has(category)}
-                  onChange={() => toggleCategory(category)}
-                  style={panelCheckbox}
-                />
-                <span style={dot(categoryMeta(registry, category).colour)} />
-                {categoryMeta(registry, category).label}
-              </span>
-              <span style={panelFigures}>{categoryCounts.get(category) ?? 0}</span>
-            </label>
-          ))}
-
-          <div style={panelSeparator} />
-
-          <div style={sectionLabel}>Latest</div>
-          <div style={feed}>
-            {visible.length === 0 && <div style={panelMuted}>Nothing matches the filters.</div>}
-            {visible.slice(0, 40).map((event) => (
-              <button
-                key={event.id}
-                type="button"
-                style={feedRow(selection?.kind === "event" && event.id === selection.id)}
-                onClick={() => flyTo(event)}
-                title={event.title}
-              >
-                <span style={{ ...dot(categoryMeta(registry, event.category).colour), marginTop: 5 }} />
-                <span style={{ minWidth: 0, flex: 1 }}>
-                  <span style={feedTitle}>{event.title}</span>
-                  <span style={panelMuted}>
-                    {event.country || event.place || event.source} · {relativeTime(event.time, now)}
-                    {event.severity === "critical" || event.severity === "high" ? (
-                      <span style={{ color: SEVERITY_COLOURS[event.severity] }}>
-                        {" "}
-                        · {event.severity}
-                      </span>
-                    ) : null}
-                  </span>
+            <div style={sectionLabel}>Categories</div>
+            {shownCategories.map((category) => (
+              <label key={category} style={{ ...panelToggle, justifyContent: "space-between" }}>
+                <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <input
+                    type="checkbox"
+                    checked={!hidden.has(category)}
+                    onChange={() => toggleCategory(category)}
+                    style={panelCheckbox}
+                  />
+                  <span style={dot(categoryMeta(registry, category).colour)} />
+                  {categoryMeta(registry, category).label}
                 </span>
-                {event.live && <span style={{ ...liveBadge, marginTop: 3 }}>LIVE</span>}
-              </button>
+                <span style={panelFigures}>{categoryCounts.get(category) ?? 0}</span>
+              </label>
             ))}
-          </div>
 
-          <div style={panelSeparator} />
+            <div style={panelSeparator} />
 
-          <Toggle label="3D terrain" value={terrain} onChange={setTerrain} />
-          <Toggle label="Globe" value={globe} onChange={setGlobe} />
-          <div style={panelMuted}>
-            {dem && zoom < dem.minZoom
-              ? `Relief from z${dem.minZoom} · now z${zoom.toFixed(1)}`
-              : `z${zoom.toFixed(1)}`}
-          </div>
-          <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
-            <button type="button" style={{ ...actionButton, flex: 1 }} onClick={fitToData}>
-              Fit to data
-            </button>
-            <button type="button" style={{ ...actionButton, flex: 1 }} onClick={resetView}>
-              Reset view
-            </button>
+            <div style={sectionLabel}>Latest</div>
+            <div style={feed}>
+              {visible.length === 0 && <div style={panelMuted}>Nothing matches the filters.</div>}
+              {visible.slice(0, 40).map((event) => (
+                <button
+                  key={event.id}
+                  type="button"
+                  style={feedRow(selection?.kind === "event" && event.id === selection.id)}
+                  onClick={() => flyTo(event)}
+                  title={event.title}
+                >
+                  <span style={{ ...dot(categoryMeta(registry, event.category).colour), marginTop: 5 }} />
+                  <span style={{ minWidth: 0, flex: 1 }}>
+                    <span style={feedTitle}>{event.title}</span>
+                    <span style={panelMuted}>
+                      {event.country || event.place || event.source} · {relativeTime(event.time, now)}
+                      {event.severity === "critical" || event.severity === "high" ? (
+                        <span style={{ color: SEVERITY_COLOURS[event.severity] }}>
+                          {" "}
+                          · {event.severity}
+                        </span>
+                      ) : null}
+                    </span>
+                  </span>
+                  {event.live && <span style={{ ...liveBadge, marginTop: 3 }}>LIVE</span>}
+                </button>
+              ))}
+            </div>
+
+            <div style={panelSeparator} />
+
+            <Toggle label="3D terrain" value={terrain} onChange={setTerrain} />
+            <Toggle label="Globe" value={globe} onChange={setGlobe} />
+            <div style={panelMuted}>
+              {dem && zoom < dem.minZoom
+                ? `Relief from z${dem.minZoom} · now z${zoom.toFixed(1)}`
+                : `z${zoom.toFixed(1)}`}
+            </div>
+            <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
+              <button type="button" style={{ ...actionButton, flex: 1 }} onClick={fitToData}>
+                Fit to data
+              </button>
+              <button type="button" style={{ ...actionButton, flex: 1 }} onClick={resetView}>
+                Reset view
+              </button>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* ── Cluster hover ────────────────────────────────────────────────── */}
       {hover && (
@@ -896,7 +945,7 @@ function EventsPage(): React.ReactElement {
       )}
 
       {/* ── Legend ───────────────────────────────────────────────────────── */}
-      <div style={legend}>
+      <div style={{ ...legend, left: selectedEvent || selectedArea ? 354 : 12 }}>
         <span style={panelMuted}>Clusters</span>
         {CLUSTER_STEPS.map((step, index) => {
           const next = CLUSTER_STEPS[index + 1];
