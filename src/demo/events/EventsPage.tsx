@@ -19,6 +19,12 @@
  * src/workshopConfig.ts), the URL (`?dataset=…&mediaset=rid::path&stream=…`),
  * or the panel.
  *
+ * Categories are the built-ins plus any a module adds through the
+ * event-monitor-categories variable (./categories.ts), and anything can be
+ * put into any of them by hand — a whole source, one value of its category
+ * column, or a single event (./categoryOverrides.ts). A column of media item
+ * references is previewed in the details panel (./MediaPreview.tsx).
+ *
  * Three extensions on one stock basemap:
  *
  *   elevation()         terrain and hillshade; the same DEM answers "how
@@ -55,8 +61,6 @@ import {
   panelToggle,
 } from "@/components/mapPanel";
 import {
-  CATEGORIES,
-  CATEGORY_ORDER,
   CLUSTER_STEPS,
   EVENT_LAYERS,
   EVENTS_SOURCE,
@@ -65,18 +69,31 @@ import {
   eventsExtension,
   filterEvents,
   selectionFilter,
+  setCategoryColours,
   setEventData,
   type EventsSource,
 } from "./eventsLayer";
+import { buildRegistry, categoryMeta } from "./categories";
+import {
+  applyOverrides,
+  loadOverrides,
+  overriddenCategory,
+  saveOverrides,
+  withOverride,
+  type CategoryOverrides,
+} from "./categoryOverrides";
 import {
   AREA_LAYERS,
   areaSelectionFilter,
   areasExtension,
+  setAreaCategoryColours,
   setAreaData,
 } from "./areasLayer";
 import {
   SEVERITIES,
   generateEvents,
+  primaryKey,
+  severityRank,
   sortNewestFirst,
   type EventCategory,
   type MonitorEvent,
@@ -98,7 +115,11 @@ import {
 import { boundsOf, shapeBounds, type Bounds } from "./sources/geo";
 import type { MonitorArea } from "./sources/interpret";
 import { useEventSources } from "./sources/useEventSources";
-import { useWorkshopEventSources } from "@/workshopConfig";
+import {
+  useWorkshopEventCategories,
+  useWorkshopEventSources,
+  useWorkshopSelectedEvent,
+} from "@/workshopConfig";
 import {
   actionButton,
   dot,
@@ -146,8 +167,12 @@ interface ClusterHover {
   x: number;
   y: number;
   count: number;
-  breakdown: Array<{ category: EventCategory; count: number }>;
+  /** Null while the cluster's events are being fetched. */
+  breakdown: Array<{ category: EventCategory; count: number }> | null;
 }
+
+/** How many of a cluster's events the hover card counts by category. */
+const HOVER_LEAF_LIMIT = 2000;
 
 type Selection = { kind: "event"; id: string } | { kind: "area"; id: string } | null;
 
@@ -200,20 +225,64 @@ function EventsPage(): React.ReactElement {
   // has yet to say whether it is, so embedded pages never flash it.
   const [mockChoice, setMockChoice] = useState<boolean | null>(null);
   const mock = mockChoice ?? (!hasSources && workshop.status === "ready");
-  const { states, reload } = useEventSources(configs, now);
+  // ── Categories ─────────────────────────────────────────────────────────────
+  //
+  // The built-ins plus any the Workshop variable adds, and what has been put
+  // into which by hand (categoryOverrides.ts). Keyed on content, like the
+  // sources: a new registry re-reads every loaded source.
+  const workshopCategories = useWorkshopEventCategories();
+  const categoriesKey = JSON.stringify(workshopCategories.categories);
+  const registry = useMemo(
+    () => buildRegistry(workshopCategories.categories),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [categoriesKey],
+  );
+  const [overrides, setOverrides] = useState<CategoryOverrides>(loadOverrides);
+  useEffect(() => saveOverrides(overrides), [overrides]);
 
-  const events = useMemo(
+  const { states, reload } = useEventSources(configs, now, registry);
+
+  // As interpreted, before anything was put into a category by hand.
+  const rawEvents = useMemo(
     () => sortNewestFirst([...(mock ? mockEvents : []), ...states.flatMap((s) => s.events)]),
     [mock, mockEvents, states],
   );
-  const areas = useMemo(() => states.flatMap((s) => s.areas), [states]);
+  const rawAreas = useMemo(() => states.flatMap((s) => s.areas), [states]);
+  const events = useMemo(
+    () => applyOverrides(rawEvents, overrides, registry),
+    [rawEvents, overrides, registry],
+  );
+  const areas = useMemo(
+    () => applyOverrides(rawAreas, overrides, registry),
+    [rawAreas, overrides, registry],
+  );
   const eventsById = useMemo(() => new Map(events.map((e) => [e.id, e])), [events]);
   const areasById = useMemo(() => new Map(areas.map((a) => [a.id, a])), [areas]);
+  const rawById = useMemo(
+    () => new Map<string, { id: string; category: string; sourceKey?: string; categoryValue?: string }>(
+      [...rawEvents, ...rawAreas].map((item) => [item.id, item]),
+    ),
+    [rawEvents, rawAreas],
+  );
+
+  /** The picker for one event or area: its own choice, and what it gets without one. */
+  const categoryChoiceFor = (id: string) => {
+    const raw = rawById.get(id);
+    const withoutOwn = raw
+      ? overriddenCategory(raw, { ...overrides, events: {} }, registry) ?? raw.category
+      : "other";
+    const chosen = overrides.events[id];
+    return {
+      registry,
+      chosen: chosen && registry.byId[chosen] ? chosen : undefined,
+      automatic: withoutOwn,
+      onChange: (category: string | undefined) =>
+        setOverrides((previous) => withOverride(previous, { kind: "event", id }, category)),
+    };
+  };
 
   // ── Filters ────────────────────────────────────────────────────────────────
-  const [categories, setCategories] = useState<Set<EventCategory>>(
-    () => new Set(CATEGORY_ORDER),
-  );
+  const [hidden, setHidden] = useState<Set<EventCategory>>(() => new Set());
   const [minSeverity, setMinSeverity] = useState<Severity>("low");
   // Real data is rarely all from the last week; mock data is. Until someone
   // picks a window, it follows whether there are real sources.
@@ -231,19 +300,19 @@ function EventsPage(): React.ReactElement {
   const [groundHeight, setGroundHeight] = useState<number | null | "loading">(null);
 
   const visible = useMemo(
-    () => filterEvents(events, { categories, minSeverity, windowMs, now }),
-    [events, categories, minSeverity, windowMs, now],
+    () => filterEvents(events, { hidden, minSeverity, windowMs, now }),
+    [events, hidden, minSeverity, windowMs, now],
   );
   const visibleAreas = useMemo(
-    () => areas.filter((area) => categories.has(area.category)),
-    [areas, categories],
+    () => areas.filter((area) => !hidden.has(area.category)),
+    [areas, hidden],
   );
   // Counts beside each category ignore the category filter itself, so turning
   // a category off does not make its own count read zero.
   const categoryCounts = useMemo(() => {
     const counts = new Map<EventCategory, number>();
     for (const event of filterEvents(events, {
-      categories: new Set(CATEGORY_ORDER),
+      hidden: new Set(),
       minSeverity,
       windowMs,
       now,
@@ -252,13 +321,32 @@ function EventsPage(): React.ReactElement {
     }
     return counts;
   }, [events, minSeverity, windowMs, now]);
-  // "Other" only appears once a source has produced some.
-  const shownCategories = CATEGORY_ORDER.filter(
+  // Custom categories always show — a module defined them for a reason —
+  // and "Other" once something has landed in it.
+  const shownCategories = registry.order.filter(
     (category) => category !== "other" || (categoryCounts.get("other") ?? 0) > 0 || areas.some((a) => a.category === "other"),
   );
 
   const selectedEvent = selection?.kind === "event" ? eventsById.get(selection.id) ?? null : null;
   const selectedArea = selection?.kind === "area" ? areasById.get(selection.id) ?? null : null;
+  const selectedPk = selectedEvent
+    ? primaryKey(selectedEvent)
+    : selectedArea
+      ? primaryKey(selectedArea)
+      : undefined;
+
+  // Events (then areas) by the key the selected-event variable holds. The
+  // first wins where two sources share a key.
+  const byPk = useMemo(() => {
+    const map = new Map<string, { kind: "event"; item: MonitorEvent } | { kind: "area"; item: MonitorArea }>();
+    for (const item of events) {
+      if (!map.has(primaryKey(item))) {map.set(primaryKey(item), { kind: "event", item });}
+    }
+    for (const item of areas) {
+      if (!map.has(primaryKey(item))) {map.set(primaryKey(item), { kind: "area", item });}
+    }
+    return map;
+  }, [events, areas]);
 
   // Read at the moment a map is (re)built: the extensions are seeded with the
   // current data and the camera with the current view.
@@ -266,6 +354,8 @@ function EventsPage(): React.ReactElement {
   visibleRef.current = visible;
   const areasRef = useRef(visibleAreas);
   areasRef.current = visibleAreas;
+  const registryRef = useRef(registry);
+  registryRef.current = registry;
   const viewRef = useRef<View>(SPAWN);
 
   const signature = `${terrain}-${globe}`;
@@ -277,8 +367,8 @@ function EventsPage(): React.ReactElement {
         sky: terrain,
         onReady: setDem,
       }),
-      areasExtension(areasRef.current),
-      eventsExtension(visibleRef.current),
+      areasExtension(areasRef.current, registryRef.current),
+      eventsExtension(visibleRef.current, registryRef.current),
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [signature],
@@ -297,6 +387,14 @@ function EventsPage(): React.ReactElement {
     setMap(null);
     setHover(null);
   }, [signature]);
+
+  // Categories → colours, without rebuilding the map.
+  useEffect(() => {
+    if (map) {
+      setCategoryColours(map, registry);
+      setAreaCategoryColours(map, registry);
+    }
+  }, [map, registry]);
 
   // Data → map.
   useEffect(() => {
@@ -385,17 +483,33 @@ function EventsPage(): React.ReactElement {
       setSelection(null);
     };
 
+    // The cluster under the pointer, so moving within one only moves the
+    // card, and a late answer for a cluster already left is dropped.
+    let hoverCluster: number | null = null;
     const onClusterMove = (event: maplibregl.MapLayerMouseEvent) => {
       const properties = event.features?.[0]?.properties;
       if (!properties) {return;}
-      setHover({
-        x: event.point.x,
-        y: event.point.y,
-        count: Number(properties.point_count),
-        breakdown: clusterBreakdown(properties),
-      });
+      const { x, y } = event.point;
+      const clusterId = Number(properties.cluster_id);
+      if (clusterId === hoverCluster) {
+        setHover((previous) => (previous ? { ...previous, x, y } : previous));
+        return;
+      }
+      hoverCluster = clusterId;
+      setHover({ x, y, count: Number(properties.point_count), breakdown: null });
+      const source = map.getSource(EVENTS_SOURCE) as unknown as EventsSource | undefined;
+      void source
+        ?.getClusterLeaves(clusterId, HOVER_LEAF_LIMIT, 0)
+        .then((leaves) => {
+          if (hoverCluster !== clusterId) {return;}
+          setHover((previous) => (previous ? { ...previous, breakdown: clusterBreakdown(leaves) } : previous));
+        })
+        .catch(() => undefined);
     };
-    const onClusterLeave = () => setHover(null);
+    const onClusterLeave = () => {
+      hoverCluster = null;
+      setHover(null);
+    };
 
     const onMouseMove = (event: maplibregl.MapMouseEvent) => {
       const interactive = map.queryRenderedFeatures(event.point, {
@@ -411,7 +525,10 @@ function EventsPage(): React.ReactElement {
     };
     // The hover card is positioned in screen space; any camera move makes it
     // point at the wrong place.
-    const onMoveStart = () => setHover(null);
+    const onMoveStart = () => {
+      hoverCluster = null;
+      setHover(null);
+    };
 
     map.on("click", onClick);
     map.on("mousemove", onMouseMove);
@@ -468,8 +585,78 @@ function EventsPage(): React.ReactElement {
     });
   };
 
+  // ── The selected-event Workshop variable ─────────────────────────────────
+  //
+  // Both ways: a selection made here is written to it; a value set from the
+  // module selects that event. Our own writes come back as value changes, so
+  // a value is only acted on when it is new, and one we sent a moment ago
+  // (overtaken by a later selection) is ignored. A key whose event has not
+  // loaded yet waits for it.
+  const workshopSelection = useWorkshopSelectedEvent();
+  const lastSeenValue = useRef<string | undefined | null>(null);
+  const pendingPk = useRef<string | undefined>(undefined);
+  const recentlySent = useRef<Array<{ value: string | undefined; at: number }>>([]);
+
+  /** Filters that hide an event are relaxed, so a selection from outside shows. */
+  const reveal = (event: MonitorEvent) => {
+    setHidden((previous) => {
+      if (!previous.has(event.category)) {return previous;}
+      const next = new Set(previous);
+      next.delete(event.category);
+      return next;
+    });
+    if (severityRank(event.severity) < severityRank(minSeverity)) {setMinSeverity("low");}
+    if (windowMs != null && event.time != null && event.time < now - windowMs) {setWindowMs(null);}
+  };
+
+  // Incoming: declared before the outgoing effect, so a value waiting for
+  // its event is marked pending before anything could write over it.
+  useEffect(() => {
+    if (workshopSelection.status !== "ready") {return;}
+    const wanted = workshopSelection.value;
+    const isNew = wanted !== lastSeenValue.current;
+    lastSeenValue.current = wanted;
+    if (!isNew && pendingPk.current == null) {return;}
+    const echo = recentlySent.current.some(
+      (sent) => sent.value === wanted && Date.now() - sent.at < 3000,
+    );
+    if (wanted === selectedPk || (isNew && echo && wanted !== recentlySent.current.at(-1)?.value)) {
+      pendingPk.current = undefined;
+      return;
+    }
+    if (wanted == null) {
+      pendingPk.current = undefined;
+      setSelection(null);
+      return;
+    }
+    const target = byPk.get(wanted);
+    if (!target) {
+      pendingPk.current = wanted;
+      return;
+    }
+    pendingPk.current = undefined;
+    if (target.kind === "event") {
+      reveal(target.item);
+      flyTo(target.item);
+    } else {
+      setSelection({ kind: "area", id: target.item.id });
+      zoomToArea(target.item);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [workshopSelection.status, workshopSelection.value, byPk]);
+
+  // Outgoing.
+  useEffect(() => {
+    if (workshopSelection.status !== "ready" || pendingPk.current != null) {return;}
+    if (selectedPk === workshopSelection.value) {return;}
+    recentlySent.current = [...recentlySent.current.slice(-4), { value: selectedPk, at: Date.now() }];
+    lastSeenValue.current = selectedPk;
+    workshopSelection.set(selectedPk);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedPk, workshopSelection.status]);
+
   const toggleCategory = (category: EventCategory) => {
-    setCategories((previous) => {
+    setHidden((previous) => {
       const next = new Set(previous);
       if (next.has(category)) {next.delete(category);}
       else {next.add(category);}
@@ -555,7 +742,17 @@ function EventsPage(): React.ReactElement {
           onTitleChange={setTitleField}
             sessionOnly={sessionOnly}
             pinnedKeys={pinnedKeys}
-            workshopProblems={workshop.invalid}
+            workshopProblems={[...workshop.invalid, ...workshopCategories.invalid]}
+            registry={registry}
+            overrides={overrides}
+            onSourceCategory={(key, category) =>
+              setOverrides((previous) => withOverride(previous, { kind: "source", sourceKey: key }, category))
+            }
+            onValueCategory={(key, value, category) =>
+              setOverrides((previous) =>
+                withOverride(previous, { kind: "value", sourceKey: key, value }, category),
+              )
+            }
             waitingForWorkshop={workshop.status === "pending"}
           />
 
@@ -597,12 +794,12 @@ function EventsPage(): React.ReactElement {
               <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <input
                   type="checkbox"
-                  checked={categories.has(category)}
+                  checked={!hidden.has(category)}
                   onChange={() => toggleCategory(category)}
                   style={panelCheckbox}
                 />
-                <span style={dot(CATEGORIES[category].colour)} />
-                {CATEGORIES[category].label}
+                <span style={dot(categoryMeta(registry, category).colour)} />
+                {categoryMeta(registry, category).label}
               </span>
               <span style={panelFigures}>{categoryCounts.get(category) ?? 0}</span>
             </label>
@@ -621,7 +818,7 @@ function EventsPage(): React.ReactElement {
                 onClick={() => flyTo(event)}
                 title={event.title}
               >
-                <span style={{ ...dot(CATEGORIES[event.category].colour), marginTop: 5 }} />
+                <span style={{ ...dot(categoryMeta(registry, event.category).colour), marginTop: 5 }} />
                 <span style={{ minWidth: 0, flex: 1 }}>
                   <span style={feedTitle}>{event.title}</span>
                   <span style={panelMuted}>
@@ -663,13 +860,17 @@ function EventsPage(): React.ReactElement {
       {hover && (
         <div style={{ ...hoverCard, left: hover.x + 16, top: hover.y + 16 }}>
           <div style={panelHeading}>{hover.count} events — click to expand</div>
-          {hover.breakdown.map(({ category, count }) => (
+          {hover.breakdown == null && <div style={panelMuted}>Counting…</div>}
+          {hover.breakdown?.map(({ category, count }) => (
             <div key={category} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span style={dot(CATEGORIES[category].colour)} />
-              <span style={{ flex: 1 }}>{CATEGORIES[category].label}</span>
+              <span style={dot(categoryMeta(registry, category).colour)} />
+              <span style={{ flex: 1 }}>{categoryMeta(registry, category).label}</span>
               <span style={panelFigures}>{count}</span>
             </div>
           ))}
+          {hover.breakdown && hover.count > HOVER_LEAF_LIMIT && (
+            <div style={panelMuted}>Counted from the first {HOVER_LEAF_LIMIT.toLocaleString("en-GB")}.</div>
+          )}
         </div>
       )}
 
@@ -680,6 +881,7 @@ function EventsPage(): React.ReactElement {
           now={now}
           groundHeight={groundHeight}
           demReady={dem != null}
+          categoryChoice={categoryChoiceFor(selectedEvent.id)}
           onZoom={() => flyTo(selectedEvent)}
           onClose={() => setSelection(null)}
         />
@@ -687,6 +889,7 @@ function EventsPage(): React.ReactElement {
       {selectedArea && (
         <AreaDetails
           area={selectedArea}
+          categoryChoice={categoryChoiceFor(selectedArea.id)}
           onZoom={() => zoomToArea(selectedArea)}
           onClose={() => setSelection(null)}
         />

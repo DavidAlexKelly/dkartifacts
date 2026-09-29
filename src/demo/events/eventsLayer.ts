@@ -10,11 +10,15 @@
  * few hand-picked thresholds.
  *
  * A cluster's size and colour say how many events it holds, on one
- * sequential ramp. Clusters also carry figures computed as they form
- * (`clusterProperties`): the highest severity inside, so a cluster hiding a
- * critical event gets a red outline, and a count per category, which the page
- * shows on hover. Both are aggregated in the worker, so hovering a cluster of
- * 200 never has to fetch its leaves.
+ * sequential ramp. Clusters also carry the highest severity inside
+ * (`clusterProperties`, aggregated in the worker), so a cluster hiding a
+ * critical event gets a red outline. What is in a cluster by category is NOT
+ * aggregated: categories can be added at runtime (custom ones from Workshop),
+ * and cluster properties are fixed when the source is created — so the hover
+ * card asks the source for the cluster's events instead (`getClusterLeaves`).
+ *
+ * Category colours come from a CategoryRegistry (categories.ts) and can be
+ * re-applied to a live map with `setCategoryColours`, for the same reason.
  *
  * Severity is the outline rather than the fill because a fill by the maximum
  * turns the whole world red at low zoom — almost any cluster of twenty events
@@ -27,6 +31,7 @@
  */
 
 import { FONT_MEDIUM, FONT_REGULAR, type BasemapExtension } from "@acc/decho-basemap";
+import { BUILTIN_REGISTRY, categoryMeta, type CategoryRegistry } from "./categories";
 import {
   SEVERITIES,
   severityRank,
@@ -34,26 +39,6 @@ import {
   type MonitorEvent,
   type Severity,
 } from "./mockEvents";
-
-export interface CategoryMeta {
-  label: string;
-  colour: string;
-}
-
-export const CATEGORIES: Record<EventCategory, CategoryMeta> = {
-  conflict: { label: "Armed conflict", colour: "#e5484d" },
-  military: { label: "Military activity", colour: "#b38cf2" },
-  protest: { label: "Protests & unrest", colour: "#f59e3d" },
-  earthquake: { label: "Earthquakes", colour: "#c9a26b" },
-  wildfire: { label: "Wildfires", colour: "#ff6b3d" },
-  weather: { label: "Severe weather", colour: "#4fa3f7" },
-  outbreak: { label: "Disease outbreaks", colour: "#5fd08a" },
-  cyber: { label: "Cyber incidents", colour: "#38d6d6" },
-  infrastructure: { label: "Infrastructure", colour: "#e6d84a" },
-  other: { label: "Other", colour: "#9aa5b1" },
-};
-
-export const CATEGORY_ORDER = Object.keys(CATEGORIES) as EventCategory[];
 
 export const SEVERITY_COLOURS: Record<Severity, string> = {
   low: "#6f9fc9",
@@ -79,7 +64,12 @@ export const EVENT_LAYERS = {
 export const CLUSTER_MAX_ZOOM = 11;
 
 export interface EventFilter {
-  categories: ReadonlySet<EventCategory>;
+  /**
+   * Categories switched off. A set of what is hidden rather than what is
+   * shown, so a category that appears later — a custom one from Workshop —
+   * is visible until someone turns it off.
+   */
+  hidden: ReadonlySet<EventCategory>;
   minSeverity: Severity;
   /**
    * Only events newer than this many ms before `now`; null for all. Events
@@ -98,7 +88,7 @@ export function filterEvents(
   const since = filter.windowMs == null ? -Infinity : filter.now - filter.windowMs;
   return events.filter(
     (event) =>
-      filter.categories.has(event.category) &&
+      !filter.hidden.has(event.category) &&
       severityRank(event.severity) >= minRank &&
       (event.time == null || event.time >= since),
   );
@@ -141,22 +131,8 @@ export function toFeatureCollection(
   };
 }
 
-/** `count_<category>` on every cluster. */
-export function categoryCountProperty(category: EventCategory): string {
-  return `count_${category}`;
-}
-
 function clusterProperties(): Record<string, unknown> {
-  const properties: Record<string, unknown> = {
-    maxSeverity: ["max", ["get", "severity"]],
-  };
-  for (const category of CATEGORY_ORDER) {
-    properties[categoryCountProperty(category)] = [
-      "+",
-      ["case", ["==", ["get", "category"], category], 1, 0],
-    ];
-  }
-  return properties;
+  return { maxSeverity: ["max", ["get", "severity"]] };
 }
 
 /** A `match` over a numeric severity property, returning its colour. */
@@ -197,12 +173,13 @@ function byClusterSize(
 
 const HAS_CRITICAL = ["==", ["get", "maxSeverity"], severityRank("critical")];
 
-function categoryColour(): unknown[] {
+/** A `match` from a feature's category to its colour. Shared with areasLayer.ts. */
+export function categoryColour(registry: CategoryRegistry): unknown[] {
   return [
     "match",
     ["get", "category"],
-    ...CATEGORY_ORDER.flatMap((category) => [category, CATEGORIES[category].colour]),
-    "#cccccc",
+    ...registry.order.flatMap((category) => [category, registry.byId[category].colour]),
+    categoryMeta(registry, "other").colour,
   ];
 }
 
@@ -221,7 +198,7 @@ export function selectionFilter(id: string | null): unknown[] {
 /* eslint-disable @typescript-eslint/no-explicit-any --
    Layer specifications are untyped for the reason the basemap's
    StyleContribution gives: MapLibre validates the assembled style. */
-export function eventLayers(): any[] {
+export function eventLayers(registry: CategoryRegistry = BUILTIN_REGISTRY): any[] {
   return [
     {
       id: EVENT_LAYERS.clusterHalo,
@@ -289,7 +266,7 @@ export function eventLayers(): any[] {
       source: EVENTS_SOURCE,
       filter: IS_POINT,
       paint: {
-        "circle-color": categoryColour(),
+        "circle-color": categoryColour(registry),
         "circle-radius": [
           "interpolate",
           ["linear"],
@@ -346,7 +323,10 @@ export function eventLayers(): any[] {
  * The extension. `initial` seeds the source; later changes go through
  * `setEventData` so the map is not rebuilt every time a filter moves.
  */
-export function eventsExtension(initial: readonly MonitorEvent[]): BasemapExtension {
+export function eventsExtension(
+  initial: readonly MonitorEvent[],
+  registry: CategoryRegistry = BUILTIN_REGISTRY,
+): BasemapExtension {
   return {
     id: "events",
     style: () => ({
@@ -362,7 +342,7 @@ export function eventsExtension(initial: readonly MonitorEvent[]): BasemapExtens
       },
       // No `before`: events draw over everything, labels included, because
       // they are the subject of this map and the basemap is the backdrop.
-      layers: eventLayers(),
+      layers: eventLayers(registry),
     }),
   };
 }
@@ -371,6 +351,24 @@ export function eventsExtension(initial: readonly MonitorEvent[]): BasemapExtens
 export interface EventsSource {
   setData(data: EventFeatureCollection): unknown;
   getClusterExpansionZoom(clusterId: number): Promise<number>;
+  getClusterLeaves(
+    clusterId: number,
+    limit: number,
+    offset: number,
+  ): Promise<Array<{ properties?: Record<string, unknown> | null }>>;
+}
+
+/** Point colours for a registry that changed after the map was built. */
+export function setCategoryColours(
+  map: {
+    getLayer(id: string): unknown;
+    setPaintProperty(layer: string, name: string, value: unknown): unknown;
+  },
+  registry: CategoryRegistry,
+): void {
+  if (map.getLayer(EVENT_LAYERS.point)) {
+    map.setPaintProperty(EVENT_LAYERS.point, "circle-color", categoryColour(registry));
+  }
 }
 
 export function setEventData(
@@ -381,14 +379,16 @@ export function setEventData(
   source?.setData(toFeatureCollection(events));
 }
 
-/** Per-category counts carried on a cluster feature, largest first. */
+/** How many of a cluster's events are in each category, largest first. */
 export function clusterBreakdown(
-  properties: Record<string, unknown>,
+  leaves: ReadonlyArray<{ properties?: Record<string, unknown> | null }>,
 ): Array<{ category: EventCategory; count: number }> {
-  return CATEGORY_ORDER.map((category) => ({
-    category,
-    count: Number(properties[categoryCountProperty(category)] ?? 0),
-  }))
-    .filter((entry) => entry.count > 0)
+  const counts = new Map<string, number>();
+  for (const leaf of leaves) {
+    const category = leaf.properties?.category;
+    if (typeof category === "string") {counts.set(category, (counts.get(category) ?? 0) + 1);}
+  }
+  return [...counts]
+    .map(([category, count]) => ({ category, count }))
     .sort((a, b) => b.count - a.count);
 }

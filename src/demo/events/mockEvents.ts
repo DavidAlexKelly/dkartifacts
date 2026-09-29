@@ -12,18 +12,17 @@
  * page labels them as mock data.
  */
 
-export type EventCategory =
-  | "conflict"
-  | "protest"
-  | "military"
-  | "earthquake"
-  | "wildfire"
-  | "weather"
-  | "outbreak"
-  | "cyber"
-  | "infrastructure"
-  /** Real sources only: a record whose category matched nothing above. */
-  | "other";
+import type { BuiltinCategory } from "./categories";
+import type { MediaRef } from "./sources/media";
+
+/**
+ * A category id: one of the built-ins (see categories.ts) or a custom one a
+ * Workshop module defined, "custom:…".
+ */
+export type EventCategory = string;
+
+/** The categories mock data is written in: the built-ins, less "other". */
+type MockCategory = Exclude<BuiltinCategory, "other">;
 
 export type Severity = "low" | "moderate" | "high" | "critical";
 
@@ -64,6 +63,24 @@ export interface MonitorEvent {
   live?: boolean;
   /** The record as the source had it, for the details panel. */
   fields?: Record<string, unknown>;
+  /**
+   * The source's own word for the category ("Battles"), whatever category
+   * it was sorted into — what a value-to-category mapping is keyed on.
+   */
+  categoryValue?: string;
+  /** Media items the record references, previewed in the details panel. */
+  media?: MediaRef[];
+  /**
+   * The primary key as its source knows it — the value of its id column —
+   * for the Workshop selected-event variable. Absent when the source has no
+   * id column; `primaryKey()` then falls back to `id`.
+   */
+  pk?: string;
+}
+
+/** What the selected-event variable holds for an event or area. */
+export function primaryKey(item: { id: string; pk?: string }): string {
+  return item.pk ?? item.id;
 }
 
 interface Hotspot {
@@ -147,7 +164,7 @@ const HOTSPOTS: Hotspot[] = [
   { place: "Gauteng", country: "South Africa", lon: 28.05, lat: -26.2, spread: 0.5, weight: 2, categories: ["infrastructure", "protest"] },
 ];
 
-const SOURCES: Record<Exclude<EventCategory, "other">, string[]> = {
+const SOURCES: Record<MockCategory, string[]> = {
   conflict: ["ACLED (mock)", "Field reporting (mock)", "OSINT aggregation (mock)"],
   protest: ["ACLED (mock)", "Local media (mock)"],
   military: ["ADS-B feed (mock)", "AIS feed (mock)", "Defence ministry statement (mock)"],
@@ -215,7 +232,6 @@ function scaled(rng: Rng, severity: Severity, base: number): number {
   return Math.round(base * severityRank(severity) ** 2 * between(rng, 0.6, 1.4));
 }
 
-type MockCategory = Exclude<EventCategory, "other">;
 
 function write(rng: Rng, category: MockCategory, severity: Severity, hotspot: Hotspot): Written {
   const { place } = hotspot;

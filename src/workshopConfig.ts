@@ -32,6 +32,19 @@
  * package, which deliberately reports false inside a Foundry container so a
  * Code Workspace preview counts as standalone.
  *
+ *  eventCategories   — string list, read by the event monitor only: extra
+ *                      categories, each "Label", "Label|#colour" or
+ *                      "Label|#colour|keyword, keyword*". Data can be put
+ *                      into them by keyword or by hand. See
+ *                      src/demo/events/categories.ts.
+ *
+ *  selectedEvent     — string, both ways, read by the event monitor only: the
+ *                      primary key of the selected event (its source's id
+ *                      column; for mock events, "evt-0001"). Selecting an
+ *                      event writes it, closing the selection clears it, and
+ *                      a module that sets it selects that event and flies to
+ *                      it — as soon as it has loaded, if it has not yet.
+ *
  *  eventDatasetRids, eventMediaSetInputs, eventStreamRids
  *                    — string lists, read by the event monitor (/events) only.
  *                      The same shapes as the davebettermap widget's
@@ -63,6 +76,7 @@ import {
   type SourceConfig,
   type SourceKind,
 } from "@/demo/events/sources/config";
+import { parseCustomCategory, type CategoryDef } from "@/demo/events/categories";
 
 export const ARTIFACT_SHELL_CONFIG = [
   {
@@ -125,6 +139,37 @@ export const ARTIFACT_SHELL_CONFIG = [
       },
     },
   },
+  {
+    fieldId: "eventCategories",
+    field: {
+      type: "single" as const,
+      label: "event-monitor-categories",
+      helperText:
+        "Event monitor (/events): extra categories, one per entry, as Label, " +
+        "Label|#colour or Label|#colour|keyword, keyword*. Records whose " +
+        "category, title or summary contain a keyword are sorted into it; " +
+        "anything can also be put into it by hand on the page.",
+      fieldValue: {
+        type: "inputOutput" as const,
+        variableType: { type: "string-list" as const, defaultValue: [] as string[] },
+      },
+    },
+  },
+  {
+    fieldId: "selectedEvent",
+    field: {
+      type: "single" as const,
+      label: "selected-event",
+      helperText:
+        "Event monitor (/events): the primary key of the selected event — its " +
+        "source's id column. Written when someone selects an event, cleared " +
+        "when they close it; set it from the module to select that event.",
+      fieldValue: {
+        type: "inputOutput" as const,
+        variableType: { type: "string" as const },
+      },
+    },
+  },
 ] as const satisfies IConfigDefinition;
 
 export type ArtifactShellContext = IAsyncValue<
@@ -164,6 +209,12 @@ const STANDALONE: ArtifactShellContext = {
     eventDatasetRids: { fieldValue: { status: "LOADED", value: [] } },
     eventMediaSetInputs: { fieldValue: { status: "LOADED", value: [] } },
     eventStreamRids: { fieldValue: { status: "LOADED", value: [] } },
+    eventCategories: { fieldValue: { status: "LOADED", value: [] } },
+    selectedEvent: {
+      fieldValue: { status: "LOADED", value: undefined },
+      // Nobody to tell: writes go nowhere outside the provider.
+      setLoadedValue: () => undefined,
+    },
   },
 } as unknown as ArtifactShellContext;
 
@@ -235,4 +286,78 @@ export function resolveEventSources(context: ArtifactShellContext): WorkshopEven
 
 export function useWorkshopEventSources(): WorkshopEventSources {
   return resolveEventSources(useContext(ShellWorkshopContext));
+}
+
+// ── Event monitor categories ────────────────────────────────────────────────
+
+export interface WorkshopEventCategories {
+  categories: CategoryDef[];
+  /** Entries that could not be read, and why. */
+  invalid: Array<{ variable: string; entry: string; error: string }>;
+}
+
+/** The custom categories, as a plain function of the context. */
+export function resolveEventCategories(context: ArtifactShellContext): WorkshopEventCategories {
+  if (context.status !== "LOADED" && context.status !== "RELOADING") {
+    return { categories: [], invalid: [] };
+  }
+  const field = context.value.eventCategories.fieldValue;
+  const entries =
+    field.status === "LOADED" || field.status === "RELOADING" ? field.value ?? [] : [];
+  const categories: CategoryDef[] = [];
+  const invalid: WorkshopEventCategories["invalid"] = [];
+  const seen = new Set<string>();
+  entries.forEach((entry, index) => {
+    if (typeof entry !== "string" || entry.trim() === "") {return;}
+    const parsed = parseCustomCategory(entry, index);
+    if (!parsed.ok) {
+      invalid.push({ variable: "event-monitor-categories", entry, error: parsed.error });
+    } else if (seen.has(parsed.def.id)) {
+      invalid.push({
+        variable: "event-monitor-categories",
+        entry,
+        error: `"${parsed.def.label}" is already defined above.`,
+      });
+    } else {
+      seen.add(parsed.def.id);
+      categories.push(parsed.def);
+    }
+  });
+  return { categories, invalid };
+}
+
+export function useWorkshopEventCategories(): WorkshopEventCategories {
+  return resolveEventCategories(useContext(ShellWorkshopContext));
+}
+
+// ── Selected event ──────────────────────────────────────────────────────────
+
+export interface WorkshopSelectedEvent {
+  /** "pending" until an embedding Workshop has answered. */
+  status: "pending" | "ready";
+  /** The primary key the variable holds, or undefined when nothing is selected. */
+  value: string | undefined;
+}
+
+export function resolveSelectedEvent(context: ArtifactShellContext): WorkshopSelectedEvent {
+  if (context.status !== "LOADED" && context.status !== "RELOADING") {
+    return { status: context.status === "FAILED" ? "ready" : "pending", value: undefined };
+  }
+  const field = context.value.selectedEvent.fieldValue;
+  const value =
+    field.status === "LOADED" || field.status === "RELOADING" ? field.value : undefined;
+  return { status: "ready", value: typeof value === "string" && value !== "" ? value : undefined };
+}
+
+/** The variable, and a setter that writes it back to Workshop (undefined clears it). */
+export function useWorkshopSelectedEvent(): WorkshopSelectedEvent & {
+  set: (value: string | undefined) => void;
+} {
+  const context = useContext(ShellWorkshopContext);
+  const loaded = context.status === "LOADED" || context.status === "RELOADING";
+  const setter = loaded ? context.value.selectedEvent.setLoadedValue : undefined;
+  return {
+    ...resolveSelectedEvent(context),
+    set: (value) => setter?.(value === "" ? undefined : value),
+  };
 }

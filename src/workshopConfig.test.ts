@@ -12,7 +12,9 @@ import { describe, expect, it } from "vitest";
 import {
   ARTIFACT_SHELL_CONFIG,
   resolveArtifactSwitching,
+  resolveEventCategories,
   resolveEventSources,
+  resolveSelectedEvent,
   type ArtifactShellContext,
 } from "@/workshopConfig";
 
@@ -36,14 +38,17 @@ describe("the Workshop config", () => {
       ["eventDatasetRids", "event-monitor-dataset-rids"],
       ["eventMediaSetInputs", "event-monitor-media-set-inputs"],
       ["eventStreamRids", "event-monitor-stream-rids"],
+      ["eventCategories", "event-monitor-categories"],
+      ["selectedEvent", "selected-event"],
     ]);
   });
 
-  it("takes the event monitor's sources as string lists, empty by default", () => {
-    for (const field of ARTIFACT_SHELL_CONFIG.slice(1)) {
+  it("takes the event monitor's sources and categories as string lists, empty by default", () => {
+    for (const field of ARTIFACT_SHELL_CONFIG.slice(1, 5)) {
       expect(field.field.fieldValue.type, field.fieldId).toBe("inputOutput");
       expect(field.field.fieldValue.variableType.type, field.fieldId).toBe("string-list");
-      expect(field.field.fieldValue.variableType.defaultValue, field.fieldId).toEqual([]);
+      const variableType = field.field.fieldValue.variableType as { defaultValue?: unknown };
+      expect(variableType.defaultValue, field.fieldId).toEqual([]);
     }
   });
 
@@ -108,6 +113,8 @@ function withSources(lists: {
   datasets?: string[];
   media?: string[];
   streams?: string[];
+  categories?: string[];
+  selected?: string;
 }): ArtifactShellContext {
   const field = (value: string[] | undefined) => ({ fieldValue: { status: "LOADED", value } });
   return {
@@ -117,6 +124,8 @@ function withSources(lists: {
       eventDatasetRids: field(lists.datasets),
       eventMediaSetInputs: field(lists.media),
       eventStreamRids: field(lists.streams),
+      eventCategories: field(lists.categories),
+      selectedEvent: { fieldValue: { status: "LOADED", value: lists.selected } },
     },
   } as unknown as ArtifactShellContext;
 }
@@ -159,5 +168,41 @@ describe("resolveEventSources", () => {
     expect(resolveEventSources({ status: "LOADING" }).status).toBe("pending");
     expect(resolveEventSources({ status: "NOT_STARTED" }).status).toBe("pending");
     expect(resolveEventSources({ status: "FAILED", error: "rejected" }).status).toBe("ready");
+  });
+});
+
+describe("resolveEventCategories", () => {
+  it("reads each entry as a custom category, reporting bad and repeated ones", () => {
+    const { categories, invalid } = resolveEventCategories(
+      withSources({ categories: ["Frontline|#ff0000|battle*", "", "Aid", "frontline", "Bad|blue"] }),
+    );
+    expect(categories.map((c) => [c.id, c.colour])).toEqual([
+      ["custom:frontline", "#ff0000"],
+      ["custom:aid", categories[1].colour],
+    ]);
+    expect(invalid.map((i) => i.entry)).toEqual(["frontline", "Bad|blue"]);
+  });
+
+  it("is empty until Workshop answers, and when unset", () => {
+    expect(resolveEventCategories({ status: "LOADING" })).toEqual({ categories: [], invalid: [] });
+    expect(resolveEventCategories(withSources({}))).toEqual({ categories: [], invalid: [] });
+  });
+});
+
+describe("the selected-event variable", () => {
+  it("is a bidirectional string", () => {
+    const field = ARTIFACT_SHELL_CONFIG.find((f) => f.fieldId === "selectedEvent")!;
+    expect(field.field.fieldValue.type).toBe("inputOutput");
+    expect(field.field.fieldValue.variableType.type).toBe("string");
+  });
+
+  it("reads the key, treating empty as nothing selected", () => {
+    expect(resolveSelectedEvent(withSources({ selected: "FAKE1005" }))).toEqual({ status: "ready", value: "FAKE1005" });
+    expect(resolveSelectedEvent(withSources({ selected: "" }))).toEqual({ status: "ready", value: undefined });
+    expect(resolveSelectedEvent(withSources({}))).toEqual({ status: "ready", value: undefined });
+  });
+
+  it("is pending until Workshop answers", () => {
+    expect(resolveSelectedEvent({ status: "LOADING" })).toEqual({ status: "pending", value: undefined });
   });
 });

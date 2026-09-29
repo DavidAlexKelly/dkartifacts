@@ -20,6 +20,13 @@
  *
  * Adapted from the davebettermap widget's dataset and stream services, which
  * carried two diverging copies of this; one copy here serves every source.
+ *
+ * NO REGULAR EXPRESSIONS. Every value parsed here comes out of someone's
+ * dataset, and a single cell can be megabytes of WKT. The text formats are
+ * read by scanning characters instead, which is linear in the input whatever
+ * it holds — a backtracking pattern over data nobody vetted is a denial of
+ * service waiting for the wrong row (and Foundry's code scan fails the build
+ * on one). Keep it that way when adding a format.
  */
 
 export interface LatLng {
@@ -63,9 +70,106 @@ function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-const LAT_LNG_TEXT = /^\s*(-?\d+(?:\.\d+)?)\s*[,;]\s*(-?\d+(?:\.\d+)?)\s*$/;
-const WKT_POINT = /^\s*POINT\s*Z?\s*\(\s*(-?[\d.eE+-]+)\s+(-?[\d.eE+-]+)(?:\s+[-\d.eE+]+)?\s*\)\s*$/i;
-const GEOHASH = /^[0123456789bcdefghjkmnpqrstuvwxyz]{4,12}$/;
+// ── Scanning helpers ────────────────────────────────────────────────────────
+
+function isWhitespace(ch: string): boolean {
+  return ch === " " || ch === "\t" || ch === "\n" || ch === "\r" || ch === "\f" || ch === "\v";
+}
+
+/** Split on runs of whitespace, dropping empty pieces. */
+function splitWhitespace(text: string): string[] {
+  const parts: string[] = [];
+  let start = -1;
+  for (let i = 0; i <= text.length; i++) {
+    const space = i === text.length || isWhitespace(text[i]);
+    if (space && start >= 0) {
+      parts.push(text.slice(start, i));
+      start = -1;
+    } else if (!space && start < 0) {
+      start = i;
+    }
+  }
+  return parts;
+}
+
+/** "-12", "51.5", "0.12": an optional minus, digits, an optional fraction. */
+function isPlainDecimal(text: string): boolean {
+  let i = text.startsWith("-") ? 1 : 0;
+  let digits = 0;
+  let dot = false;
+  for (; i < text.length; i++) {
+    const ch = text[i];
+    if (ch >= "0" && ch <= "9") {digits++;}
+    else if (ch === "." && !dot && digits > 0) {dot = true;}
+    else {return false;}
+  }
+  return digits > 0 && !text.endsWith(".");
+}
+
+/** A WKT ordinate: digits, sign, point and exponent only — never hex or "Infinity". */
+function toOrdinate(part: string): number | null {
+  if (part.length === 0) {return null;}
+  for (const ch of part) {
+    if (!((ch >= "0" && ch <= "9") || ch === "." || ch === "-" || ch === "+" || ch === "e" || ch === "E")) {
+      return null;
+    }
+  }
+  const n = Number(part);
+  return Number.isFinite(n) ? n : null;
+}
+
+/**
+ * "51.50, -0.12" (or with a semicolon): exactly two plain decimals and one
+ * separator, as Foundry writes a geopoint string. Latitude first.
+ */
+function parseLatLngText(text: string): LatLng | null {
+  let separator = -1;
+  for (let i = 0; i < text.length; i++) {
+    if (text[i] === "," || text[i] === ";") {
+      if (separator >= 0) {return null;}
+      separator = i;
+    }
+  }
+  if (separator < 0) {return null;}
+  const lat = text.slice(0, separator).trim();
+  const lng = text.slice(separator + 1).trim();
+  return isPlainDecimal(lat) && isPlainDecimal(lng) ? latLng(lat, lng) : null;
+}
+
+/**
+ * The WKT keyword at the start of `text` (case-insensitive), and what follows
+ * it once a Z, M or ZM dimension marker is skipped — or null.
+ */
+function wktBody(text: string, keyword: string): string | null {
+  const trimmed = text.trim();
+  if (trimmed.slice(0, keyword.length).toUpperCase() !== keyword) {return null;}
+  let rest = trimmed.slice(keyword.length).trimStart();
+  const marker = rest.slice(0, 2).toUpperCase();
+  if (marker === "ZM") {rest = rest.slice(2).trimStart();}
+  else if (marker[0] === "Z" || marker[0] === "M") {rest = rest.slice(1).trimStart();}
+  return rest.startsWith("(") && rest.endsWith(")") ? rest : null;
+}
+
+/** POINT (lng lat), with an optional third and fourth ordinate ignored. */
+function parseWktPoint(text: string): LatLng | null {
+  const body = wktBody(text, "POINT");
+  if (!body) {return null;}
+  const tokens = splitWhitespace(body.slice(1, -1));
+  if (tokens.length < 2 || tokens.length > 4) {return null;}
+  const ordinates = tokens.map(toOrdinate);
+  if (ordinates.some((n) => n == null)) {return null;}
+  return latLng(ordinates[1], ordinates[0]);
+}
+
+const BASE32 = "0123456789bcdefghjkmnpqrstuvwxyz";
+
+function isGeohash(text: string): boolean {
+  if (text.length < 4 || text.length > 12) {return false;}
+  for (const ch of text) {
+    if (!BASE32.includes(ch)) {return false;}
+  }
+  return true;
+}
 
 export interface PointOptions {
   /** Accept geohash strings. Only safe for a column already known to be geo. */
@@ -77,12 +181,11 @@ export function parsePoint(raw: unknown, options: PointOptions = {}): LatLng | n
   const value = maybeJson(raw);
 
   if (typeof value === "string") {
-    const pair = LAT_LNG_TEXT.exec(value);
-    if (pair) {return latLng(pair[1], pair[2]);}
-    const wkt = WKT_POINT.exec(value);
-    if (wkt) {return latLng(wkt[2], wkt[1]);}
-    if (options.geohash && GEOHASH.test(value.trim().toLowerCase())) {
-      return decodeGeohash(value.trim().toLowerCase());
+    const point = parseLatLngText(value) ?? parseWktPoint(value);
+    if (point) {return point;}
+    if (options.geohash) {
+      const hash = value.trim().toLowerCase();
+      if (isGeohash(hash)) {return decodeGeohash(hash);}
     }
     return null;
   }
@@ -136,14 +239,20 @@ export function parseShape(raw: unknown): Shape | null {
 
 // ── WKT ─────────────────────────────────────────────────────────────────────
 
+/** Longest first, so MULTIPOLYGON is not read as POLYGON's prefix and so on. */
+const WKT_SHAPES = ["MULTIPOLYGON", "MULTILINESTRING", "POLYGON", "LINESTRING"] as const;
+
 function parseWktShape(text: string): Shape | null {
-  const trimmed = text.trim();
-  const match = /^(MULTIPOLYGON|POLYGON|MULTILINESTRING|LINESTRING)\s*Z?\s*(\(.*\))\s*$/is.exec(
-    trimmed,
-  );
-  if (!match) {return null;}
-  const kind = match[1].toUpperCase();
-  const body = match[2];
+  let kind: (typeof WKT_SHAPES)[number] | null = null;
+  let body: string | null = null;
+  for (const keyword of WKT_SHAPES) {
+    body = wktBody(text, keyword);
+    if (body) {
+      kind = keyword;
+      break;
+    }
+  }
+  if (!kind || !body) {return null;}
   try {
     switch (kind) {
       case "LINESTRING": {
@@ -208,15 +317,15 @@ function splitTopLevel(text: string): string[] {
 
 function coordList(text: string): number[][] {
   return text.split(",").map((pair) => {
-    const [x, y] = pair.trim().split(/\s+/).map(Number);
-    if (!isValidLatLng(y, x)) {throw new Error(`bad coordinate "${pair}"`);}
+    const [x, y] = splitWhitespace(pair).map(toOrdinate);
+    if (x == null || y == null || !isValidLatLng(y, x)) {
+      throw new Error(`bad coordinate "${pair}"`);
+    }
     return [x, y];
   });
 }
 
 // ── Geohash ─────────────────────────────────────────────────────────────────
-
-const BASE32 = "0123456789bcdefghjkmnpqrstuvwxyz";
 
 export function decodeGeohash(hash: string): LatLng | null {
   let even = true;
