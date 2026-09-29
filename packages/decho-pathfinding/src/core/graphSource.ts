@@ -38,9 +38,9 @@
 
 import { getFile, getFileOptional } from "@acc/decho-foundry-bytes";
 
-import { createLoadedCell, type LoadedCell } from "./cell";
-import { MalformedGraphError, NoGraphDataError } from "./errors";
-import { parseCellGraph, type CellMeta } from "./format";
+import { createLoadedCell, type LoadedCell } from "./cell.js";
+import { MalformedGraphError, NoGraphDataError } from "./errors.js";
+import { parseCellGraph, type CellMeta } from "./format.js";
 import {
   SIDES,
   cellFor,
@@ -49,13 +49,13 @@ import {
   neighbourCell,
   type CellCoord,
   type Side,
-} from "./grid";
-import { defaultGraphStore, type GraphStore } from "./defaults";
+} from "./grid.js";
+import { defaultGraphStore, type GraphStore } from "./defaults.js";
 import {
   stitchCells,
   type StitchLink,
   type StitchOptions,
-} from "./stitch";
+} from "./stitch.js";
 
 /**
  * Bits reserved for a node's index within its cell: 4 194 304 nodes.

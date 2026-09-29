@@ -1,13 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { ASSET_STORE, PLANET_STORE, THEATRE_STORE } from "../core/defaults";
+import { ASSET_STORE, PLANET_STORE, THEATRE_STORE } from "../core/defaults.js";
 import {
   MAP_STYLES,
   resolveAssetStore,
   resolveTileStore,
   resolveView,
   spritePathForStyle,
-} from "./options";
+} from "./options.js";
 
 describe("resolveTileStore", () => {
   it("defaults to the preset planet store", () => {

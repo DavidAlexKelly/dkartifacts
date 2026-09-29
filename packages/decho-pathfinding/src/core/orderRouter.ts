@@ -25,9 +25,9 @@
  * wires the two together, so that is where it belongs.
  */
 
-import type { Pathfinder } from "./pathfinder";
-import type { RouteOptions, RouteResult } from "./route";
-import type { VehicleProfile } from "./profiles";
+import type { Pathfinder } from "./pathfinder.js";
+import type { RouteOptions, RouteResult } from "./route.js";
+import type { VehicleProfile } from "./profiles.js";
 
 /** `LatLng` from @acc/app6d/orders. */
 export interface LatLngLike {

@@ -44,7 +44,7 @@
  * basemap works; one broken add-on should cost its own feature, not the map.
  */
 
-import type { MaplibreLike } from "./assets";
+import type { MaplibreLike } from "./assets.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any --
    Layer, source, terrain and sky specifications are `any` for exactly the
@@ -151,6 +151,15 @@ export interface ExtensionMap {
   ): unknown;
   hasImage?(id: string): boolean;
   removeImage?(id: string): unknown;
+  /**
+   * maplibre-gl 6 and later: the one way to supply an image a tile asks for.
+   * From 6, `styleimagemissing` only reports the miss — an image added from
+   * its listener is too late for that tile. Absent on 5, where the event is
+   * still the way.
+   */
+  setMissingStyleImageResolver?(
+    resolver: ((id: string) => void | Promise<void>) | null,
+  ): unknown;
 }
 
 export interface BasemapExtension {

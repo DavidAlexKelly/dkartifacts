@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { whenStyleLoaded, type StyleReadyMap } from "./styleReady";
+import { whenStyleLoaded, type StyleReadyMap } from "./styleReady.js";
 
 /** A map whose style loads when the test says so. */
 function fakeMap(loaded = false) {

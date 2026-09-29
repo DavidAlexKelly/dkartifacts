@@ -26,8 +26,8 @@
  * meet, but it is worth knowing which is which.
  */
 
-import type { CellBounds } from "./grid";
-import { metresPerDegreeLon, METRES_PER_DEGREE_LAT } from "./grid";
+import type { CellBounds } from "./grid.js";
+import { metresPerDegreeLon, METRES_PER_DEGREE_LAT } from "./grid.js";
 
 export type HeightArray = Int16Array | Float32Array;
 

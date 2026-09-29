@@ -28,7 +28,7 @@ export {
   configureDefaultStores,
   defaultStores,
   type DefaultStores,
-} from "./defaults";
+} from "./defaults.js";
 
 export {
   createBasemap,
@@ -36,7 +36,7 @@ export {
   type BasemapHandle,
   type BasemapOptions,
   type StyleFragment,
-} from "./basemap";
+} from "./basemap.js";
 
 // The extension contract. Add-ons (elevation, mil graphics, imagery) implement
 // BasemapExtension; the merge and attach helpers are exported because they are
@@ -53,7 +53,7 @@ export {
   type MergedExtensionStyle,
   type StyleContribution,
   type TerrainSpec,
-} from "./extensions";
+} from "./extensions.js";
 
 // Extruded buildings from the archive this package already serves. It needs no
 // new dataset and no new dependency — the Protomaps `buildings` layer carries
@@ -72,7 +72,7 @@ export {
   type OverlayExtension,
   type OverlayOptions,
   type WetGapsOptions,
-} from "./overlays";
+} from "./overlays.js";
 
 export {
   OVERLAY_SOURCE_LAYERS,
@@ -80,7 +80,7 @@ export {
   describeSourceLayer,
   type DescribeSourceLayerOptions,
   type SourceLayerCensus,
-} from "./census";
+} from "./census.js";
 
 // Ground textures: trees on the woodland, wheat on the farmland, reeds on the
 // marsh. Same bargain as the overlays above — it styles the archive's own
@@ -94,7 +94,7 @@ export {
   plateExpression,
   type LandusePatternsExtension,
   type LandusePatternsOptions,
-} from "./landusePatterns";
+} from "./landusePatterns.js";
 
 export {
   BUSH_ICON,
@@ -120,7 +120,7 @@ export {
   type RenderTextureOptions,
   type TextureIcon,
   type TexturePlacement,
-} from "./textures";
+} from "./textures.js";
 
 export {
   BUILDINGS_SOURCE_LAYER,
@@ -133,7 +133,7 @@ export {
   type Buildings3dExtension,
   type Buildings3dOptions,
   type QueryableMap,
-} from "./buildings";
+} from "./buildings.js";
 
 // "Style is not done loading" is the most common intermittent failure in a
 // MapLibre application, and waiting correctly is four lines nobody writes
@@ -144,7 +144,7 @@ export {
   whenStyleLoaded,
   type StyleReadyMap,
   type WhenStyleLoadedOptions,
-} from "./styleReady";
+} from "./styleReady.js";
 
 export {
   createTileSource,
@@ -152,7 +152,7 @@ export {
   type StatusListener,
   type TileSourceHandle,
   type TileSourceOptions,
-} from "./tileSource";
+} from "./tileSource.js";
 
 export {
   fixedGridResolver,
@@ -168,7 +168,7 @@ export {
   type ManifestStore,
   type Resolver,
   type TileStore,
-} from "./stores";
+} from "./stores.js";
 
 export {
   FONT_ITALIC,
@@ -180,9 +180,9 @@ export {
   unregisterAssetProtocols,
   type AssetStore,
   type MaplibreLike,
-} from "./assets";
+} from "./assets.js";
 
-export { FoundryRangeSource, MediaItemSource } from "./sources";
+export { FoundryRangeSource, MediaItemSource } from "./sources.js";
 
 // ── The byte layer, re-exported from @acc/decho-foundry-bytes ───────────────
 //

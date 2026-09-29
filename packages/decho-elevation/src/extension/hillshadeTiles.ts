@@ -41,16 +41,16 @@ import type {
   StyleContribution,
 } from "@acc/decho-basemap";
 
-import { defaultHillshadeStore } from "../core/defaults";
+import { defaultHillshadeStore } from "../core/defaults.js";
 import {
   createDemSource,
   type DemSourceHandle,
   type DemSourceOptions,
-} from "../core/demSource";
+} from "../core/demSource.js";
 import {
   shadedReliefTile,
   type ShadedReliefOptions,
-} from "../core/renderers";
+} from "../core/renderers.js";
 
 export interface HillshadeTilesOptions
   extends Omit<DemSourceOptions, "tiles">,

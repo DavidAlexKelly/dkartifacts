@@ -38,10 +38,10 @@
 
 import { abortError } from "@acc/decho-foundry-bytes";
 
-import { NoNodeNearbyError, NoRouteError } from "./errors";
-import { haversineM } from "./geo";
-import { cellsAlongLine } from "./grid";
-import { createMinHeap } from "./heap";
+import { NoNodeNearbyError, NoRouteError } from "./errors.js";
+import { haversineM } from "./geo.js";
+import { cellsAlongLine } from "./grid.js";
+import { createMinHeap } from "./heap.js";
 import {
   compileProfile,
   edgeCost,
@@ -49,9 +49,9 @@ import {
   DEFAULT_PROFILE,
   type CompiledProfile,
   type VehicleProfile,
-} from "./profiles";
-import { simplifyPath, type Waypoint } from "./simplify";
-import { NODE_SLOT_BITS, type GraphSource } from "./graphSource";
+} from "./profiles.js";
+import { simplifyPath, type Waypoint } from "./simplify.js";
+import { NODE_SLOT_BITS, type GraphSource } from "./graphSource.js";
 
 export interface GeoPoint {
   lat: number;

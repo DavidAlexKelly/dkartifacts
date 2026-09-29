@@ -22,9 +22,9 @@
  * geotiff.js without waiting for this package.
  */
 
-import { decodeGeoTiff } from "./geotiff";
-import type { CellBounds } from "./grid";
-import type { HeightGrid } from "./heightGrid";
+import { decodeGeoTiff } from "./geotiff.js";
+import type { CellBounds } from "./grid.js";
+import type { HeightGrid } from "./heightGrid.js";
 
 export interface DemDecodeOptions {
   /** Value meaning "no data", when the chunk itself does not declare one. */

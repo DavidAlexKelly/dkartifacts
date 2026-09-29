@@ -6,31 +6,31 @@
  * Regenerate: npm run generate   (from packages/unit-symbol-picker)
  */
 
-import type { SymbolSetTable } from "../types";
-import { ACTIVITY } from "./activity";
-import { AIR } from "./air";
-import { AIR_MISSILE } from "./airMissile";
-import { ATMOSPHERIC } from "./atmospheric";
-import { CONTROL_MEASURE } from "./controlMeasure";
-import { CYBERSPACE } from "./cyberspace";
-import { INTERNAL } from "./internal";
-import { LAND_CIVILIAN } from "./landCivilian";
-import { LAND_EQUIPMENT } from "./landEquipment";
-import { LAND_INSTALLATION } from "./landInstallation";
-import { LAND_UNIT } from "./landUnit";
-import { METEOROLOGICAL_SPACE } from "./meteorologicalSpace";
-import { MINE_WARFARE } from "./mineWarfare";
-import { OCEANOGRAPHIC } from "./oceanographic";
-import { SIGINT_AIR } from "./sigintAir";
-import { SIGINT_LAND } from "./sigintLand";
-import { SIGINT_SPACE } from "./sigintSpace";
-import { SIGINT_SUBSURFACE } from "./sigintSubsurface";
-import { SIGINT_SURFACE } from "./sigintSurface";
-import { SEA_SUBSURFACE } from "./seaSubsurface";
-import { SEA_SURFACE } from "./seaSurface";
-import { SPACE } from "./space";
-import { SPACE_MISSILE } from "./spaceMissile";
-import { UNKNOWN } from "./unknown";
+import type { SymbolSetTable } from "../types.js";
+import { ACTIVITY } from "./activity.js";
+import { AIR } from "./air.js";
+import { AIR_MISSILE } from "./airMissile.js";
+import { ATMOSPHERIC } from "./atmospheric.js";
+import { CONTROL_MEASURE } from "./controlMeasure.js";
+import { CYBERSPACE } from "./cyberspace.js";
+import { INTERNAL } from "./internal.js";
+import { LAND_CIVILIAN } from "./landCivilian.js";
+import { LAND_EQUIPMENT } from "./landEquipment.js";
+import { LAND_INSTALLATION } from "./landInstallation.js";
+import { LAND_UNIT } from "./landUnit.js";
+import { METEOROLOGICAL_SPACE } from "./meteorologicalSpace.js";
+import { MINE_WARFARE } from "./mineWarfare.js";
+import { OCEANOGRAPHIC } from "./oceanographic.js";
+import { SIGINT_AIR } from "./sigintAir.js";
+import { SIGINT_LAND } from "./sigintLand.js";
+import { SIGINT_SPACE } from "./sigintSpace.js";
+import { SIGINT_SUBSURFACE } from "./sigintSubsurface.js";
+import { SIGINT_SURFACE } from "./sigintSurface.js";
+import { SEA_SUBSURFACE } from "./seaSubsurface.js";
+import { SEA_SURFACE } from "./seaSurface.js";
+import { SPACE } from "./space.js";
+import { SPACE_MISSILE } from "./spaceMissile.js";
+import { UNKNOWN } from "./unknown.js";
 
 export {
   ACTIVITY,

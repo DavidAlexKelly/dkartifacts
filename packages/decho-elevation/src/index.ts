@@ -31,7 +31,7 @@ export {
   type DemSourceStats,
   type HeightSampler,
   type ProtocolHost,
-} from "./core/demSource";
+} from "./core/demSource.js";
 
 export {
   DEFAULT_PATH_TEMPLATE,
@@ -40,7 +40,7 @@ export {
   type DemManifest,
   type DemManifestCell,
   type DemStore,
-} from "./core/store";
+} from "./core/store.js";
 
 export {
   CONTOUR_STORE,
@@ -53,7 +53,7 @@ export {
   defaultDemStore,
   defaultHillshadeStore,
   type ContourStore,
-} from "./core/defaults";
+} from "./core/defaults.js";
 
 // The cell grid. Exported because the DEM, the pathfinding graphs and the
 // basemap's finest layer are cut on ONE grid, and anything reasoning across
@@ -75,7 +75,7 @@ export {
   type CellBounds,
   type CellCoord,
   type CellGrid,
-} from "./core/grid";
+} from "./core/grid.js";
 
 export {
   gridStats,
@@ -89,7 +89,7 @@ export {
   type HeightArray,
   type HeightGrid,
   type SlopeAspect,
-} from "./core/heightGrid";
+} from "./core/heightGrid.js";
 
 // The decoder and the codec seam. A consumer whose chunks are LZW-compressed —
 // which the built-in reader refuses on purpose rather than guessing — supplies
@@ -100,8 +100,8 @@ export {
   geotiffCodec,
   type DemCodec,
   type DemDecodeOptions,
-} from "./core/codec";
-export { decodeGeoTiff, type DecodeGeoTiffOptions } from "./core/geotiff";
+} from "./core/codec.js";
+export { decodeGeoTiff, type DecodeGeoTiffOptions } from "./core/geotiff.js";
 
 // The tile pipeline, exported so an app can add a rendering of its own — an
 // avalanche-risk tint, a landing-zone mask — without forking the package.
@@ -129,23 +129,23 @@ export {
   type SlopeOptions,
   type TileFrame,
   type TileRenderer,
-} from "./core/renderers";
+} from "./core/renderers.js";
 
-export { decodeTerrarium, writeTerrarium } from "./core/terrarium";
-export { crc32, encodePng } from "./core/png";
+export { decodeTerrarium, writeTerrarium } from "./core/terrarium.js";
+export { crc32, encodePng } from "./core/png.js";
 export {
   latAtTileY,
   lonAtTileX,
   metresPerPixel,
   resampleTile,
   tileBounds,
-} from "./core/mercator";
+} from "./core/mercator.js";
 
 export {
   createCellCache,
   DEFAULT_CELL_BUDGET_BYTES,
   type CellCache,
-} from "./core/cellCache";
+} from "./core/cellCache.js";
 
 export {
   degreesForMetres,
@@ -155,7 +155,7 @@ export {
   type GeoPoint,
   type ProfileOptions,
   type ProfileSample,
-} from "./core/profile";
+} from "./core/profile.js";
 
 export {
   EFFECTIVE_EARTH_RADIUS_M,
@@ -172,4 +172,4 @@ export {
   type SightResult,
   type Viewshed,
   type ViewshedOptions,
-} from "./core/lineOfSight";
+} from "./core/lineOfSight.js";

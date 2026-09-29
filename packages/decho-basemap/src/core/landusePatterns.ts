@@ -73,8 +73,8 @@ import type {
   ExtensionContext,
   ExtensionMap,
   StyleContribution,
-} from "./extensions";
-import type { OverlayExtension, OverlayOptions } from "./overlays";
+} from "./extensions.js";
+import type { OverlayExtension, OverlayOptions } from "./overlays.js";
 import {
   NATURAL_GROUND,
   TEXTURE_COLOURS,
@@ -86,7 +86,7 @@ import {
   type LandTexture,
   type TextureIcon,
   type TexturePlacement,
-} from "./textures";
+} from "./textures.js";
 
 // Layer specifications are `any` for the reason StyleFragment.sources is: core
 // does not import maplibre-gl, so it cannot name LayerSpecification, and
@@ -512,15 +512,28 @@ function attachImages(
   // A tile resolves its patterns when it is parsed, so anything that finished
   // parsing before the loop above asks for its image through this event rather
   // than going without. It is also the path a style reload comes back on.
+  //
+  // maplibre-gl 6 split that: the event only reports, and a resolver supplies.
+  // The resolver is one per map, so this takes it for as long as it is
+  // attached — nothing else in this package sets one.
   const onMissing = (event: { id?: string }) => {
     if (event?.id) {
       add(event.id);
     }
   };
-  map.on("styleimagemissing", onMissing);
+  const useResolver = typeof map.setMissingStyleImageResolver === "function";
+  if (useResolver) {
+    map.setMissingStyleImageResolver!((id) => add(id));
+  } else {
+    map.on("styleimagemissing", onMissing);
+  }
 
   return () => {
-    map.off("styleimagemissing", onMissing);
+    if (useResolver) {
+      map.setMissingStyleImageResolver!(null);
+    } else {
+      map.off("styleimagemissing", onMissing);
+    }
     for (const targetId of added) {
       try {
         map.removeImage?.(targetId);

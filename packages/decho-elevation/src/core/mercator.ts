@@ -18,7 +18,7 @@
  * the download it follows is seconds.
  */
 
-import type { CellBounds } from "./grid";
+import type { CellBounds } from "./grid.js";
 
 /**
  * WGS84's semi-major axis — NOT the mean radius grid.ts measures distances

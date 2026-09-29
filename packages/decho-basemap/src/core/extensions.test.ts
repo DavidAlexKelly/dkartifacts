@@ -7,7 +7,7 @@ import {
   type BasemapExtension,
   type ExtensionContext,
   type ExtensionMap,
-} from "./extensions";
+} from "./extensions.js";
 
 const ctx: ExtensionContext = {
   maplibregl: { addProtocol: () => undefined, removeProtocol: () => undefined },

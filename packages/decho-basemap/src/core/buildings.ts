@@ -50,7 +50,7 @@
  * A prop could not be ordered against another add-on's layers; an extension can.
  */
 
-import type { BasemapExtension, ExtensionMap, StyleContribution } from "./extensions";
+import type { BasemapExtension, ExtensionMap, StyleContribution } from "./extensions.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any --
    Layer and paint specifications are `any` for the reason StyleFragment.sources

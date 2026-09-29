@@ -12,7 +12,7 @@
  * code has selected. The component is then a rendering of the answer.
  */
 
-import type { SidcOption } from "./fields";
+import type { SidcOption } from "./fields.js";
 
 /**
  * An icon option that knows where it sits in the hierarchy.

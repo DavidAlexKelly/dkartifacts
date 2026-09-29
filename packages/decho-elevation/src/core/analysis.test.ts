@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { createCellCache } from "./cellCache";
-import type { HeightSampler } from "./demSource";
+import { createCellCache } from "./cellCache.js";
+import type { HeightSampler } from "./demSource.js";
 import {
   VIEWSHED_HIDDEN,
   VIEWSHED_NO_DATA,
@@ -10,9 +10,9 @@ import {
   earthBulge,
   lineOfSight,
   viewshed,
-} from "./lineOfSight";
-import { elevationProfile, sampleAlong } from "./profile";
-import type { HeightGrid } from "./heightGrid";
+} from "./lineOfSight.js";
+import { elevationProfile, sampleAlong } from "./profile.js";
+import type { HeightGrid } from "./heightGrid.js";
 
 /** A sampler over an analytic surface. No dataset, no network, no decode. */
 function surface(height: (lon: number, lat: number) => number): HeightSampler {

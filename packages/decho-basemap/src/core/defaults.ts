@@ -18,8 +18,8 @@
  * Console. The scopes alone return 403.
  */
 
-import type { AssetStore } from "./assets";
-import type { FixedGridStore, ManifestStore } from "./stores";
+import type { AssetStore } from "./assets.js";
+import type { FixedGridStore, ManifestStore } from "./stores.js";
 
 /** Chunked planet basemap: "[MAP] Chunked PMtiles" in Offline World. */
 export const PLANET_STORE: ManifestStore = {

@@ -21,9 +21,9 @@
  *   import { LAND_UNIT } from "@acc/unit-symbol-picker/tables/landUnit";
  */
 
-import type { SidcOption } from "./core/fields";
-import { SYMBOL_SET_TABLES } from "./core/generated/symbolSets/index";
-import type { IconOption, SymbolSetTable } from "./core/generated/types";
+import type { SidcOption } from "./core/fields.js";
+import { SYMBOL_SET_TABLES } from "./core/generated/symbolSets/index.js";
+import type { IconOption, SymbolSetTable } from "./core/generated/types.js";
 
 export type {
   AmplifierGroupTable,
@@ -31,7 +31,7 @@ export type {
   IconOption,
   LegacyEntry,
   SymbolSetTable,
-} from "./core/generated/types";
+} from "./core/generated/types.js";
 
 // CONTEXTS, STATUSES and SYMBOL_SETS exist in ../core/fields too, hand-written
 // and shorter. Both are legitimate — the hand lists are what the picker's
@@ -47,11 +47,11 @@ export {
   STATUSES as GENERATED_STATUSES,
   SYMBOL_SETS as GENERATED_SYMBOL_SETS,
   VERSION,
-} from "./core/generated/base";
+} from "./core/generated/base.js";
 
-export { LEGACY_2525C, lookupLegacy } from "./core/generated/legacy";
+export { LEGACY_2525C, lookupLegacy } from "./core/generated/legacy.js";
 
-export * from "./core/generated/symbolSets/index";
+export * from "./core/generated/symbolSets/index.js";
 
 /**
  * The picker's `icons` prop, ready to pass.

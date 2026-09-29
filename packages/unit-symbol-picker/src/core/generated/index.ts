@@ -6,7 +6,7 @@
  * Regenerate: npm run generate   (from packages/unit-symbol-picker)
  */
 
-export * from "./types";
-export * from "./base";
-export * from "./legacy";
-export * from "./symbolSets/index";
+export * from "./types.js";
+export * from "./base.js";
+export * from "./legacy.js";
+export * from "./symbolSets/index.js";

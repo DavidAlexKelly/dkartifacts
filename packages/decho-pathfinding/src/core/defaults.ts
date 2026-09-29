@@ -11,7 +11,7 @@
  * dataset from the basemap's, so adding the basemap's Resource does not cover
  * it. That omission is the single most common way this package appears broken.
  */
-import type { CellGrid } from "./grid";
+import type { CellGrid } from "./grid.js";
 
 export interface GraphStore {
   /** Dataset holding the per-cell chunks. */

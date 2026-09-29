@@ -48,9 +48,9 @@
  * which the search loads on demand anyway.
  */
 
-import type { LoadedCell } from "./cell";
-import { haversineM } from "./geo";
-import { OPPOSITE, SIDE_EAST, SIDE_WEST, type Side } from "./grid";
+import type { LoadedCell } from "./cell.js";
+import { haversineM } from "./geo.js";
+import { OPPOSITE, SIDE_EAST, SIDE_WEST, type Side } from "./grid.js";
 
 export interface StitchLink {
   /** Node index in the OTHER cell. */

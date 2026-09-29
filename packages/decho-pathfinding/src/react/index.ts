@@ -13,10 +13,10 @@
  *   import { useRouteLayer }                  from "@acc/decho-pathfinding/map";
  */
 
-export { usePathfinding, type UsePathfindingResult } from "./usePathfinding";
+export { usePathfinding, type UsePathfindingResult } from "./usePathfinding.js";
 
 export {
   useOrderRouter,
   type UseOrderRouterOptions,
   type UseOrderRouterResult,
-} from "./useOrderRouter";
+} from "./useOrderRouter.js";

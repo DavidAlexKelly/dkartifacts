@@ -28,14 +28,14 @@
  * the basemap's does: both are already deployed there.
  */
 
-import { getFileOptional, settleRangeMode } from "./bytes";
+import { getFileOptional, settleRangeMode } from "./bytes.js";
 import {
   cellKey,
   gridMismatch,
   type CellBounds,
   type CellCoord,
   type CellGrid,
-} from "./grid";
+} from "./grid.js";
 
 export interface DemManifestCell {
   col: number;

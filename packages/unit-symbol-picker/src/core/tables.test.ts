@@ -20,7 +20,7 @@ import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
-import { COMMON_LAND_ICONS, ECHELON_SYMBOL_SETS, SYMBOL_SETS } from "./fields";
+import { COMMON_LAND_ICONS, ECHELON_SYMBOL_SETS, SYMBOL_SETS } from "./fields.js";
 import {
   AMPLIFIER_GROUPS,
   CONTEXTS,
@@ -29,10 +29,10 @@ import {
   STATUSES,
   SYMBOL_SETS as PUBLISHED_SYMBOL_SETS,
   VERSION,
-} from "./generated/base";
-import { LEGACY_2525C, lookupLegacy } from "./generated/legacy";
-import { LAND_UNIT, SYMBOL_SET_TABLES } from "./generated/symbolSets/index";
-import { DEFAULT_SIDC, formatSidc, legacyToSidc } from "./sidc";
+} from "./generated/base.js";
+import { LEGACY_2525C, lookupLegacy } from "./generated/legacy.js";
+import { LAND_UNIT, SYMBOL_SET_TABLES } from "./generated/symbolSets/index.js";
+import { DEFAULT_SIDC, formatSidc, legacyToSidc } from "./sidc.js";
 
 const PACKAGE_ROOT = fileURLToPath(new URL("../..", import.meta.url));
 

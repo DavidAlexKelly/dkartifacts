@@ -22,20 +22,20 @@ export {
   configureDefaultGraphStore,
   defaultGraphStore,
   type GraphStore,
-} from "./core/defaults";
+} from "./core/defaults.js";
 
 export {
   createPathfinder,
   type Pathfinder,
   type PathfinderOptions,
-} from "./core/pathfinder";
+} from "./core/pathfinder.js";
 
 export {
   findRoute,
   type GeoPoint,
   type RouteOptions,
   type RouteResult,
-} from "./core/route";
+} from "./core/route.js";
 
 export {
   createGraphSource,
@@ -46,7 +46,7 @@ export {
   type GraphSourceOptions,
   type GraphSourceStats,
   type NeighbourVisitor,
-} from "./core/graphSource";
+} from "./core/graphSource.js";
 
 export {
   DEFAULT_PROFILE,
@@ -61,7 +61,7 @@ export {
   edgeSeconds,
   type CompiledProfile,
   type VehicleProfile,
-} from "./core/profiles";
+} from "./core/profiles.js";
 
 // The adapter that satisfies @acc/app6d/orders' injected OrderRouter.
 export {
@@ -71,7 +71,7 @@ export {
   type OrderRouteRequestLike,
   type OrderRouterLike,
   type OrderRouterOptions,
-} from "./core/orderRouter";
+} from "./core/orderRouter.js";
 
 // The grid is exported because it is the contract between this dataset and the
 // basemap's z12 cut: anything reasoning about coverage needs the same
@@ -94,7 +94,7 @@ export {
   type CellCoord,
   type CellGrid,
   type Side,
-} from "./core/grid";
+} from "./core/grid.js";
 
 // The parser and the cell index are exported for testing, for diagnostics
 // panels, and for anything that wants to read a chunk without routing over it.
@@ -103,9 +103,9 @@ export {
   parseCellGraph,
   type CellGraph,
   type CellMeta,
-} from "./core/format";
+} from "./core/format.js";
 
-export { createLoadedCell, type BorderBand, type LoadedCell } from "./core/cell";
+export { createLoadedCell, type BorderBand, type LoadedCell } from "./core/cell.js";
 
 export {
   DEFAULT_STITCH_OPTIONS,
@@ -113,13 +113,13 @@ export {
   type StitchLink,
   type StitchOptions,
   type StitchResult,
-} from "./core/stitch";
+} from "./core/stitch.js";
 
-export { simplifyPath, type Waypoint } from "./core/simplify";
+export { simplifyPath, type Waypoint } from "./core/simplify.js";
 
-export { EARTH_RADIUS_M, haversineM } from "./core/geo";
+export { EARTH_RADIUS_M, haversineM } from "./core/geo.js";
 
-export { createMinHeap, type MinHeap } from "./core/heap";
+export { createMinHeap, type MinHeap } from "./core/heap.js";
 
 export {
   MalformedGraphError,
@@ -129,4 +129,4 @@ export {
   PathfindingError,
   isPathfindingError,
   type PathfindingErrorKind,
-} from "./core/errors";
+} from "./core/errors.js";

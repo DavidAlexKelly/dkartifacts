@@ -22,7 +22,7 @@
  * idea specialised to heights, and predates this.
  */
 
-import type { QueryableMap } from "./buildings";
+import type { QueryableMap } from "./buildings.js";
 
 export interface SourceLayerCensus {
   zoom: number;

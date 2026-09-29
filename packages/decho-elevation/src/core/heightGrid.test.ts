@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { CellBounds } from "./grid";
+import type { CellBounds } from "./grid.js";
 import {
   gridStats,
   gridStepMetres,
@@ -9,7 +9,7 @@ import {
   slopeAt,
   type HeightArray,
   type HeightGrid,
-} from "./heightGrid";
+} from "./heightGrid.js";
 
 /** One degree square at the equator keeps the metre arithmetic easy to check. */
 const BOUNDS: CellBounds = { west: 0, south: 0, east: 1, north: 1 };

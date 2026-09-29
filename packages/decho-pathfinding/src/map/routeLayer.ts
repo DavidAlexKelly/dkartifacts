@@ -18,7 +18,7 @@
  * two units) can coexist on the same map.
  */
 
-import type { Waypoint } from "../core/simplify";
+import type { Waypoint } from "../core/simplify.js";
 
 /** The slice of maplibregl.Map this module uses. */
 export interface MapLike {

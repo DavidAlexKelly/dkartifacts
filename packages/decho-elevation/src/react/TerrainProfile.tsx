@@ -11,8 +11,8 @@
  * too: the line goes red past the point where the ground crosses it.
  */
 
-import type { ElevationProfile } from "../core/profile";
-import type { SightResult } from "../core/lineOfSight";
+import type { ElevationProfile } from "../core/profile.js";
+import type { SightResult } from "../core/lineOfSight.js";
 
 export interface TerrainProfileProps {
   profile: ElevationProfile;

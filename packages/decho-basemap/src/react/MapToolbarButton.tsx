@@ -19,7 +19,7 @@
 
 import type { ReactNode } from "react";
 
-import { DEFAULT_SURFACE_THEME, toolbarButton, type SurfaceTheme } from "./theme";
+import { DEFAULT_SURFACE_THEME, toolbarButton, type SurfaceTheme } from "./theme.js";
 
 export interface MapToolbarButtonProps {
   /** Tooltip and accessible name. Required: the icon is not a label. */

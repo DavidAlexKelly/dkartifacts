@@ -8,9 +8,9 @@
 
 import { describe, expect, it } from "vitest";
 
-import { COMMON_LAND_ICONS } from "./fields";
-import { LAND_UNIT } from "./generated/symbolSets/index";
-import { iconLevels, iconPath } from "./iconLevels";
+import { COMMON_LAND_ICONS } from "./fields.js";
+import { LAND_UNIT } from "./generated/symbolSets/index.js";
+import { iconLevels, iconPath } from "./iconLevels.js";
 
 const icons = LAND_UNIT.icons;
 const labelsOf = (level: { options: Array<{ label: string }> }) =>

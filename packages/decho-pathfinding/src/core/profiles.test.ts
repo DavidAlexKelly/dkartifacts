@@ -7,7 +7,7 @@ import {
   edgeCost,
   edgeSeconds,
   type VehicleProfile,
-} from "./profiles";
+} from "./profiles.js";
 
 const BASE: VehicleProfile = {
   id: "test",

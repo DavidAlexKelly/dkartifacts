@@ -2,8 +2,13 @@
   "compilerOptions": {
     "target": "ES2020",
     "lib": ["ES2020", "DOM", "DOM.Iterable"],
-    "module": "ESNext",
-    "moduleResolution": "bundler",
+    /* NodeNext, not bundler: dist is loaded by Node itself as well as by
+       bundlers — Vitest, for one, hands node_modules to Node's own loader —
+       and Node rejects extensionless and directory imports ("./core"). This
+       makes the compiler insist on "./core/index.js" in the source, so dist is
+       valid for both. */
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
     "strict": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,

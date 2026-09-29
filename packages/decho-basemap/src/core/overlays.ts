@@ -40,7 +40,7 @@ import type {
   ExtensionContext,
   ExtensionMap,
   StyleContribution,
-} from "./extensions";
+} from "./extensions.js";
 
 // Layer specifications are `any` for the reason StyleFragment.sources is: core
 // does not import maplibre-gl, so it cannot name LayerSpecification, and

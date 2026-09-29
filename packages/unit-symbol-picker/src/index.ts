@@ -9,6 +9,6 @@
 // are at "@acc/unit-symbol-picker/tables", and deliberately not re-exported
 // here: they are ~2000 rows, and this entry point stays something a validator
 // can import without paying for them.
-export * from "./core/sidc";
-export * from "./core/fields";
-export * from "./core/iconLevels";
+export * from "./core/sidc.js";
+export * from "./core/fields.js";
+export * from "./core/iconLevels.js";

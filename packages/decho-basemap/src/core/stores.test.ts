@@ -6,7 +6,7 @@ import {
   storeTarget,
   type FixedGridStore,
   type GlobeManifest,
-} from "./stores";
+} from "./stores.js";
 
 /**
  * Trimmed version of the real manifest.json in "[MAP] Chunked PMtiles":

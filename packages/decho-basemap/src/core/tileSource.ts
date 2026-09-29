@@ -27,7 +27,7 @@ import {
   registerCacheSizeSource,
   settleRangeMode,
 } from "@acc/decho-foundry-bytes";
-import { FoundryRangeSource, MediaItemSource } from "./sources";
+import { FoundryRangeSource, MediaItemSource } from "./sources.js";
 import {
   fixedGridResolver,
   manifestResolver,
@@ -35,8 +35,8 @@ import {
   type GlobeManifest,
   type Resolver,
   type TileStore,
-} from "./stores";
-import type { MaplibreLike } from "./assets";
+} from "./stores.js";
+import type { MaplibreLike } from "./assets.js";
 
 /** Handles held resident. Each PMTiles caches its own decoded directories. */
 const MAX_RESIDENT_ARCHIVES = 32;

@@ -24,12 +24,12 @@ export {
   type MapLike,
   type RouteLayerHandle,
   type RouteLayerOptions,
-} from "./routeLayer";
+} from "./routeLayer.js";
 
-export { useRouteLayer } from "./useRouteLayer";
+export { useRouteLayer } from "./useRouteLayer.js";
 
 export {
   attachViewportPrefetch,
   type PrefetchableMap,
   type ViewportPrefetchOptions,
-} from "./viewportPrefetch";
+} from "./viewportPrefetch.js";

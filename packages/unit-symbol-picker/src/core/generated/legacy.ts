@@ -6,7 +6,7 @@
  * Regenerate: npm run generate   (from packages/unit-symbol-picker)
  */
 
-import type { LegacyEntry } from "./types";
+import type { LegacyEntry } from "./types.js";
 
 /**
  * 2525C / APP-6B function codes to their modern equivalent.

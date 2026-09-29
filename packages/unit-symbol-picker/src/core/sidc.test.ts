@@ -9,7 +9,7 @@ import {
   parseLegacy,
   parseSidc,
   withField,
-} from "./sidc";
+} from "./sidc.js";
 
 describe("parseSidc", () => {
   it("reads the twenty digits into their named slots", () => {

@@ -65,10 +65,10 @@
  * profile while zoomed out to a continent is a legitimate thing to do, and one
  * cell is a reasonable price for it; drawing terrain nobody can see is not.
  */
-import { getFileOptional, getLaneStats, isConfigured } from "./bytes";
-import { DEFAULT_CELL_BUDGET_BYTES, createCellCache } from "./cellCache";
-import { type DemCodec, codecForPath } from "./codec";
-import { defaultDemStore } from "./defaults";
+import { getFileOptional, getLaneStats, isConfigured } from "./bytes.js";
+import { DEFAULT_CELL_BUDGET_BYTES, createCellCache } from "./cellCache.js";
+import { type DemCodec, codecForPath } from "./codec.js";
+import { defaultDemStore } from "./defaults.js";
 import {
   type CellBounds,
   type CellCoord,
@@ -77,12 +77,12 @@ import {
   cellKey,
   cellsAlongLine,
   cellsInBounds,
-} from "./grid";
-import { type HeightGrid, type SlopeAspect, sampleHeight, slopeAt } from "./heightGrid";
-import { metresPerPixel, resampleTile, tileBounds } from "./mercator";
-import { encodePng } from "./png";
-import { type TileRenderer, terrariumTile } from "./renderers";
-import { type DemIndex, type DemStore, loadDemIndex } from "./store";
+} from "./grid.js";
+import { type HeightGrid, type SlopeAspect, sampleHeight, slopeAt } from "./heightGrid.js";
+import { metresPerPixel, resampleTile, tileBounds } from "./mercator.js";
+import { encodePng } from "./png.js";
+import { type TileRenderer, terrariumTile } from "./renderers.js";
+import { type DemIndex, type DemStore, loadDemIndex } from "./store.js";
 
 /** How long a cell that answered 404 is remembered as absent. */
 const MISSING_TTL_MS = 5 * 60 * 1000;

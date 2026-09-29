@@ -11,7 +11,7 @@ import {
   metresPerDegreeLon,
   parseCellKey,
   type CellGrid,
-} from "./grid";
+} from "./grid.js";
 
 /** The cut every Offline World dataset shares. */
 const GRID: CellGrid = { originLon: -180, originLat: 85, cellDeg: 2 };

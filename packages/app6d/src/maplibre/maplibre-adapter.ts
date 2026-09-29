@@ -1,6 +1,7 @@
 // maplibre/maplibre-adapter.ts — MapAdapter implementation for maplibre-gl.
 // WorldCoord = [lng, lat], matching GeoJSON / MapLibre convention.
-import maplibregl from "maplibre-gl";
+// Namespace, not default: maplibre-gl 6 is ESM-only and has no default export.
+import * as maplibregl from "maplibre-gl";
 import type { MapAdapter, MarkerHandle, ScreenPt, WorldCoord } from "../adapter/types";
 
 class MaplibreMarkerHandle implements MarkerHandle {

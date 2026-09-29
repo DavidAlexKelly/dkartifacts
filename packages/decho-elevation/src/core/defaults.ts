@@ -11,8 +11,8 @@
  * from the basemap's tiles and its glyphs, so adding those does not cover it.
  * That omission is the most common way this package appears broken.
  */
-import type { CellGrid } from "./grid";
-import type { DemStore } from "./store";
+import type { CellGrid } from "./grid.js";
+import type { DemStore } from "./store.js";
 
 /**
  * "Elevation" in Offline World: one GeoTIFF per 2° cell, named after the

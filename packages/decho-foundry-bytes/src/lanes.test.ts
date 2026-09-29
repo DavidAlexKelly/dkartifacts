@@ -5,7 +5,7 @@ import {
   SMALL_LANE_LIMIT,
   createLane,
   isLargeFilePath,
-} from "./lanes";
+} from "./lanes.js";
 
 describe("createLane", () => {
   it("admits up to the limit immediately", async () => {

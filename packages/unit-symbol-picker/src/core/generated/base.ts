@@ -6,7 +6,7 @@
  * Regenerate: npm run generate   (from packages/unit-symbol-picker)
  */
 
-import type { AmplifierGroupTable, CodeOption } from "./types";
+import type { AmplifierGroupTable, CodeOption } from "./types.js";
 
 /** The one version the standard defines. Digits 1-2. */
 export const VERSION = "10";

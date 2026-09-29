@@ -18,9 +18,9 @@
  * not part of the supported surface.
  */
 
-import type { CellMeta } from "../core/format";
-import { haversineM } from "../core/geo";
-import { cellBounds, cellKey, type CellGrid } from "../core/grid";
+import type { CellMeta } from "../core/format.js";
+import { haversineM } from "../core/geo.js";
+import { cellBounds, cellKey, type CellGrid } from "../core/grid.js";
 
 export interface SyntheticCellSpec {
   grid: CellGrid;

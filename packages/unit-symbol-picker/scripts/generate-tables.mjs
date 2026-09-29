@@ -393,7 +393,7 @@ function writeBase(symbolSetIndex) {
   emit(
     "base.ts",
     `${header(["Base.xml"])}
-import type { AmplifierGroupTable, CodeOption } from "./types";
+import type { AmplifierGroupTable, CodeOption } from "./types.js";
 
 /** The one version the standard defines. Digits 1-2. */
 export const VERSION = ${JSON.stringify(version)};
@@ -525,7 +525,7 @@ function writeSymbolSet(fileName, table) {
   emit(
     `symbolSets/${camel(fileName)}.ts`,
     `${header([fileName])}
-import type { SymbolSetTable } from "../types";
+import type { SymbolSetTable } from "../types.js";
 
 export const ${constantName(fileName)}: SymbolSetTable = {
   code: ${JSON.stringify(table.code)},
@@ -542,7 +542,7 @@ export const ${constantName(fileName)}: SymbolSetTable = {
 
 function writeSymbolSetIndex(files) {
   const imports = files
-    .map((f) => `import { ${constantName(f)} } from "./${camel(f)}";`)
+    .map((f) => `import { ${constantName(f)} } from "./${camel(f)}.js";`)
     .join("\n");
   const entries = files
     .map((f) => `  ${constantName(f)},`)
@@ -554,7 +554,7 @@ function writeSymbolSetIndex(files) {
   emit(
     "symbolSets/index.ts",
     `${header(["*.xml"])}
-import type { SymbolSetTable } from "../types";
+import type { SymbolSetTable } from "../types.js";
 ${imports}
 
 export {
@@ -651,7 +651,7 @@ function writeLegacy(map) {
   emit(
     "legacy.ts",
     `${header(["*.xml (LegacySymbols)"])}
-import type { LegacyEntry } from "./types";
+import type { LegacyEntry } from "./types.js";
 
 /**
  * 2525C / APP-6B function codes to their modern equivalent.
@@ -701,10 +701,10 @@ writeLegacy(buildLegacy(sources));
 emit(
   "index.ts",
   `${header(["*.xml"])}
-export * from "./types";
-export * from "./base";
-export * from "./legacy";
-export * from "./symbolSets/index";
+export * from "./types.js";
+export * from "./base.js";
+export * from "./legacy.js";
+export * from "./symbolSets/index.js";
 `,
 );
 

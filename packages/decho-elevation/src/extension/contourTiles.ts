@@ -79,9 +79,9 @@ import {
   type TileSourceHandle,
 } from "@acc/decho-basemap";
 
-import { defaultContourStore, type ContourStore } from "../core/defaults";
-import { cellBounds, cellKey, cellsInBounds, type CellGrid } from "../core/grid";
-import type { ContourStep } from "../core/renderers";
+import { defaultContourStore, type ContourStore } from "../core/defaults.js";
+import { cellBounds, cellKey, cellsInBounds, type CellGrid } from "../core/grid.js";
+import type { ContourStep } from "../core/renderers.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 

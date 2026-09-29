@@ -2,19 +2,19 @@ export {
   DechoBasemap,
   type DechoBasemapProps,
   type DechoBasemapRef,
-} from "./DechoBasemap";
+} from "./DechoBasemap.js";
 
 export {
   useBasemap,
   type UseBasemapOptions,
   type UseBasemapResult,
-} from "./useBasemap";
+} from "./useBasemap.js";
 
 export {
   useDrawingTools,
   type DrawMode,
   type DrawingToolsState,
-} from "./useDrawingTools";
+} from "./useDrawingTools.js";
 
 // The toolbar's colours and metrics. Exported so a host's own map panels and
 // toolbar controls match the library's rather than approximating them — one
@@ -26,13 +26,13 @@ export {
   toolbarSeparator,
   toolbarSurface,
   type SurfaceTheme,
-} from "./theme";
+} from "./theme.js";
 
 // A button for the end of the toolbar, via <DechoBasemap toolbarItems={...} />.
 export {
   MapToolbarButton,
   type MapToolbarButtonProps,
-} from "./MapToolbarButton";
+} from "./MapToolbarButton.js";
 
 // The toolbar's glyphs, for anyone replacing the toolbar but keeping the
 // iconography.
@@ -47,7 +47,7 @@ export {
   SelectIcon,
   TexturesIcon,
   type IconProps,
-} from "./DrawingIcons";
+} from "./DrawingIcons.js";
 
 export {
   MAP_STYLES,
@@ -56,4 +56,4 @@ export {
   resolveView,
   spritePathForStyle,
   type MapStyleName,
-} from "./options";
+} from "./options.js";

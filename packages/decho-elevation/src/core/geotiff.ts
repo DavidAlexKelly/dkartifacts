@@ -29,8 +29,8 @@
  * one place; that is what the codec interface is for.
  */
 
-import type { CellBounds } from "./grid";
-import type { HeightArray, HeightGrid } from "./heightGrid";
+import type { CellBounds } from "./grid.js";
+import type { HeightArray, HeightGrid } from "./heightGrid.js";
 
 // ── TIFF tags this reader looks at ──────────────────────────────────────────
 

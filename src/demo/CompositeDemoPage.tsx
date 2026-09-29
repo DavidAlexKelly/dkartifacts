@@ -35,7 +35,8 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 // A value import, not a type-only one: this page constructs Markers itself.
-import maplibregl from "maplibre-gl";
+// Namespace, not default: maplibre-gl 6 is ESM-only and has no default export.
+import * as maplibregl from "maplibre-gl";
 
 import {
   buildings3d,

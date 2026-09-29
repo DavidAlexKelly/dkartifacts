@@ -46,7 +46,8 @@
  */
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import maplibregl from "maplibre-gl";
+// Namespace, not default: maplibre-gl 6 is ESM-only and has no default export.
+import * as maplibregl from "maplibre-gl";
 import { describeBasemapError } from "@acc/decho-basemap";
 import { DechoBasemap } from "@acc/decho-basemap/react";
 import { elevation } from "@acc/decho-elevation/extension";

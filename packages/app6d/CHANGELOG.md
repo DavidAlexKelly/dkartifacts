@@ -13,6 +13,9 @@ All notable changes to this project are documented here.
 
 ### Changed
 
+- `maplibre-gl` peer also accepts 6 (`^3.0.0 || ^4.0.0 || ^5.0.0 || ^6.0.0`).
+  The MapLibre adapter imports it as a namespace, since 6 is ESM-only with no
+  default export; that works on every supported major.
 - `"sideEffects": false` (was `true`). Nothing in the package runs at import
   time, so bundlers can now drop the parts of the catalog a consumer does not
   import.

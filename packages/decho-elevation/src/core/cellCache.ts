@@ -16,7 +16,7 @@
  * it is a hope.
  */
 
-import type { HeightGrid } from "./heightGrid";
+import type { HeightGrid } from "./heightGrid.js";
 
 export interface CellCache {
   get(key: string): HeightGrid | undefined;
