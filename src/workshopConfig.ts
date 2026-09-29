@@ -45,6 +45,14 @@
  *                      a module that sets it selects that event and flies to
  *                      it — as soon as it has loaded, if it has not yet.
  *
+ *  eventSpriteSet, eventStart{Latitude,Longitude,Zoom}, eventGlobe,
+ *  eventTerrain, eventFitToDataOnLoad, eventClustering, eventClusterRadius,
+ *  eventShowSettings, eventAllowSourceEditing, eventAllowCategoryEditing,
+ *  eventFeedLength
+ *                    — read by the event monitor only: its default look and
+ *                      what users may change. Unset, each is what the page
+ *                      does outside Workshop. See src/demo/events/appearance.ts.
+ *
  *  eventDatasetRids, eventMediaSetInputs, eventStreamRids
  *                    — string lists, read by the event monitor (/events) only.
  *                      The same shapes as the davebettermap widget's
@@ -77,6 +85,14 @@ import {
   type SourceKind,
 } from "@/demo/events/sources/config";
 import { parseCustomCategory, type CategoryDef } from "@/demo/events/categories";
+import {
+  DEFAULT_APPEARANCE,
+  NUMBER_LIMITS,
+  checkNumber,
+  spritePathFrom,
+  type EventAppearance,
+  type NumberLimit,
+} from "@/demo/events/appearance";
 
 export const ARTIFACT_SHELL_CONFIG = [
   {
@@ -170,6 +186,190 @@ export const ARTIFACT_SHELL_CONFIG = [
       },
     },
   },
+  {
+    fieldId: "eventSpriteSet",
+    field: {
+      type: "single" as const,
+      label: "event-monitor-sprite-set",
+      helperText:
+        "Event monitor (/events): the basemap's sprite set — a path in " +
+        "the assets dataset such as sprites/light, or just its name " +
+        "(light, dark).",
+      fieldValue: {
+        type: "inputOutput" as const,
+        variableType: { type: "string" as const, defaultValue: "sprites/light" },
+      },
+    },
+  },
+  {
+    fieldId: "eventStartLatitude",
+    field: {
+      type: "single" as const,
+      label: "event-monitor-start-latitude",
+      helperText:
+        "Event monitor (/events): latitude the map opens on, and " +
+        "returns to on Reset view.",
+      fieldValue: {
+        type: "inputOutput" as const,
+        variableType: { type: "number" as const, defaultValue: 38 },
+      },
+    },
+  },
+  {
+    fieldId: "eventStartLongitude",
+    field: {
+      type: "single" as const,
+      label: "event-monitor-start-longitude",
+      helperText:
+        "Event monitor (/events): longitude the map opens on, and " +
+        "returns to on Reset view.",
+      fieldValue: {
+        type: "inputOutput" as const,
+        variableType: { type: "number" as const, defaultValue: 25 },
+      },
+    },
+  },
+  {
+    fieldId: "eventStartZoom",
+    field: {
+      type: "single" as const,
+      label: "event-monitor-start-zoom",
+      helperText:
+        "Event monitor (/events): zoom the map opens at, 0 (whole " +
+        "world) to 22.",
+      fieldValue: {
+        type: "inputOutput" as const,
+        variableType: { type: "number" as const, defaultValue: 2.3 },
+      },
+    },
+  },
+  {
+    fieldId: "eventGlobe",
+    field: {
+      type: "single" as const,
+      label: "event-monitor-globe",
+      helperText:
+        "Event monitor (/events): start on the globe projection rather " +
+        "than a flat map. Users can still switch it in settings.",
+      fieldValue: {
+        type: "inputOutput" as const,
+        variableType: { type: "boolean" as const, defaultValue: true },
+      },
+    },
+  },
+  {
+    fieldId: "eventTerrain",
+    field: {
+      type: "single" as const,
+      label: "event-monitor-terrain",
+      helperText:
+        "Event monitor (/events): start with 3D terrain on. Users can " +
+        "still switch it in settings.",
+      fieldValue: {
+        type: "inputOutput" as const,
+        variableType: { type: "boolean" as const, defaultValue: true },
+      },
+    },
+  },
+  {
+    fieldId: "eventFitToDataOnLoad",
+    field: {
+      type: "single" as const,
+      label: "event-monitor-fit-to-data-on-load",
+      helperText:
+        "Event monitor (/events): once the data has loaded, frame it " +
+        "all instead of staying at the start view.",
+      fieldValue: {
+        type: "inputOutput" as const,
+        variableType: { type: "boolean" as const, defaultValue: false },
+      },
+    },
+  },
+  {
+    fieldId: "eventClustering",
+    field: {
+      type: "single" as const,
+      label: "event-monitor-clustering",
+      helperText:
+        "Event monitor (/events): group nearby events into clusters " +
+        "when zoomed out. Off draws every event on its own.",
+      fieldValue: {
+        type: "inputOutput" as const,
+        variableType: { type: "boolean" as const, defaultValue: true },
+      },
+    },
+  },
+  {
+    fieldId: "eventClusterRadius",
+    field: {
+      type: "single" as const,
+      label: "event-monitor-cluster-radius",
+      helperText:
+        "Event monitor (/events): how close events must be, in screen " +
+        "pixels, to merge into a cluster (1–200).",
+      fieldValue: {
+        type: "inputOutput" as const,
+        variableType: { type: "number" as const, defaultValue: 50 },
+      },
+    },
+  },
+  {
+    fieldId: "eventShowSettings",
+    field: {
+      type: "single" as const,
+      label: "event-monitor-show-settings",
+      helperText:
+        "Event monitor (/events): show the Settings button — sources, " +
+        "filters, categories and the feed. Off leaves just the map.",
+      fieldValue: {
+        type: "inputOutput" as const,
+        variableType: { type: "boolean" as const, defaultValue: true },
+      },
+    },
+  },
+  {
+    fieldId: "eventAllowSourceEditing",
+    field: {
+      type: "single" as const,
+      label: "event-monitor-allow-source-editing",
+      helperText:
+        "Event monitor (/events): let users add and remove sources and " +
+        "switch mock events. Off uses only the sources set by the " +
+        "module.",
+      fieldValue: {
+        type: "inputOutput" as const,
+        variableType: { type: "boolean" as const, defaultValue: true },
+      },
+    },
+  },
+  {
+    fieldId: "eventAllowCategoryEditing",
+    field: {
+      type: "single" as const,
+      label: "event-monitor-allow-category-editing",
+      helperText:
+        "Event monitor (/events): let users put events, sources and " +
+        "values into categories. Off shows categories as detected.",
+      fieldValue: {
+        type: "inputOutput" as const,
+        variableType: { type: "boolean" as const, defaultValue: true },
+      },
+    },
+  },
+  {
+    fieldId: "eventFeedLength",
+    field: {
+      type: "single" as const,
+      label: "event-monitor-feed-length",
+      helperText:
+        "Event monitor (/events): how many events the Latest list shows " +
+        "(0 hides it, up to 500).",
+      fieldValue: {
+        type: "inputOutput" as const,
+        variableType: { type: "number" as const, defaultValue: 40 },
+      },
+    },
+  },
 ] as const satisfies IConfigDefinition;
 
 export type ArtifactShellContext = IAsyncValue<
@@ -215,6 +415,19 @@ const STANDALONE: ArtifactShellContext = {
       // Nobody to tell: writes go nowhere outside the provider.
       setLoadedValue: () => undefined,
     },
+    eventSpriteSet: { fieldValue: { status: "LOADED", value: "sprites/light" } },
+    eventStartLatitude: { fieldValue: { status: "LOADED", value: 38 } },
+    eventStartLongitude: { fieldValue: { status: "LOADED", value: 25 } },
+    eventStartZoom: { fieldValue: { status: "LOADED", value: 2.3 } },
+    eventGlobe: { fieldValue: { status: "LOADED", value: true } },
+    eventTerrain: { fieldValue: { status: "LOADED", value: true } },
+    eventFitToDataOnLoad: { fieldValue: { status: "LOADED", value: false } },
+    eventClustering: { fieldValue: { status: "LOADED", value: true } },
+    eventClusterRadius: { fieldValue: { status: "LOADED", value: 50 } },
+    eventShowSettings: { fieldValue: { status: "LOADED", value: true } },
+    eventAllowSourceEditing: { fieldValue: { status: "LOADED", value: true } },
+    eventAllowCategoryEditing: { fieldValue: { status: "LOADED", value: true } },
+    eventFeedLength: { fieldValue: { status: "LOADED", value: 40 } },
   },
 } as unknown as ArtifactShellContext;
 
@@ -360,4 +573,89 @@ export function useWorkshopSelectedEvent(): WorkshopSelectedEvent & {
     ...resolveSelectedEvent(context),
     set: (value) => setter?.(value === "" ? undefined : value),
   };
+}
+
+// ── Event monitor look and feel ─────────────────────────────────────────────
+
+export interface WorkshopEventAppearance {
+  /** "pending" until an embedding Workshop has answered. */
+  status: "pending" | "ready";
+  appearance: EventAppearance;
+  /** Values that could not be used (the default stands in), and why. */
+  invalid: Array<{ variable: string; entry: string; error: string }>;
+}
+
+type AppearanceField =
+  | "eventSpriteSet"
+  | "eventStartLatitude"
+  | "eventStartLongitude"
+  | "eventStartZoom"
+  | "eventGlobe"
+  | "eventTerrain"
+  | "eventFitToDataOnLoad"
+  | "eventClustering"
+  | "eventClusterRadius"
+  | "eventShowSettings"
+  | "eventAllowSourceEditing"
+  | "eventAllowCategoryEditing"
+  | "eventFeedLength";
+
+/** The event monitor's look and feel, as a plain function of the context. */
+export function resolveEventAppearance(context: ArtifactShellContext): WorkshopEventAppearance {
+  if (context.status !== "LOADED" && context.status !== "RELOADING") {
+    return {
+      status: context.status === "FAILED" ? "ready" : "pending",
+      appearance: DEFAULT_APPEARANCE,
+      invalid: [],
+    };
+  }
+  const invalid: WorkshopEventAppearance["invalid"] = [];
+  const read = (fieldId: AppearanceField): unknown => {
+    // Optional: a Workshop that has not caught up with a newly added field
+    // may leave it out of what it sends, and that must read as unset.
+    const field = (context.value as Partial<typeof context.value>)[fieldId]?.fieldValue;
+    return field?.status === "LOADED" || field?.status === "RELOADING" ? field.value : undefined;
+  };
+  const label = (fieldId: AppearanceField) =>
+    ARTIFACT_SHELL_CONFIG.find((entry) => entry.fieldId === fieldId)?.field.label ?? fieldId;
+  const flag = (fieldId: AppearanceField, fallback: boolean): boolean => {
+    const value = read(fieldId);
+    return typeof value === "boolean" ? value : fallback;
+  };
+  const number = (fieldId: AppearanceField, limit: NumberLimit, fallback: number): number => {
+    const value = read(fieldId);
+    // Cleared in Workshop: the default, without complaint.
+    if (value == null) {return fallback;}
+    const checked = checkNumber(Number(value), limit);
+    if (checked.ok) {return checked.value;}
+    invalid.push({ variable: label(fieldId), entry: String(value), error: checked.error });
+    return fallback;
+  };
+  const sprite = read("eventSpriteSet");
+  const defaults = DEFAULT_APPEARANCE;
+  return {
+    status: "ready",
+    appearance: {
+      spritePath: (typeof sprite === "string" && spritePathFrom(sprite)) || defaults.spritePath,
+      startView: {
+        lat: number("eventStartLatitude", NUMBER_LIMITS.lat, defaults.startView.lat),
+        lon: number("eventStartLongitude", NUMBER_LIMITS.lon, defaults.startView.lon),
+        zoom: number("eventStartZoom", NUMBER_LIMITS.zoom, defaults.startView.zoom),
+      },
+      globe: flag("eventGlobe", defaults.globe),
+      terrain: flag("eventTerrain", defaults.terrain),
+      fitToDataOnLoad: flag("eventFitToDataOnLoad", defaults.fitToDataOnLoad),
+      clustering: flag("eventClustering", defaults.clustering),
+      clusterRadius: number("eventClusterRadius", NUMBER_LIMITS.clusterRadius, defaults.clusterRadius),
+      showSettings: flag("eventShowSettings", defaults.showSettings),
+      allowSourceEditing: flag("eventAllowSourceEditing", defaults.allowSourceEditing),
+      allowCategoryEditing: flag("eventAllowCategoryEditing", defaults.allowCategoryEditing),
+      feedLength: number("eventFeedLength", NUMBER_LIMITS.feedLength, defaults.feedLength),
+    },
+    invalid,
+  };
+}
+
+export function useWorkshopEventAppearance(): WorkshopEventAppearance {
+  return resolveEventAppearance(useContext(ShellWorkshopContext));
 }

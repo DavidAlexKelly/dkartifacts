@@ -69,6 +69,10 @@ export interface SourcesSectionProps {
   workshopProblems: Array<{ variable: string; entry: string; error: string }>;
   /** Embedded, and Workshop has not sent its variables yet. */
   waitingForWorkshop: boolean;
+  /** Off: the sources are the module's — no adding, removing or mock toggle. */
+  allowSourceEditing?: boolean;
+  /** Off: no putting sources or values into categories. */
+  allowCategoryEditing?: boolean;
 }
 
 export function SourcesSection({
@@ -87,6 +91,8 @@ export function SourcesSection({
   overrides,
   onSourceCategory,
   onValueCategory,
+  allowSourceEditing = true,
+  allowCategoryEditing = true,
 }: SourcesSectionProps): React.ReactElement {
   const problems = states.filter((state) => state.problem).length + workshopProblems.length;
   const live = states.some((state) => state.status === "live");
@@ -98,15 +104,18 @@ export function SourcesSection({
         {problems > 0 && <span style={{ color: "#ff9a92" }}> · {problems} with problems</span>}
       </summary>
       <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 4 }}>
-        <label style={panelToggle}>
-          <input
-            type="checkbox"
-            checked={mock}
-            onChange={(event) => onMockChange(event.target.checked)}
-            style={panelCheckbox}
-          />
-          Mock events
-        </label>
+        {allowSourceEditing && (
+          <label style={panelToggle}>
+            <input
+              type="checkbox"
+              checked={mock}
+              onChange={(event) => onMockChange(event.target.checked)}
+              style={panelCheckbox}
+            />
+            Mock events
+          </label>
+        )}
+        {!allowSourceEditing && mock && <div style={panelMuted}>Showing mock events.</div>}
         {states.map((state) => (
           <SourceRow
             key={state.key}
@@ -115,6 +124,8 @@ export function SourcesSection({
             onReload={() => onReload(state.key)}
             onTitleChange={(field) => onTitleChange(state.key, field)}
             pinned={pinnedKeys.has(state.key)}
+            removable={allowSourceEditing}
+            categoryEditing={allowCategoryEditing}
             registry={registry}
             forced={overrides.sources[state.key]}
             valueOverrides={overrides.values[state.key] ?? {}}
@@ -132,13 +143,13 @@ export function SourcesSection({
         {sessionOnly === "url" && (
           <div style={panelMuted}>Sources from the page URL — changes here are not saved.</div>
         )}
-        {sessionOnly === "workshop" && (
+        {sessionOnly === "workshop" && allowSourceEditing && (
           <div style={panelMuted}>
             Embedded in Workshop: sources added here last for this session. Set them in the
             widget's event-monitor variables to keep them.
           </div>
         )}
-        <AddSourceForm onAdd={onAdd} registry={registry} />
+        {allowSourceEditing && <AddSourceForm onAdd={onAdd} registry={registry} />}
       </div>
     </details>
   );
@@ -150,6 +161,8 @@ function SourceRow({
   onReload,
   onTitleChange,
   pinned,
+  removable,
+  categoryEditing,
   registry,
   forced,
   valueOverrides,
@@ -162,6 +175,9 @@ function SourceRow({
   onTitleChange: (field: string | undefined) => void;
   /** From a Workshop variable: removed there, not here. */
   pinned: boolean;
+  /** Whether sources may be removed here at all. */
+  removable: boolean;
+  categoryEditing: boolean;
   registry: CategoryRegistry;
   /** The category everything in this source was put into, if any. */
   forced: string | undefined;
@@ -189,11 +205,11 @@ function SourceRow({
           <span style={kindBadge} title="Set by a Workshop variable — change it in the module">
             Workshop
           </span>
-        ) : (
+        ) : removable ? (
           <button type="button" style={iconButton} onClick={onRemove} title="Remove" aria-label="Remove source">
             ×
           </button>
-        )}
+        ) : null}
       </div>
 
       {status === "loading" && <div style={panelMuted}>Loading…</div>}
@@ -222,7 +238,7 @@ function SourceRow({
           Default category: {categoryMeta(registry, state.config.category).label}
         </div>
       )}
-      {status !== "loading" && status !== "error" && state.events.length + state.areas.length > 0 && (
+      {categoryEditing && status !== "loading" && status !== "error" && state.events.length + state.areas.length > 0 && (
         <CategoryControls
           state={state}
           registry={registry}

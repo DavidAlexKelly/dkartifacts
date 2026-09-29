@@ -75,6 +75,7 @@ import {
 } from "./eventsLayer";
 import { buildRegistry, categoryMeta } from "./categories";
 import {
+  NO_OVERRIDES,
   applyOverrides,
   loadOverrides,
   overriddenCategory,
@@ -116,6 +117,7 @@ import { boundsOf, shapeBounds, type Bounds } from "./sources/geo";
 import type { MonitorArea } from "./sources/interpret";
 import { useEventSources } from "./sources/useEventSources";
 import {
+  useWorkshopEventAppearance,
   useWorkshopEventCategories,
   useWorkshopEventSources,
   useWorkshopSelectedEvent,
@@ -144,9 +146,6 @@ import {
 
 const BASEMAP_RID = "ri.foundry.main.dataset.c7e99de1-90a4-4e22-bd26-b42316d70fe4";
 const ASSETS_RID = "ri.foundry.main.dataset.8637f7a1-7503-459c-82c9-78e6ffa94e6e";
-
-/** Europe and the Middle East in view, the rest of the globe a drag away. */
-const SPAWN = { lat: 38, lon: 25, zoom: 2.3 };
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -185,6 +184,15 @@ function EventsPage(): React.ReactElement {
   const [now] = useState(() => Date.now());
   const mockEvents = useMemo(() => generateEvents({ now }), [now]);
 
+  // ── Look and feel ──────────────────────────────────────────────────────────
+  //
+  // The module's defaults (appearance.ts). The map is not drawn until an
+  // embedding Workshop has answered, so it never opens in the wrong style or
+  // place and then rebuilds.
+  const appearanceState = useWorkshopEventAppearance();
+  const look = appearanceState.appearance;
+  const lookReady = appearanceState.status === "ready";
+
   // ── Sources ────────────────────────────────────────────────────────────────
   //
   // Workshop's variables (pinned), then the URL's or this browser's saved
@@ -215,19 +223,22 @@ function EventsPage(): React.ReactElement {
 
   const configs = useMemo(
     () =>
-      dedupe([...pinned, ...local]).map((config) => {
+      // Locked, sources added on the page — this browser's saved ones
+      // included — are left out; a URL's still count, as the page's config.
+      dedupe([...pinned, ...(look.allowSourceEditing ? local : urlSources)]).map((config) => {
         const titleField = titles[sourceKey(config)];
         const { titleField: _saved, ...rest } = config;
         return titleField ? { ...rest, titleField } : rest;
       }),
-    [pinned, local, titles],
+    [pinned, local, urlSources, titles, look.allowSourceEditing],
   );
   const hasSources = configs.length > 0;
 
   // Mock data unless something real is configured — and not while Workshop
   // has yet to say whether it is, so embedded pages never flash it.
   const [mockChoice, setMockChoice] = useState<boolean | null>(null);
-  const mock = mockChoice ?? (!hasSources && workshop.status === "ready");
+  const mock =
+    (look.allowSourceEditing ? mockChoice : null) ?? (!hasSources && workshop.status === "ready");
   // ── Categories ─────────────────────────────────────────────────────────────
   //
   // The built-ins plus any the Workshop variable adds, and what has been put
@@ -240,8 +251,11 @@ function EventsPage(): React.ReactElement {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [categoriesKey],
   );
-  const [overrides, setOverrides] = useState<CategoryOverrides>(loadOverrides);
-  useEffect(() => saveOverrides(overrides), [overrides]);
+  const [savedOverrides, setOverrides] = useState<CategoryOverrides>(loadOverrides);
+  useEffect(() => saveOverrides(savedOverrides), [savedOverrides]);
+  // Locked, categories are as detected: what was chosen here before is kept
+  // for when editing is allowed again, but not applied.
+  const overrides = look.allowCategoryEditing ? savedOverrides : NO_OVERRIDES;
 
   const { states, reload } = useEventSources(configs, now, registry);
 
@@ -281,6 +295,7 @@ function EventsPage(): React.ReactElement {
       automatic: withoutOwn,
       onChange: (category: string | undefined) =>
         setOverrides((previous) => withOverride(previous, { kind: "event", id }, category)),
+      editable: look.allowCategoryEditing,
     };
   };
 
@@ -292,12 +307,18 @@ function EventsPage(): React.ReactElement {
   const [windowChoice, setWindowMs] = useState<number | null | undefined>(undefined);
   const windowMs = windowChoice !== undefined ? windowChoice : hasSources ? null : 7 * DAY;
 
-  const [terrain, setTerrain] = useState(true);
-  const [globe, setGlobe] = useState(true);
+  // What the user picked in settings, over the module's default; a new
+  // default from Workshop replaces the pick.
+  const [terrainChoice, setTerrain] = useState<boolean | null>(null);
+  const [globeChoice, setGlobe] = useState<boolean | null>(null);
+  useEffect(() => setTerrain(null), [look.terrain]);
+  useEffect(() => setGlobe(null), [look.globe]);
+  const terrain = terrainChoice ?? look.terrain;
+  const globe = globeChoice ?? look.globe;
 
   const [map, setMap] = useState<maplibregl.Map | null>(null);
   const [dem, setDem] = useState<DemSourceHandle | null>(null);
-  const [zoom, setZoom] = useState(SPAWN.zoom);
+  const [zoom, setZoom] = useState(look.startView.zoom);
   const [selection, setSelection] = useState<Selection>(null);
   const [hover, setHover] = useState<ClusterHover | null>(null);
   const [groundHeight, setGroundHeight] = useState<number | null | "loading">(null);
@@ -359,9 +380,11 @@ function EventsPage(): React.ReactElement {
   areasRef.current = visibleAreas;
   const registryRef = useRef(registry);
   registryRef.current = registry;
-  const viewRef = useRef<View>(SPAWN);
+  // Null until the camera first moves: a map built before then opens on the
+  // start view, one rebuilt later (terrain toggled, say) where it was.
+  const viewRef = useRef<View | null>(null);
 
-  const signature = `${terrain}-${globe}`;
+  const signature = [terrain, globe, look.spritePath, look.clustering, look.clusterRadius].join("|");
   const extensions = useMemo(
     () => [
       elevation({
@@ -371,13 +394,16 @@ function EventsPage(): React.ReactElement {
         onReady: setDem,
       }),
       areasExtension(areasRef.current, registryRef.current),
-      eventsExtension(visibleRef.current, registryRef.current),
+      eventsExtension(visibleRef.current, registryRef.current, {
+        cluster: look.clustering,
+        clusterRadius: look.clusterRadius,
+      }),
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [signature],
   );
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const spawn = useMemo(() => viewRef.current, [signature]);
+  const spawn = useMemo(() => viewRef.current ?? look.startView, [signature, lookReady]);
 
   const onMapReady = (instance: maplibregl.Map) => {
     // The top-right corner is the settings button's, so zoom and compass
@@ -566,7 +592,8 @@ function EventsPage(): React.ReactElement {
   };
 
   const fit = (bounds: Bounds | null, maxZoom = 13) => {
-    if (bounds) {map?.fitBounds(bounds, { padding: { top: 60, bottom: 60, left: 320, right: 360 }, maxZoom, duration: 1400 });}
+    // Room on the left for the details panel.
+    if (bounds) {map?.fitBounds(bounds, { padding: { top: 60, bottom: 60, left: 360, right: 60 }, maxZoom, duration: 1400 });}
   };
 
   const zoomToArea = (area: MonitorArea) => fit(shapeBounds(area.geometry));
@@ -583,13 +610,37 @@ function EventsPage(): React.ReactElement {
   const resetView = () => {
     setSelection(null);
     map?.flyTo({
-      center: [SPAWN.lon, SPAWN.lat],
-      zoom: SPAWN.zoom,
+      center: [look.startView.lon, look.startView.lat],
+      zoom: look.startView.zoom,
       pitch: 0,
       bearing: 0,
       duration: 1600,
     });
   };
+
+  // A start view changed from Workshop once the map is up: go there.
+  const startKey = `${look.startView.lat},${look.startView.lon},${look.startView.zoom}`;
+  const shownStart = useRef<string | null>(null);
+  useEffect(() => {
+    if (!map) {return;}
+    if (shownStart.current != null && shownStart.current !== startKey) {
+      map.flyTo({ center: [look.startView.lon, look.startView.lat], zoom: look.startView.zoom, duration: 1400 });
+    }
+    shownStart.current = startKey;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [map, startKey]);
+
+  // Frame the data once, when it has all arrived — unless something has been
+  // selected meanwhile (from Workshop, say), which has its own camera move.
+  const fittedOnLoad = useRef(false);
+  const sourcesLoading = workshop.status !== "ready" || states.some((state) => state.status === "loading");
+  useEffect(() => {
+    if (!map || !look.fitToDataOnLoad || fittedOnLoad.current || sourcesLoading) {return;}
+    if (visible.length + visibleAreas.length === 0) {return;}
+    fittedOnLoad.current = true;
+    if (selection == null) {fitToData();}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [map, look.fitToDataOnLoad, sourcesLoading, visible, visibleAreas]);
 
   // ── The selected-event Workshop variable ─────────────────────────────────
   //
@@ -663,7 +714,8 @@ function EventsPage(): React.ReactElement {
 
   // Settings live in a drop-down behind the top-right button; a click
   // anywhere else, or Escape, puts them away.
-  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsChoice, setSettingsOpen] = useState(false);
+  const settingsOpen = look.showSettings && settingsChoice;
   const settingsRef = useRef<HTMLDivElement>(null);
   const settingsToggleRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -714,36 +766,38 @@ function EventsPage(): React.ReactElement {
 
   return (
     <div style={{ position: "relative", height: "100%" }}>
-      <DechoBasemap
-        key={signature}
-        rid={BASEMAP_RID}
-        assetsRid={ASSETS_RID}
-        spritePath="sprites/light"
-        spawnLat={spawn.lat}
-        spawnLong={spawn.lon}
-        spawnZoom={spawn.zoom}
-        globe={globe}
-        navigationControl={false}
-        extensions={extensions}
-        onMapReady={onMapReady}
-        style={{ height: "100%" }}
-        renderError={(err) => {
-          const { title, detail, remediation, rid, path } = describeBasemapError(err);
-          return (
-            <div style={errorStyle}>
-              <strong>{title}</strong>
-              <div>{detail}</div>
-              {remediation && <div style={{ marginTop: 8 }}>{remediation}</div>}
-              {rid && (
-                <div style={{ marginTop: 8, opacity: 0.75 }}>
-                  {rid}
-                  {path ? ` · ${path}` : ""}
-                </div>
-              )}
-            </div>
-          );
-        }}
-      />
+      {lookReady && (
+        <DechoBasemap
+          key={signature}
+          rid={BASEMAP_RID}
+          assetsRid={ASSETS_RID}
+          spritePath={look.spritePath}
+          spawnLat={spawn.lat}
+          spawnLong={spawn.lon}
+          spawnZoom={spawn.zoom}
+          globe={globe}
+          navigationControl={false}
+          extensions={extensions}
+          onMapReady={onMapReady}
+          style={{ height: "100%" }}
+          renderError={(err) => {
+            const { title, detail, remediation, rid, path } = describeBasemapError(err);
+            return (
+              <div style={errorStyle}>
+                <strong>{title}</strong>
+                <div>{detail}</div>
+                {remediation && <div style={{ marginTop: 8 }}>{remediation}</div>}
+                {rid && (
+                  <div style={{ marginTop: 8, opacity: 0.75 }}>
+                    {rid}
+                    {path ? ` · ${path}` : ""}
+                  </div>
+                )}
+              </div>
+            );
+          }}
+        />
+      )}
 
       {/* ── Status and the settings button ───────────────────────────────── */}
       <div style={toolbar} ref={settingsToggleRef}>
@@ -758,6 +812,7 @@ function EventsPage(): React.ReactElement {
             )}
           </span>
         </div>
+        {look.showSettings && (
         <button
           type="button"
           style={settingsButton(settingsOpen)}
@@ -768,6 +823,7 @@ function EventsPage(): React.ReactElement {
           <span aria-hidden="true" style={{ fontSize: 14, lineHeight: 1 }}>⚙</span>
           Settings
         </button>
+        )}
       </div>
 
       {/* ── Settings: sources, filters and feed ──────────────────────────── */}
@@ -790,7 +846,7 @@ function EventsPage(): React.ReactElement {
               onTitleChange={setTitleField}
               sessionOnly={sessionOnly}
               pinnedKeys={pinnedKeys}
-              workshopProblems={[...workshop.invalid, ...workshopCategories.invalid]}
+              workshopProblems={[...workshop.invalid, ...workshopCategories.invalid, ...appearanceState.invalid]}
               registry={registry}
               overrides={overrides}
               onSourceCategory={(key, category) =>
@@ -802,6 +858,8 @@ function EventsPage(): React.ReactElement {
                 )
               }
               waitingForWorkshop={workshop.status === "pending"}
+            allowSourceEditing={look.allowSourceEditing}
+            allowCategoryEditing={look.allowCategoryEditing}
             />
 
             <div style={panelSeparator} />
@@ -853,36 +911,40 @@ function EventsPage(): React.ReactElement {
               </label>
             ))}
 
-            <div style={panelSeparator} />
+            {look.feedLength > 0 && (
+              <>
+              <div style={panelSeparator} />
 
-            <div style={sectionLabel}>Latest</div>
-            <div style={feed}>
-              {visible.length === 0 && <div style={panelMuted}>Nothing matches the filters.</div>}
-              {visible.slice(0, 40).map((event) => (
-                <button
-                  key={event.id}
-                  type="button"
-                  style={feedRow(selection?.kind === "event" && event.id === selection.id)}
-                  onClick={() => flyTo(event)}
-                  title={event.title}
-                >
-                  <span style={{ ...dot(categoryMeta(registry, event.category).colour), marginTop: 5 }} />
-                  <span style={{ minWidth: 0, flex: 1 }}>
-                    <span style={feedTitle}>{event.title}</span>
-                    <span style={panelMuted}>
-                      {event.country || event.place || event.source} · {relativeTime(event.time, now)}
-                      {event.severity === "critical" || event.severity === "high" ? (
-                        <span style={{ color: SEVERITY_COLOURS[event.severity] }}>
-                          {" "}
-                          · {event.severity}
-                        </span>
-                      ) : null}
+              <div style={sectionLabel}>Latest</div>
+              <div style={feed}>
+                {visible.length === 0 && <div style={panelMuted}>Nothing matches the filters.</div>}
+                {visible.slice(0, look.feedLength).map((event) => (
+                  <button
+                    key={event.id}
+                    type="button"
+                    style={feedRow(selection?.kind === "event" && event.id === selection.id)}
+                    onClick={() => flyTo(event)}
+                    title={event.title}
+                  >
+                    <span style={{ ...dot(categoryMeta(registry, event.category).colour), marginTop: 5 }} />
+                    <span style={{ minWidth: 0, flex: 1 }}>
+                      <span style={feedTitle}>{event.title}</span>
+                      <span style={panelMuted}>
+                        {event.country || event.place || event.source} · {relativeTime(event.time, now)}
+                        {event.severity === "critical" || event.severity === "high" ? (
+                          <span style={{ color: SEVERITY_COLOURS[event.severity] }}>
+                            {" "}
+                            · {event.severity}
+                          </span>
+                        ) : null}
+                      </span>
                     </span>
-                  </span>
-                  {event.live && <span style={{ ...liveBadge, marginTop: 3 }}>LIVE</span>}
-                </button>
-              ))}
-            </div>
+                    {event.live && <span style={{ ...liveBadge, marginTop: 3 }}>LIVE</span>}
+                  </button>
+                ))}
+              </div>
+              </>
+            )}
 
             <div style={panelSeparator} />
 
