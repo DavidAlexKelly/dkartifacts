@@ -12,14 +12,50 @@ import { errorPanel, mapPanel, panelMuted, surface } from "@/components/mapPanel
  * until its rows were clipped out of reach. The column lives in
  * `sidePanelContent` inside it.
  */
-export const sidePanel: React.CSSProperties = {
+/** The top-right corner: a status chip and the button that opens settings. */
+export const toolbar: React.CSSProperties = {
+  position: "absolute",
+  top: 12,
+  right: 12,
+  zIndex: 3,
+  display: "flex",
+  alignItems: "center",
+  gap: 6,
+};
+
+export const statusChip: React.CSSProperties = {
+  ...mapPanel,
+  position: "static",
+  flexDirection: "row",
+  alignItems: "center",
+  gap: 8,
+  padding: "5px 10px",
+};
+
+export const settingsButton = (open: boolean): React.CSSProperties => ({
+  ...mapPanel,
+  position: "static",
+  flexDirection: "row",
+  alignItems: "center",
+  gap: 6,
+  padding: "5px 10px",
+  cursor: "pointer",
+  font: "600 12px/1.6 sans-serif",
+  background: open ? surface.accent : surface.background,
+  color: open ? "#fff" : surface.text,
+});
+
+/** Settings drop down from the button, over the map's right-hand side. */
+export const settingsPanel: React.CSSProperties = {
   ...mapPanel,
   display: "block",
-  top: 12,
-  left: 12,
-  bottom: 12,
-  width: 280,
+  top: 50,
+  right: 12,
+  width: 300,
+  maxHeight: "calc(100% - 62px)",
+  boxSizing: "border-box",
   overflowY: "auto",
+  zIndex: 4,
 };
 
 export const sidePanelContent: React.CSSProperties = {
@@ -137,7 +173,7 @@ export const hoverCard: React.CSSProperties = {
 export const detailsPanel: React.CSSProperties = {
   ...mapPanel,
   top: 12,
-  right: 12,
+  left: 12,
   width: 330,
   maxHeight: "calc(100% - 24px)",
   overflowY: "auto",
@@ -199,7 +235,7 @@ export const factValue: React.CSSProperties = { margin: 0 };
 export const legend: React.CSSProperties = {
   ...mapPanel,
   bottom: 12,
-  left: 304,
+  left: 12,
   flexDirection: "row",
   alignItems: "center",
   gap: 12,
