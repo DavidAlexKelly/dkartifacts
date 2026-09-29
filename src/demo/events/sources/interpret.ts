@@ -71,6 +71,8 @@ export interface MonitorArea {
   source: string;
   fields: Record<string, unknown>;
   media?: MediaRef[];
+  /** The source's own primary key, when it has an id column. */
+  pk?: string;
 }
 
 export interface InterpretContext {
@@ -120,7 +122,7 @@ interface Hints {
 
 const HINTS = {
   id: {
-    exact: ["id", "eventid", "uid", "uuid", "key", "incidentid", "recordid", "objectid", "eventidcnty", "entityid", "featureid"],
+    exact: ["id", "pk", "primarykey", "eventid", "uid", "uuid", "key", "incidentid", "recordid", "objectid", "eventidcnty", "entityid", "featureid"],
     // Things that move: a stream of positions keyed by one of these is a set
     // of tracks, each record replacing that entity's last.
     contains: ["callsign", "mmsi", "icao", "imo", "registration", "tailnumber", "vesselid", "vehicleid", "trackid", "deviceid", "assetid", "unitid"],
@@ -511,6 +513,7 @@ export function interpretRecords(
         source,
         fields: record,
         ...(media.length > 0 ? { media } : {}),
+        ...(ownId ? { pk: ownId } : {}),
       });
       return;
     }
@@ -545,6 +548,7 @@ export function interpretRecords(
       fields: record,
       categoryValue,
       ...(media.length > 0 ? { media } : {}),
+      ...(ownId ? { pk: ownId } : {}),
     });
   });
 

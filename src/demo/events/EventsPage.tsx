@@ -92,6 +92,8 @@ import {
 import {
   SEVERITIES,
   generateEvents,
+  primaryKey,
+  severityRank,
   sortNewestFirst,
   type EventCategory,
   type MonitorEvent,
@@ -113,7 +115,11 @@ import {
 import { boundsOf, shapeBounds, type Bounds } from "./sources/geo";
 import type { MonitorArea } from "./sources/interpret";
 import { useEventSources } from "./sources/useEventSources";
-import { useWorkshopEventCategories, useWorkshopEventSources } from "@/workshopConfig";
+import {
+  useWorkshopEventCategories,
+  useWorkshopEventSources,
+  useWorkshopSelectedEvent,
+} from "@/workshopConfig";
 import {
   actionButton,
   dot,
@@ -323,6 +329,24 @@ function EventsPage(): React.ReactElement {
 
   const selectedEvent = selection?.kind === "event" ? eventsById.get(selection.id) ?? null : null;
   const selectedArea = selection?.kind === "area" ? areasById.get(selection.id) ?? null : null;
+  const selectedPk = selectedEvent
+    ? primaryKey(selectedEvent)
+    : selectedArea
+      ? primaryKey(selectedArea)
+      : undefined;
+
+  // Events (then areas) by the key the selected-event variable holds. The
+  // first wins where two sources share a key.
+  const byPk = useMemo(() => {
+    const map = new Map<string, { kind: "event"; item: MonitorEvent } | { kind: "area"; item: MonitorArea }>();
+    for (const item of events) {
+      if (!map.has(primaryKey(item))) {map.set(primaryKey(item), { kind: "event", item });}
+    }
+    for (const item of areas) {
+      if (!map.has(primaryKey(item))) {map.set(primaryKey(item), { kind: "area", item });}
+    }
+    return map;
+  }, [events, areas]);
 
   // Read at the moment a map is (re)built: the extensions are seeded with the
   // current data and the camera with the current view.
@@ -560,6 +584,76 @@ function EventsPage(): React.ReactElement {
       duration: 1600,
     });
   };
+
+  // ── The selected-event Workshop variable ─────────────────────────────────
+  //
+  // Both ways: a selection made here is written to it; a value set from the
+  // module selects that event. Our own writes come back as value changes, so
+  // a value is only acted on when it is new, and one we sent a moment ago
+  // (overtaken by a later selection) is ignored. A key whose event has not
+  // loaded yet waits for it.
+  const workshopSelection = useWorkshopSelectedEvent();
+  const lastSeenValue = useRef<string | undefined | null>(null);
+  const pendingPk = useRef<string | undefined>(undefined);
+  const recentlySent = useRef<Array<{ value: string | undefined; at: number }>>([]);
+
+  /** Filters that hide an event are relaxed, so a selection from outside shows. */
+  const reveal = (event: MonitorEvent) => {
+    setHidden((previous) => {
+      if (!previous.has(event.category)) {return previous;}
+      const next = new Set(previous);
+      next.delete(event.category);
+      return next;
+    });
+    if (severityRank(event.severity) < severityRank(minSeverity)) {setMinSeverity("low");}
+    if (windowMs != null && event.time != null && event.time < now - windowMs) {setWindowMs(null);}
+  };
+
+  // Incoming: declared before the outgoing effect, so a value waiting for
+  // its event is marked pending before anything could write over it.
+  useEffect(() => {
+    if (workshopSelection.status !== "ready") {return;}
+    const wanted = workshopSelection.value;
+    const isNew = wanted !== lastSeenValue.current;
+    lastSeenValue.current = wanted;
+    if (!isNew && pendingPk.current == null) {return;}
+    const echo = recentlySent.current.some(
+      (sent) => sent.value === wanted && Date.now() - sent.at < 3000,
+    );
+    if (wanted === selectedPk || (isNew && echo && wanted !== recentlySent.current.at(-1)?.value)) {
+      pendingPk.current = undefined;
+      return;
+    }
+    if (wanted == null) {
+      pendingPk.current = undefined;
+      setSelection(null);
+      return;
+    }
+    const target = byPk.get(wanted);
+    if (!target) {
+      pendingPk.current = wanted;
+      return;
+    }
+    pendingPk.current = undefined;
+    if (target.kind === "event") {
+      reveal(target.item);
+      flyTo(target.item);
+    } else {
+      setSelection({ kind: "area", id: target.item.id });
+      zoomToArea(target.item);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [workshopSelection.status, workshopSelection.value, byPk]);
+
+  // Outgoing.
+  useEffect(() => {
+    if (workshopSelection.status !== "ready" || pendingPk.current != null) {return;}
+    if (selectedPk === workshopSelection.value) {return;}
+    recentlySent.current = [...recentlySent.current.slice(-4), { value: selectedPk, at: Date.now() }];
+    lastSeenValue.current = selectedPk;
+    workshopSelection.set(selectedPk);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedPk, workshopSelection.status]);
 
   const toggleCategory = (category: EventCategory) => {
     setHidden((previous) => {

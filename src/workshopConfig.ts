@@ -38,6 +38,13 @@
  *                      into them by keyword or by hand. See
  *                      src/demo/events/categories.ts.
  *
+ *  selectedEvent     — string, both ways, read by the event monitor only: the
+ *                      primary key of the selected event (its source's id
+ *                      column; for mock events, "evt-0001"). Selecting an
+ *                      event writes it, closing the selection clears it, and
+ *                      a module that sets it selects that event and flies to
+ *                      it — as soon as it has loaded, if it has not yet.
+ *
  *  eventDatasetRids, eventMediaSetInputs, eventStreamRids
  *                    — string lists, read by the event monitor (/events) only.
  *                      The same shapes as the davebettermap widget's
@@ -148,6 +155,21 @@ export const ARTIFACT_SHELL_CONFIG = [
       },
     },
   },
+  {
+    fieldId: "selectedEvent",
+    field: {
+      type: "single" as const,
+      label: "selected-event",
+      helperText:
+        "Event monitor (/events): the primary key of the selected event — its " +
+        "source's id column. Written when someone selects an event, cleared " +
+        "when they close it; set it from the module to select that event.",
+      fieldValue: {
+        type: "inputOutput" as const,
+        variableType: { type: "string" as const },
+      },
+    },
+  },
 ] as const satisfies IConfigDefinition;
 
 export type ArtifactShellContext = IAsyncValue<
@@ -188,6 +210,11 @@ const STANDALONE: ArtifactShellContext = {
     eventMediaSetInputs: { fieldValue: { status: "LOADED", value: [] } },
     eventStreamRids: { fieldValue: { status: "LOADED", value: [] } },
     eventCategories: { fieldValue: { status: "LOADED", value: [] } },
+    selectedEvent: {
+      fieldValue: { status: "LOADED", value: undefined },
+      // Nobody to tell: writes go nowhere outside the provider.
+      setLoadedValue: () => undefined,
+    },
   },
 } as unknown as ArtifactShellContext;
 
@@ -301,4 +328,36 @@ export function resolveEventCategories(context: ArtifactShellContext): WorkshopE
 
 export function useWorkshopEventCategories(): WorkshopEventCategories {
   return resolveEventCategories(useContext(ShellWorkshopContext));
+}
+
+// ── Selected event ──────────────────────────────────────────────────────────
+
+export interface WorkshopSelectedEvent {
+  /** "pending" until an embedding Workshop has answered. */
+  status: "pending" | "ready";
+  /** The primary key the variable holds, or undefined when nothing is selected. */
+  value: string | undefined;
+}
+
+export function resolveSelectedEvent(context: ArtifactShellContext): WorkshopSelectedEvent {
+  if (context.status !== "LOADED" && context.status !== "RELOADING") {
+    return { status: context.status === "FAILED" ? "ready" : "pending", value: undefined };
+  }
+  const field = context.value.selectedEvent.fieldValue;
+  const value =
+    field.status === "LOADED" || field.status === "RELOADING" ? field.value : undefined;
+  return { status: "ready", value: typeof value === "string" && value !== "" ? value : undefined };
+}
+
+/** The variable, and a setter that writes it back to Workshop (undefined clears it). */
+export function useWorkshopSelectedEvent(): WorkshopSelectedEvent & {
+  set: (value: string | undefined) => void;
+} {
+  const context = useContext(ShellWorkshopContext);
+  const loaded = context.status === "LOADED" || context.status === "RELOADING";
+  const setter = loaded ? context.value.selectedEvent.setLoadedValue : undefined;
+  return {
+    ...resolveSelectedEvent(context),
+    set: (value) => setter?.(value === "" ? undefined : value),
+  };
 }

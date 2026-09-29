@@ -194,6 +194,10 @@ describe("an ACLED-style table", () => {
     expect(protest.severity).toBe("low");
   });
 
+  it("keeps the source's own primary key for the selected-event variable", () => {
+    expect(result.events.map((e) => e.pk)).toEqual(["UKR123", "UKR124"]);
+  });
+
   it("titles an event by what and where when there is no title column", () => {
     expect(result.events[0].title).toBe("Battles — Pokrovsk");
   });

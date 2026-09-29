@@ -70,6 +70,17 @@ export interface MonitorEvent {
   categoryValue?: string;
   /** Media items the record references, previewed in the details panel. */
   media?: MediaRef[];
+  /**
+   * The primary key as its source knows it — the value of its id column —
+   * for the Workshop selected-event variable. Absent when the source has no
+   * id column; `primaryKey()` then falls back to `id`.
+   */
+  pk?: string;
+}
+
+/** What the selected-event variable holds for an event or area. */
+export function primaryKey(item: { id: string; pk?: string }): string {
+  return item.pk ?? item.id;
 }
 
 interface Hotspot {
