@@ -503,6 +503,32 @@ describe("pattern images", () => {
     warn.mockRestore();
   });
 
+  it("supplies images through the resolver on maplibre-gl 6, where the event only reports", async () => {
+    // From 6 an image added from a styleimagemissing listener is too late for
+    // the tile that asked; the resolver is awaited instead. One per map, so it
+    // is handed back on detach.
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const extension = landusePatterns();
+    await extension.style?.(ctx);
+    const resolvers: Array<((id: string) => void | Promise<void>) | null> = [];
+    const { map, events } = stubMap({
+      setMissingStyleImageResolver: (resolver) => {
+        resolvers.push(resolver);
+        return undefined;
+      },
+    });
+    const dispose = extension.attach?.(map, ctx) as () => void;
+
+    expect(resolvers).toHaveLength(1);
+    expect(typeof resolvers[0]).toBe("function");
+    expect(events.styleimagemissing ?? []).toHaveLength(0);
+    // Not one of ours: ignored, not thrown on.
+    expect(() => resolvers[0]!("some-other-icon")).not.toThrow();
+    dispose();
+    expect(resolvers).toEqual([resolvers[0], null]);
+    warn.mockRestore();
+  });
+
   it("survives a map that cannot hold images", async () => {
     // No canvas in node, so nothing rasterises here either — the point is that
     // the extension attaches and tears down without throwing, leaving the

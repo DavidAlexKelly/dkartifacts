@@ -6,6 +6,9 @@
  */
 
 import type { Flavor } from "@protomaps/basemaps";
+// Type-only, so this module still loads without maplibre-gl. Named rather than
+// through the global `maplibregl` namespace, which maplibre-gl 6 no longer declares.
+import type { Map as MaplibreMap } from "maplibre-gl";
 
 import type { AssetStore } from "../core/assets";
 import { defaultStores } from "../core/defaults";
@@ -169,7 +172,7 @@ export interface UseBasemapOptions {
   onDrawChange?: (features: FeatureCollection) => void;
 
   /** Called once, after the map and the basemap are ready. */
-  onMapReady?: (map: maplibregl.Map, globe: BasemapHandle) => void;
+  onMapReady?: (map: MaplibreMap, globe: BasemapHandle) => void;
 }
 
 // ── Option resolution ───────────────────────────────────────────────────────

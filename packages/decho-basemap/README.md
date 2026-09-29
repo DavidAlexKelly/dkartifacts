@@ -555,8 +555,25 @@ whole whole-file path stops being used, with no code change.
 2. **Resources:** the tile and asset datasets must be added as Resources on the
    OAuth app in Developer Console. **The scopes alone return 403** — this is
    the single most common setup failure.
-3. **Peers:** `maplibre-gl@^5` (the protocol handler must receive an
+3. **Peers:** `maplibre-gl@^5 || ^6` (the protocol handler must receive an
    `AbortController`), `pmtiles@^4`, `@protomaps/basemaps@^5`.
+4. **On `maplibre-gl` 6, tell MapLibre where its worker is — once, in the app.**
+   6 is ESM-only and loads its worker from a separate file that bundlers do
+   not pick up on their own; without this the map stays blank with "Worker
+   failed to load" in the console. With Vite, at the top of the app's entry:
+
+   ```ts
+   import { setWorkerUrl } from "maplibre-gl";
+   import workerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
+
+   setWorkerUrl(workerUrl);
+   ```
+
+   `?worker&url`, not `?url`: the worker imports a shared chunk, and only the
+   worker pipeline bundles it in. Other bundlers:
+   [MapLibre's installation notes](https://maplibre.org/maplibre-gl-js/docs/#installation).
+   It is the app's to do rather than this package's because the import is
+   bundler-specific. On 5 there is nothing to set.
 
 ## Package notes
 

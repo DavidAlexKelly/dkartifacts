@@ -83,15 +83,19 @@ export const FONT_ITALIC = ["Noto Sans Italic"];
 
 // ── Protocol handlers ───────────────────────────────────────────────────────
 
+// Methods, not function-typed properties: TypeScript checks method parameters
+// bivariantly, so maplibre-gl 6 — whose addProtocol wants a handler returning
+// its own AddProtocolResponseData rather than unknown — satisfies this as
+// well as 5 does.
 export interface MaplibreLike {
-  addProtocol: (
+  addProtocol(
     name: string,
     handler: (
       params: { url: string },
       abortController?: AbortController,
     ) => Promise<{ data: unknown }>,
-  ) => void;
-  removeProtocol: (name: string) => void;
+  ): void;
+  removeProtocol(name: string): void;
 }
 
 function pathFromUrl(url: string, protocol: string, prefix: string): string {
