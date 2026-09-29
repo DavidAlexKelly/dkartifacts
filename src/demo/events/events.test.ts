@@ -134,6 +134,19 @@ describe("the extension", () => {
     expect(categoryColour(registry)).toEqual(point.paint["circle-color"]);
   });
 
+  it("takes its cluster radius from the options", async () => {
+    const contribution = await eventsExtension(events, undefined, { clusterRadius: 80 }).style!(ctx);
+    expect(contribution.sources![EVENTS_SOURCE].clusterRadius).toBe(80);
+  });
+
+  it("draws every event on its own when clustering is off", async () => {
+    const contribution = await eventsExtension(events, undefined, { cluster: false }).style!(ctx);
+    const source = contribution.sources![EVENTS_SOURCE];
+    expect(source.cluster).toBeUndefined();
+    expect(source.clusterProperties).toBeUndefined();
+    expect(source.data.features).toHaveLength(events.length);
+  });
+
   it("draws on top rather than under the labels", async () => {
     const contribution = await eventsExtension(events).style!(ctx);
     expect(contribution.before).toBeUndefined();

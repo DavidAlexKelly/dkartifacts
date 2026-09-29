@@ -323,9 +323,17 @@ export function eventLayers(registry: CategoryRegistry = BUILTIN_REGISTRY): any[
  * The extension. `initial` seeds the source; later changes go through
  * `setEventData` so the map is not rebuilt every time a filter moves.
  */
+export interface ClusterOptions {
+  /** Off: every event drawn on its own at every zoom. */
+  cluster?: boolean;
+  /** Screen pixels within which events merge. */
+  clusterRadius?: number;
+}
+
 export function eventsExtension(
   initial: readonly MonitorEvent[],
   registry: CategoryRegistry = BUILTIN_REGISTRY,
+  { cluster = true, clusterRadius = 50 }: ClusterOptions = {},
 ): BasemapExtension {
   return {
     id: "events",
@@ -334,10 +342,15 @@ export function eventsExtension(
         [EVENTS_SOURCE]: {
           type: "geojson",
           data: toFeatureCollection(initial),
-          cluster: true,
-          clusterRadius: 50,
-          clusterMaxZoom: CLUSTER_MAX_ZOOM,
-          clusterProperties: clusterProperties(),
+          // Unclustered, the cluster layers simply have nothing to draw.
+          ...(cluster
+            ? {
+                cluster: true,
+                clusterRadius,
+                clusterMaxZoom: CLUSTER_MAX_ZOOM,
+                clusterProperties: clusterProperties(),
+              }
+            : {}),
         },
       },
       // No `before`: events draw over everything, labels included, because

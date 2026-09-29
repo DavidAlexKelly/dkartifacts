@@ -9,9 +9,11 @@
  */
 
 import { describe, expect, it } from "vitest";
+import { DEFAULT_APPEARANCE, spritePathFrom } from "@/demo/events/appearance";
 import {
   ARTIFACT_SHELL_CONFIG,
   resolveArtifactSwitching,
+  resolveEventAppearance,
   resolveEventCategories,
   resolveEventSources,
   resolveSelectedEvent,
@@ -40,6 +42,19 @@ describe("the Workshop config", () => {
       ["eventStreamRids", "event-monitor-stream-rids"],
       ["eventCategories", "event-monitor-categories"],
       ["selectedEvent", "selected-event"],
+      ["eventSpriteSet", "event-monitor-sprite-set"],
+      ["eventStartLatitude", "event-monitor-start-latitude"],
+      ["eventStartLongitude", "event-monitor-start-longitude"],
+      ["eventStartZoom", "event-monitor-start-zoom"],
+      ["eventGlobe", "event-monitor-globe"],
+      ["eventTerrain", "event-monitor-terrain"],
+      ["eventFitToDataOnLoad", "event-monitor-fit-to-data-on-load"],
+      ["eventClustering", "event-monitor-clustering"],
+      ["eventClusterRadius", "event-monitor-cluster-radius"],
+      ["eventShowSettings", "event-monitor-show-settings"],
+      ["eventAllowSourceEditing", "event-monitor-allow-source-editing"],
+      ["eventAllowCategoryEditing", "event-monitor-allow-category-editing"],
+      ["eventFeedLength", "event-monitor-feed-length"],
     ]);
   });
 
@@ -204,5 +219,108 @@ describe("the selected-event variable", () => {
 
   it("is pending until Workshop answers", () => {
     expect(resolveSelectedEvent({ status: "LOADING" })).toEqual({ status: "pending", value: undefined });
+  });
+});
+
+describe("the look-and-feel variables", () => {
+  /** A loaded context with just these fields set; the rest read as unset. */
+  const withLook = (values: Record<string, unknown>): ArtifactShellContext => {
+    const fields: Record<string, unknown> = {};
+    for (const { fieldId } of ARTIFACT_SHELL_CONFIG) {
+      fields[fieldId] = { fieldValue: { status: "LOADED", value: values[fieldId] } };
+    }
+    return { status: "LOADED", value: fields } as unknown as ArtifactShellContext;
+  };
+
+  it("declare today's look as their defaults", () => {
+    const defaults = Object.fromEntries(
+      ARTIFACT_SHELL_CONFIG.map((f) => [
+        f.fieldId,
+        (f.field.fieldValue.variableType as { defaultValue?: unknown }).defaultValue,
+      ]),
+    );
+    expect(resolveEventAppearance(withLook(defaults))).toEqual({
+      status: "ready",
+      appearance: DEFAULT_APPEARANCE,
+      invalid: [],
+    });
+  });
+
+  it("fall back to the defaults when unset", () => {
+    expect(resolveEventAppearance(withLook({})).appearance).toEqual(DEFAULT_APPEARANCE);
+  });
+
+  it("wait for Workshop, and give up waiting on a failed config", () => {
+    expect(resolveEventAppearance({ status: "LOADING" } as ArtifactShellContext).status).toBe("pending");
+    expect(resolveEventAppearance({ status: "FAILED" } as ArtifactShellContext)).toEqual({
+      status: "ready",
+      appearance: DEFAULT_APPEARANCE,
+      invalid: [],
+    });
+  });
+
+  it("take what a module sets", () => {
+    const { appearance, invalid } = resolveEventAppearance(
+      withLook({
+        eventSpriteSet: "dark",
+        eventStartLatitude: 51.5,
+        eventStartLongitude: -0.12,
+        eventStartZoom: 9,
+        eventGlobe: false,
+        eventTerrain: false,
+        eventFitToDataOnLoad: true,
+        eventClustering: false,
+        eventClusterRadius: 80.4,
+        eventShowSettings: false,
+        eventAllowSourceEditing: false,
+        eventAllowCategoryEditing: false,
+        eventFeedLength: 0,
+      }),
+    );
+    expect(invalid).toEqual([]);
+    expect(appearance).toEqual({
+      spritePath: "sprites/dark",
+      startView: { lat: 51.5, lon: -0.12, zoom: 9 },
+      globe: false,
+      terrain: false,
+      fitToDataOnLoad: true,
+      clustering: false,
+      clusterRadius: 80,
+      showSettings: false,
+      allowSourceEditing: false,
+      allowCategoryEditing: false,
+      feedLength: 0,
+    });
+  });
+
+  it("report numbers out of range and use the default instead", () => {
+    const { appearance, invalid } = resolveEventAppearance(
+      withLook({ eventStartLatitude: 120, eventStartZoom: -1, eventFeedLength: 9000 }),
+    );
+    expect(appearance.startView).toEqual(DEFAULT_APPEARANCE.startView);
+    expect(appearance.feedLength).toBe(DEFAULT_APPEARANCE.feedLength);
+    expect(invalid.map((problem) => [problem.variable, problem.entry])).toEqual([
+      ["event-monitor-start-latitude", "120"],
+      ["event-monitor-start-zoom", "-1"],
+      ["event-monitor-feed-length", "9000"],
+    ]);
+  });
+
+  it("read a sprite set by name or by path", () => {
+    expect(spritePathFrom("dark")).toBe("sprites/dark");
+    expect(spritePathFrom(" /sprites/light/ ")).toBe("sprites/light");
+    expect(spritePathFrom("icons/custom")).toBe("icons/custom");
+    expect(spritePathFrom("  ")).toBeNull();
+    expect(resolveEventAppearance(withLook({ eventSpriteSet: "" })).appearance.spritePath).toBe("sprites/light");
+  });
+});
+
+describe("a Workshop that leaves the look-and-feel fields out", () => {
+  it("reads them as unset rather than failing", () => {
+    const context = {
+      status: "LOADED",
+      value: { selectedEvent: { fieldValue: { status: "LOADED", value: undefined } } },
+    } as unknown as ArtifactShellContext;
+    expect(resolveEventAppearance(context).appearance).toEqual(DEFAULT_APPEARANCE);
   });
 });

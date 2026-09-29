@@ -1,5 +1,5 @@
 /**
- * The right-hand details panel: one for an event, one for an area.
+ * The details panel: one for an event, one for an area.
  *
  * Both end with the record exactly as its source had it, collapsed by
  * default. The interpreted view above it is a guess about unknown columns,
@@ -40,6 +40,8 @@ export interface CategoryChoice {
   /** The category it gets without that choice: the data's, or a source setting's. */
   automatic: string;
   onChange: (category: string | undefined) => void;
+  /** False: the category is shown, not chosen. */
+  editable?: boolean;
 }
 
 export function EventDetails({
@@ -186,7 +188,8 @@ function MediaSection({ media }: { media: MediaRef[] }): React.ReactElement {
 
 /** "Automatic (what it would be)", then every category. */
 function CategoryPicker({ choice }: { choice: CategoryChoice }): React.ReactElement {
-  const { registry, chosen, automatic, onChange } = choice;
+  const { registry, chosen, automatic, onChange, editable = true } = choice;
+  if (!editable) {return <span>{categoryMeta(registry, chosen ?? automatic).label}</span>;}
   return (
     <select
       value={chosen ?? ""}
