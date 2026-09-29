@@ -24,8 +24,8 @@
  * import, so a caller with a different map library can still use it.
  */
 
-import { cellsInBounds, type CellCoord } from "../core/grid";
-import type { GraphSource } from "../core/graphSource";
+import { cellsInBounds, type CellCoord } from "../core/grid.js";
+import type { GraphSource } from "../core/graphSource.js";
 
 /** The slice of maplibregl.Map this module uses. */
 export interface PrefetchableMap {

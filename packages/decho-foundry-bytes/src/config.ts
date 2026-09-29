@@ -28,7 +28,7 @@
 
 import type { PlatformClient } from "@osdk/client";
 
-import { FoundryNotConfiguredError } from "./errors";
+import { FoundryNotConfiguredError } from "./errors.js";
 
 export interface FoundryAccess {
   /** Foundry host, e.g. "https://acme.palantirfoundry.com". */

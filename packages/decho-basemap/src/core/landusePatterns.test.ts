@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   landusePatterns,
   patternExpression,
-} from "./landusePatterns";
+} from "./landusePatterns.js";
 import {
   NATURAL_GROUND,
   SLOTS_PER_TEXTURE,
@@ -18,13 +18,13 @@ import {
   wrappedPlacements,
   type LandTexture,
   type TexturePlacement,
-} from "./textures";
-import { going } from "./overlays";
+} from "./textures.js";
+import { going } from "./overlays.js";
 import {
   mergeExtensionStyle,
   type ExtensionContext,
   type ExtensionMap,
-} from "./extensions";
+} from "./extensions.js";
 
 const ctx: ExtensionContext = {
   maplibregl: { addProtocol: () => undefined, removeProtocol: () => undefined },

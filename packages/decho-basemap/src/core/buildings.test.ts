@@ -7,8 +7,8 @@ import {
   buildings3d,
   describeBuildingCoverage,
   type QueryableMap,
-} from "./buildings";
-import { mergeExtensionStyle, type ExtensionContext, type ExtensionMap } from "./extensions";
+} from "./buildings.js";
+import { mergeExtensionStyle, type ExtensionContext, type ExtensionMap } from "./extensions.js";
 
 const ctx: ExtensionContext = {
   maplibregl: { addProtocol: () => undefined, removeProtocol: () => undefined },

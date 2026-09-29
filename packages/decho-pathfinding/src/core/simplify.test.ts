@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { haversineM } from "./geo";
-import { simplifyPath, type Waypoint } from "./simplify";
+import { haversineM } from "./geo.js";
+import { simplifyPath, type Waypoint } from "./simplify.js";
 
 describe("simplifying a path", () => {
   it("collapses a straight line to its endpoints", () => {

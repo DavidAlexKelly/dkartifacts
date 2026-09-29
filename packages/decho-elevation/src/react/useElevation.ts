@@ -20,13 +20,13 @@ import {
   createDemSource,
   type DemSourceHandle,
   type DemSourceOptions,
-} from "../core/demSource";
+} from "../core/demSource.js";
 import {
   elevationProfile,
   type ElevationProfile,
   type GeoPoint,
   type ProfileOptions,
-} from "../core/profile";
+} from "../core/profile.js";
 import {
   lineOfSight,
   viewshed,
@@ -34,7 +34,7 @@ import {
   type SightResult,
   type Viewshed,
   type ViewshedOptions,
-} from "../core/lineOfSight";
+} from "../core/lineOfSight.js";
 
 export interface UseElevationOptions extends DemSourceOptions {
   /** An existing source to use instead of creating one. */

@@ -20,4 +20,4 @@
  *   import { DechoBasemap }       from "@acc/decho-basemap/react";
  */
 
-export * from "./core";
+export * from "./core/index.js";

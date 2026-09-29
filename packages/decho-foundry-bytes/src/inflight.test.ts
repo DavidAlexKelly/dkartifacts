@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { createInFlightMap } from "./inflight";
+import { createInFlightMap } from "./inflight.js";
 
 /** A promise plus the levers to settle it, and the signal it was started with. */
 function deferred<T>() {

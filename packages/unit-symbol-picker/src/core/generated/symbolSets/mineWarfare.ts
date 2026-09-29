@@ -6,7 +6,7 @@
  * Regenerate: npm run generate   (from packages/unit-symbol-picker)
  */
 
-import type { SymbolSetTable } from "../types";
+import type { SymbolSetTable } from "../types.js";
 
 export const MINE_WARFARE: SymbolSetTable = {
   code: "36",

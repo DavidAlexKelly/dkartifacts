@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { createResidentCache } from "./lru";
+import { createResidentCache } from "./lru.js";
 
 const buf = (bytes: number) => new ArrayBuffer(bytes);
 

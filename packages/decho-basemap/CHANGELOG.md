@@ -21,6 +21,20 @@ renamed to the new version number at release time.
 
 ## Unreleased
 
+### Fixed
+
+- `dist` now loads under Node's own ES module loader, not only under a
+  bundler. It used to contain extensionless and directory imports
+  (`export * from "./core"`), which Vite and esbuild resolve but Node rejects
+  with "Directory import … is not supported" — hit wherever a consumer's code
+  runs through Node rather than a bundler, Vitest included (it hands
+  `node_modules` to Node). Every relative import now names its file
+  (`./core/index.js`), and the build uses `NodeNext` resolution so the compiler
+  refuses an extensionless one from now on.
+- Note for tests: `./react` imports MapLibre's stylesheet, which Node cannot
+  load. A Vitest suite that imports it needs the package processed by Vite —
+  `test.server.deps.inline: [/@acc\//]` — or `maplibre-gl` mocked.
+
 ### Added
 
 - Supports `maplibre-gl` 6 as well as 5: the peer is now `^5.0.0 || ^6.0.0`.

@@ -14,7 +14,7 @@ import {
   neighbourCell,
   parseCellKey,
   type CellGrid,
-} from "./grid";
+} from "./grid.js";
 
 /** The cut both the pathfinding chunks and the basemap's z12 layer use. */
 const GRID: CellGrid = { originLon: -180, originLat: 85, cellDeg: 2 };

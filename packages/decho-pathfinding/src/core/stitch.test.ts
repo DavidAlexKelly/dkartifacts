@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { buildSyntheticCell } from "../testing/fixtures";
-import { createLoadedCell } from "./cell";
-import { parseCellGraph } from "./format";
-import { haversineM } from "./geo";
-import { SIDE_EAST, SIDE_SOUTH, type CellGrid } from "./grid";
-import { stitchCells } from "./stitch";
+import { buildSyntheticCell } from "../testing/fixtures.js";
+import { createLoadedCell } from "./cell.js";
+import { parseCellGraph } from "./format.js";
+import { haversineM } from "./geo.js";
+import { SIDE_EAST, SIDE_SOUTH, type CellGrid } from "./grid.js";
+import { stitchCells } from "./stitch.js";
 
 const GRID: CellGrid = { originLon: -180, originLat: 85, cellDeg: 2 };
 

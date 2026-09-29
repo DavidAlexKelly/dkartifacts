@@ -11,9 +11,9 @@ import {
   createGraphSource,
   type GraphSource,
   type GraphSourceOptions,
-} from "./graphSource";
-import { findRoute, type GeoPoint, type RouteOptions, type RouteResult } from "./route";
-import type { VehicleProfile } from "./profiles";
+} from "./graphSource.js";
+import { findRoute, type GeoPoint, type RouteOptions, type RouteResult } from "./route.js";
+import type { VehicleProfile } from "./profiles.js";
 
 export interface PathfinderOptions extends GraphSourceOptions {
   /** Applied to every route that does not name its own. */

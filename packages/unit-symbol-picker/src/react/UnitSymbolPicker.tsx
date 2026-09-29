@@ -39,7 +39,7 @@ import {
   withField,
   type LegacyLookup,
   type Sidc,
-} from "../core/sidc";
+} from "../core/sidc.js";
 import {
   COMMON_LAND_ICONS,
   CONTEXTS,
@@ -50,8 +50,8 @@ import {
   MOBILITIES,
   STATUSES,
   SYMBOL_SETS,
-} from "../core/fields";
-import { iconLevels, type HierarchicalSidcOption } from "../core/iconLevels";
+} from "../core/fields.js";
+import { iconLevels, type HierarchicalSidcOption } from "../core/iconLevels.js";
 
 export interface UnitSymbolPickerProps {
   /** Controlled value. Omit for uncontrolled use. */

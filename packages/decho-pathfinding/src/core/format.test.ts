@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { buildSyntheticCell } from "../testing/fixtures";
-import { MalformedGraphError } from "./errors";
-import { parseCellGraph } from "./format";
-import { haversineM } from "./geo";
-import type { CellGrid } from "./grid";
+import { buildSyntheticCell } from "../testing/fixtures.js";
+import { MalformedGraphError } from "./errors.js";
+import { parseCellGraph } from "./format.js";
+import { haversineM } from "./geo.js";
+import type { CellGrid } from "./grid.js";
 
 const GRID: CellGrid = { originLon: -180, originLat: 85, cellDeg: 2 };
 

@@ -73,8 +73,8 @@ import type {
   ExtensionContext,
   ExtensionMap,
   StyleContribution,
-} from "./extensions";
-import type { OverlayExtension, OverlayOptions } from "./overlays";
+} from "./extensions.js";
+import type { OverlayExtension, OverlayOptions } from "./overlays.js";
 import {
   NATURAL_GROUND,
   TEXTURE_COLOURS,
@@ -86,7 +86,7 @@ import {
   type LandTexture,
   type TextureIcon,
   type TexturePlacement,
-} from "./textures";
+} from "./textures.js";
 
 // Layer specifications are `any` for the reason StyleFragment.sources is: core
 // does not import maplibre-gl, so it cannot name LayerSpecification, and

@@ -32,9 +32,9 @@
  * better than quietly implying a canopy has been accounted for.
  */
 
-import type { HeightSampler } from "./demSource";
-import { distanceMetres, EARTH_RADIUS_M } from "./grid";
-import { degreesForMetres, sampleAlong, type GeoPoint } from "./profile";
+import type { HeightSampler } from "./demSource.js";
+import { distanceMetres, EARTH_RADIUS_M } from "./grid.js";
+import { degreesForMetres, sampleAlong, type GeoPoint } from "./profile.js";
 
 /** Coefficient of refraction. 0.13 is the standard temperate-atmosphere value. */
 export const REFRACTION_K = 0.13;

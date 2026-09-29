@@ -6,8 +6,8 @@ import {
   metresPerPixel,
   resampleTile,
   tileBounds,
-} from "./mercator";
-import { encodePng, crc32 } from "./png";
+} from "./mercator.js";
+import { encodePng, crc32 } from "./png.js";
 import {
   CONTOUR_COLOUR,
   DEFAULT_NEUTRAL_SHADE,
@@ -21,8 +21,8 @@ import {
   slopeTile,
   terrariumTile,
   type TileFrame,
-} from "./renderers";
-import { decodeTerrarium, writeTerrarium } from "./terrarium";
+} from "./renderers.js";
+import { decodeTerrarium, writeTerrarium } from "./terrarium.js";
 
 describe("mercator", () => {
   it("puts tile 0/0/0 around the whole world", () => {

@@ -17,10 +17,10 @@ import {
   smallestGap,
   snapIndexInterval,
   widthByZoom,
-} from "./contourTiles";
-import { CONTOUR_LADDER } from "../core/renderers";
-import { cellKey } from "../core/grid";
-import type { ContourStore } from "../core/defaults";
+} from "./contourTiles.js";
+import { CONTOUR_LADDER } from "../core/renderers.js";
+import { cellKey } from "../core/grid.js";
+import type { ContourStore } from "../core/defaults.js";
 
 const store: ContourStore = {
   datasetRid: "ri.foundry.main.dataset.test",

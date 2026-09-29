@@ -44,7 +44,7 @@
  * basemap works; one broken add-on should cost its own feature, not the map.
  */
 
-import type { MaplibreLike } from "./assets";
+import type { MaplibreLike } from "./assets.js";
 
 /* eslint-disable @typescript-eslint/no-explicit-any --
    Layer, source, terrain and sky specifications are `any` for exactly the

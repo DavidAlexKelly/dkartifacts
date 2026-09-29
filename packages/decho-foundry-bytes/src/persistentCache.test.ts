@@ -6,7 +6,7 @@ import {
   selectVictims,
   type CacheEntryMeta,
   type KeyValueStore,
-} from "./persistentCache";
+} from "./persistentCache.js";
 
 const MB = 1024 * 1024;
 

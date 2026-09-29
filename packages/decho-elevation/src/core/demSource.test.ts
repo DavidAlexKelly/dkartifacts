@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { cellBounds, cellKey, type CellGrid } from "./grid";
-import type { DemStore } from "./store";
-import { writeTiff } from "./testing/tiff";
+import { cellBounds, cellKey, type CellGrid } from "./grid.js";
+import type { DemStore } from "./store.js";
+import { writeTiff } from "./testing/tiff.js";
 
-vi.mock("./bytes", () => ({
+vi.mock("./bytes.js", () => ({
   getFileOptional: vi.fn(),
   settleRangeMode: vi.fn(() => Promise.resolve("whole-file")),
   isConfigured: vi.fn(() => true),
@@ -17,12 +17,12 @@ vi.mock("./bytes", () => ({
   })),
 }));
 
-import { getFileOptional, getLaneStats } from "./bytes";
+import { getFileOptional, getLaneStats } from "./bytes.js";
 import {
   DEFAULT_MIN_ZOOM,
   createDemSource,
   type ProtocolHost,
-} from "./demSource";
+} from "./demSource.js";
 
 const mockedGet = vi.mocked(getFileOptional);
 

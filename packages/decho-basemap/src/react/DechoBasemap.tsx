@@ -30,7 +30,7 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import {
   useBasemap,
   type UseBasemapOptions,
-} from "./useBasemap";
+} from "./useBasemap.js";
 import {
   ClearIcon,
   LineIcon,
@@ -39,16 +39,16 @@ import {
   RectangleIcon,
   RemoveIcon,
   SelectIcon,
-} from "./DrawingIcons";
-import { MapToolbarButton } from "./MapToolbarButton";
+} from "./DrawingIcons.js";
+import { MapToolbarButton } from "./MapToolbarButton.js";
 import {
   DEFAULT_SURFACE_THEME,
   toolbarSeparator,
   toolbarSurface,
   type SurfaceTheme,
-} from "./theme";
-import type { DrawMode, DrawingToolsState } from "./useDrawingTools";
-import type { BasemapHandle } from "../core/basemap";
+} from "./theme.js";
+import type { DrawMode, DrawingToolsState } from "./useDrawingTools.js";
+import type { BasemapHandle } from "../core/basemap.js";
 
 export interface DechoBasemapProps extends UseBasemapOptions {
   className?: string;

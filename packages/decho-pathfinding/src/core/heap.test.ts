@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { createMinHeap } from "./heap";
+import { createMinHeap } from "./heap.js";
 
 describe("the open-set heap", () => {
   it("pops in key order", () => {

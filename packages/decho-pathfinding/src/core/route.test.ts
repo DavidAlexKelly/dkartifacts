@@ -19,10 +19,10 @@ import {
   buildSyntheticCell,
   syntheticDataset,
   type SyntheticCellSpec,
-} from "../testing/fixtures";
-import type { CellGrid } from "./grid";
+} from "../testing/fixtures.js";
+import type { CellGrid } from "./grid.js";
 // Type-only, so it is erased and cannot pull ./route in ahead of the mock.
-import type { RouteOptions } from "./route";
+import type { RouteOptions } from "./route.js";
 
 /**
  * Hoisted so the vi.mock factory can reach it — the factory is lifted above the
@@ -56,10 +56,10 @@ function abort(): Error {
 }
 
 // Imported after the mock is declared; vitest hoists vi.mock above these.
-const { createGraphSource } = await import("./graphSource");
-const { findRoute } = await import("./route");
-const { NoGraphDataError, NoRouteError } = await import("./errors");
-const { TERRAIN_OPEN, TERRAIN_ROAD } = await import("./profiles");
+const { createGraphSource } = await import("./graphSource.js");
+const { findRoute } = await import("./route.js");
+const { NoGraphDataError, NoRouteError } = await import("./errors.js");
+const { TERRAIN_OPEN, TERRAIN_ROAD } = await import("./profiles.js");
 
 const GRID: CellGrid = { originLon: -180, originLat: 85, cellDeg: 2 };
 const STORE = {

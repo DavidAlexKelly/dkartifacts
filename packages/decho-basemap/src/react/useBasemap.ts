@@ -19,22 +19,22 @@ import * as maplibregl from "maplibre-gl";
 import { layers as protomapsLayers, namedFlavor } from "@protomaps/basemaps";
 
 
-import { createBasemap, type BasemapHandle } from "../core/basemap";
+import { createBasemap, type BasemapHandle } from "../core/basemap.js";
 import {
   attachExtensions,
   collectStyleContributions,
   mergeExtensionStyle,
   type ExtensionContext,
   type ExtensionMap,
-} from "../core/extensions";
-import { whenStyleLoaded } from "../core/styleReady";
-import { useDrawingTools, type DrawingToolsState } from "./useDrawingTools";
+} from "../core/extensions.js";
+import { whenStyleLoaded } from "../core/styleReady.js";
+import { useDrawingTools, type DrawingToolsState } from "./useDrawingTools.js";
 import {
   resolveAssetStore,
   resolveTileStore,
   resolveView,
   type UseBasemapOptions,
-} from "./options";
+} from "./options.js";
 
 export type { UseBasemapOptions };
 export { resolveAssetStore, resolveTileStore, resolveView };

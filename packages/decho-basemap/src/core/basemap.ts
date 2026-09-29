@@ -14,13 +14,13 @@ import {
   unregisterAssetProtocols,
   type AssetStore,
   type MaplibreLike,
-} from "./assets";
+} from "./assets.js";
 import {
   createTileSource,
   type StatusListener,
   type TileSourceHandle,
-} from "./tileSource";
-import type { TileStore } from "./stores";
+} from "./tileSource.js";
+import type { TileStore } from "./stores.js";
 
 export interface BasemapOptions {
   tiles: TileStore;

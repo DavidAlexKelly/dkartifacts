@@ -58,7 +58,7 @@ import {
   createDemSource,
   type DemSourceHandle,
   type DemSourceOptions,
-} from "../core/demSource";
+} from "../core/demSource.js";
 import {
   contourTile,
   hypsometricTile,
@@ -68,7 +68,7 @@ import {
   type ContourOptions,
   type SlopeClass,
   type TileRenderer,
-} from "../core/renderers";
+} from "../core/renderers.js";
 
 export {
   contourTiles,
@@ -80,13 +80,13 @@ export {
   widthByZoom,
   type ContourTilesExtension,
   type ContourTilesOptions,
-} from "./contourTiles";
+} from "./contourTiles.js";
 
 export {
   hillshadeTiles,
   type HillshadeTilesExtension,
   type HillshadeTilesOptions,
-} from "./hillshadeTiles";
+} from "./hillshadeTiles.js";
 
 export interface HillshadeOptions {
   /** 0-1. MapLibre's own default is 0.5; 0.35 sits better under labels. */

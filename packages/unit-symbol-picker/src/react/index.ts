@@ -1,3 +1,3 @@
-export { UnitSymbolPicker, type UnitSymbolPickerProps } from "./UnitSymbolPicker";
-export type { Sidc } from "../core/sidc";
-export type { SidcOption } from "../core/fields";
+export { UnitSymbolPicker, type UnitSymbolPickerProps } from "./UnitSymbolPicker.js";
+export type { Sidc } from "../core/sidc.js";
+export type { SidcOption } from "../core/fields.js";

@@ -16,13 +16,13 @@
  * hundred KB against a graph of a few MB.
  */
 
-import type { CellGraph } from "./format";
+import type { CellGraph } from "./format.js";
 import {
   haversineM,
   metresPerLatDegree,
   metresPerLonDegree,
-} from "./geo";
-import { SIDES, SIDE_EAST, SIDE_NORTH, SIDE_SOUTH, SIDE_WEST, type Side } from "./grid";
+} from "./geo.js";
+import { SIDES, SIDE_EAST, SIDE_NORTH, SIDE_SOUTH, SIDE_WEST, type Side } from "./grid.js";
 
 /** Widest bucket grid per axis. Bounds memory on a cell with a tiny spacing. */
 const MAX_BUCKETS_PER_AXIS = 256;

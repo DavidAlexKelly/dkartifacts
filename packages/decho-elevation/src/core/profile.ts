@@ -17,8 +17,8 @@
  * loop is then pure arithmetic.
  */
 
-import { distanceMetres, metresPerDegreeLon, METRES_PER_DEGREE_LAT } from "./grid";
-import type { HeightSampler } from "./demSource";
+import { distanceMetres, metresPerDegreeLon, METRES_PER_DEGREE_LAT } from "./grid.js";
+import type { HeightSampler } from "./demSource.js";
 
 export interface GeoPoint {
   lon: number;

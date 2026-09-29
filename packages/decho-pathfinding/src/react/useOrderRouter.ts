@@ -17,9 +17,9 @@ import {
   createOrderRouter,
   type OrderRouterLike,
   type OrderRouterOptions,
-} from "../core/orderRouter";
-import type { Pathfinder, PathfinderOptions } from "../core/pathfinder";
-import { createPathfinder } from "../core/pathfinder";
+} from "../core/orderRouter.js";
+import type { Pathfinder, PathfinderOptions } from "../core/pathfinder.js";
+import { createPathfinder } from "../core/pathfinder.js";
 
 export interface UseOrderRouterOptions extends OrderRouterOptions {
   /**

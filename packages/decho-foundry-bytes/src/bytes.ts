@@ -51,10 +51,10 @@
 import { Branches } from "@osdk/foundry.datasets";
 import { MediaSets } from "@osdk/foundry.mediasets";
 
-import { access, foundryOrigin } from "./config";
-import { createResidentCache } from "./lru";
-import { createBrowserPersistentCache } from "./persistentCache";
-import { createInFlightMap, abortError } from "./inflight";
+import { access, foundryOrigin } from "./config.js";
+import { createResidentCache } from "./lru.js";
+import { createBrowserPersistentCache } from "./persistentCache.js";
+import { createInFlightMap, abortError } from "./inflight.js";
 import {
   LARGE_LANE_LIMIT,
   SMALL_LANE_LIMIT,
@@ -62,11 +62,11 @@ import {
   isLargeFilePath,
   type Lane,
   type LaneStats,
-} from "./lanes";
+} from "./lanes.js";
 import {
   FoundryMalformedRequestError,
   errorForResponse,
-} from "./errors";
+} from "./errors.js";
 
 // ── Tuning ──────────────────────────────────────────────────────────────────
 

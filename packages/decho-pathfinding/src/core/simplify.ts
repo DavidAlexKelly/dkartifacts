@@ -18,7 +18,7 @@
  * input (a nearly straight line), which is also the most common one.
  */
 
-import { metresPerLatDegree, metresPerLonDegree } from "./geo";
+import { metresPerLatDegree, metresPerLonDegree } from "./geo.js";
 
 /** Waypoints are [lat, lon] — the shape @acc/app6d/orders' OrderRoute uses. */
 export type Waypoint = [number, number];

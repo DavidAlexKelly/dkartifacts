@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { decodeGeoTiff } from "./geotiff";
-import type { CellBounds } from "./grid";
-import { sampleHeight } from "./heightGrid";
-import { writeTiff } from "./testing/tiff";
+import { decodeGeoTiff } from "./geotiff.js";
+import type { CellBounds } from "./grid.js";
+import { sampleHeight } from "./heightGrid.js";
+import { writeTiff } from "./testing/tiff.js";
 
 /** c000_r006's real extent, from the pathfinding chunk's own meta.json. */
 const BOUNDS: CellBounds = { west: -180, south: 71, east: -178, north: 73 };

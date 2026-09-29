@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import { describeOverlayLayers, describeSourceLayer } from "./census";
-import type { QueryableMap } from "./buildings";
-import { mergeExtensionStyle, type ExtensionContext, type ExtensionMap } from "./extensions";
-import { chokePoints, going, wetGaps, type OverlayExtension } from "./overlays";
+import { describeOverlayLayers, describeSourceLayer } from "./census.js";
+import type { QueryableMap } from "./buildings.js";
+import { mergeExtensionStyle, type ExtensionContext, type ExtensionMap } from "./extensions.js";
+import { chokePoints, going, wetGaps, type OverlayExtension } from "./overlays.js";
 
 const ctx: ExtensionContext = {
   maplibregl: { addProtocol: () => undefined, removeProtocol: () => undefined },

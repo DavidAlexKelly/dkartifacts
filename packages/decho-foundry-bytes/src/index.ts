@@ -33,7 +33,7 @@ export {
   access,
   foundryOrigin,
   type FoundryAccess,
-} from "./config";
+} from "./config.js";
 
 export {
   clearFileCache,
@@ -54,7 +54,7 @@ export {
   registerCacheSizeSource,
   settleRangeMode,
   type RangeMode,
-} from "./bytes";
+} from "./bytes.js";
 
 export {
   LARGE_LANE_LIMIT,
@@ -63,9 +63,9 @@ export {
   isLargeFilePath,
   type Lane,
   type LaneStats,
-} from "./lanes";
+} from "./lanes.js";
 
-export { createResidentCache, type ResidentCache } from "./lru";
+export { createResidentCache, type ResidentCache } from "./lru.js";
 
 export {
   createBrowserPersistentCache,
@@ -78,9 +78,9 @@ export {
   type CacheStats,
   type PersistentCache,
   type PersistentCacheOptions,
-} from "./persistentCache";
+} from "./persistentCache.js";
 
-export { abortError, createInFlightMap, type InFlightMap } from "./inflight";
+export { abortError, createInFlightMap, type InFlightMap } from "./inflight.js";
 
 export {
   FoundryAccessError,
@@ -94,4 +94,4 @@ export {
   isAbortError,
   type FoundryBytesErrorKind,
   type FoundryErrorGuidance,
-} from "./errors";
+} from "./errors.js";

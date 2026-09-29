@@ -28,7 +28,7 @@
  * one worth showing is the one at the scale being looked at.
  */
 
-import { writeTerrarium } from "./terrarium";
+import { writeTerrarium } from "./terrarium.js";
 
 export interface TileFrame {
   /** size * size heights, row-major from the top-left. NaN where no data. */

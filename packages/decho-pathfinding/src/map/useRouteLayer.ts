@@ -15,8 +15,8 @@ import {
   type MapLike,
   type RouteLayerHandle,
   type RouteLayerOptions,
-} from "./routeLayer";
-import type { Waypoint } from "../core/simplify";
+} from "./routeLayer.js";
+import type { Waypoint } from "../core/simplify.js";
 
 export function useRouteLayer(
   map: MapLike | null | undefined,

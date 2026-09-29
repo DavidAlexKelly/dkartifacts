@@ -9,7 +9,7 @@ import {
   describeFoundryError,
   errorForResponse,
   isAbortError,
-} from "./errors";
+} from "./errors.js";
 
 const RID = "ri.foundry.main.dataset.c7e99de1";
 const PATH = "z12/c091_r018.pmtiles";

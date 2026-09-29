@@ -1,17 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { loadDemIndex, type DemManifest, type DemStore } from "./store";
+import { loadDemIndex, type DemManifest, type DemStore } from "./store.js";
 
 // The byte layer is the one thing in this package that talks to the platform.
 // Mocking it here keeps the manifest logic — which is where the loud failures
 // live — testable without a dataset.
-vi.mock("./bytes", () => ({
+vi.mock("./bytes.js", () => ({
   getFileOptional: vi.fn(),
   settleRangeMode: vi.fn(() => Promise.resolve("whole-file")),
   isConfigured: vi.fn(() => true),
 }));
 
-import { getFileOptional, settleRangeMode } from "./bytes";
+import { getFileOptional, settleRangeMode } from "./bytes.js";
 
 const mockedGet = vi.mocked(getFileOptional);
 const mockedSettle = vi.mocked(settleRangeMode);

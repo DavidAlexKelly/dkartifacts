@@ -12,6 +12,6 @@ export {
   type PointerMap,
   type UseElevationOptions,
   type UseElevationResult,
-} from "./useElevation";
+} from "./useElevation.js";
 
-export { TerrainProfile, type TerrainProfileProps } from "./TerrainProfile";
+export { TerrainProfile, type TerrainProfileProps } from "./TerrainProfile.js";

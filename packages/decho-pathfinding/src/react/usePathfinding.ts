@@ -18,9 +18,9 @@ import {
   createPathfinder,
   type Pathfinder,
   type PathfinderOptions,
-} from "../core/pathfinder";
-import type { GeoPoint, RouteOptions, RouteResult } from "../core/route";
-import type { GraphSourceStats } from "../core/graphSource";
+} from "../core/pathfinder.js";
+import type { GeoPoint, RouteOptions, RouteResult } from "../core/route.js";
+import type { GraphSourceStats } from "../core/graphSource.js";
 
 export interface UsePathfindingResult {
   /** Run a search. Cancels any previous one. Resolves null if cancelled. */

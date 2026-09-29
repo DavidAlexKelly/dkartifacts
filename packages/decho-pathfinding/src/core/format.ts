@@ -36,9 +36,9 @@
  * the bytes are unpacked once here rather than read repeatedly during search.
  */
 
-import { MalformedGraphError } from "./errors";
-import { haversineM } from "./geo";
-import type { CellBounds } from "./grid";
+import { MalformedGraphError } from "./errors.js";
+import { haversineM } from "./geo.js";
+import type { CellBounds } from "./grid.js";
 
 /** meta.json, restricted to the fields this package relies on. */
 export interface CellMeta {
