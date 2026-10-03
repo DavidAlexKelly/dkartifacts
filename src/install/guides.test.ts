@@ -23,7 +23,7 @@ describe("install guides", () => {
     // The count is asserted rather than the list, so adding a package to
     // packages/ without adding it here fails loudly instead of the page
     // quietly omitting it.
-    expect(PACKAGE_GUIDES).toHaveLength(8);
+    expect(PACKAGE_GUIDES).toHaveLength(9);
   });
 
   it("parsed a real Artifacts repository RID for each", () => {

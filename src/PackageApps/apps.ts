@@ -46,6 +46,13 @@ export const EXAMPLE_APPS: ExampleApp[] = [
       "The basemap with an add-on: DEM cells from Foundry decoded in the browser into 3D terrain, hillshade, hypsometric tint and slope bands, plus labelled contours traced per cell — and the raster contours the same DEM can draw without them. Click two points for the section between them and whether one can see the other.",
   },
   {
+    path: "/countries",
+    label: "Countries",
+    packageName: "@acc/decho-countries",
+    blurb:
+      "The basemap with a country layer: outlines under the labels, coloured by region, highlighted on hover and selected on click, with a card of the country's facts — population, areas, GDP, capital, codes. Switch between border views (whose claims disputed territory follows) and region schemes without rebuilding the map, pick whole regions instead of countries, find a country by name, or colour by population density. Runs on the low-detail world built into the package until a countries dataset is set.",
+  },
+  {
     path: "/events",
     label: "Event monitor",
     packageName: "basemap + elevation",

@@ -35,6 +35,7 @@ import step4 from "./screenshots/install-4-npm-install.png";
 import app6d from "../../packages/app6d/package.json";
 import basemap from "../../packages/decho-basemap/package.json";
 import elevation from "../../packages/decho-elevation/package.json";
+import countriesPackage from "../../packages/decho-countries/package.json";
 import bytes from "../../packages/decho-foundry-bytes/package.json";
 import pathfinding from "../../packages/decho-pathfinding/package.json";
 import components from "../../packages/decho-components/package.json";
@@ -365,6 +366,39 @@ export const PACKAGE_GUIDES: PackageGuide[] = [
           "  extensions={[elevation({ terrain: true, hillshade: true, sky: true })]}",
           "  spawnLat={61.5} spawnLong={9} spawnZoom={10}",
           "/>;",
+        ].join("\n"),
+      },
+    ],
+  },
+  {
+    ...base(countriesPackage),
+    platform:
+      "Nothing, to start: the package carries a low-detail world. For full detail and several border views, build a dataset with the package's scripts/build-data.mjs, upload it, and add it as a Resource on your app in Developer Console — without that the country layer is missing and onError says why, while the map itself is unaffected.",
+    examplePath: "/countries",
+    usage: [
+      {
+        title: "An extension, with a card for what is clicked",
+        note: "No store means the built-in world. Pass { kind: \"dataset\", datasetRid } for your own; the views and region schemes it carries appear on the controller handed to onReady.",
+        code: [
+          'import { DechoBasemap } from "@acc/decho-basemap/react";',
+          'import { countries } from "@acc/decho-countries/extension";',
+          'import { CountryCard } from "@acc/decho-countries/react";',
+          "",
+          "const [selection, setSelection] = useState(null);",
+          "",
+          "<DechoBasemap extensions={[countries({ onSelect: setSelection })]} />;",
+          "<CountryCard selection={selection} />;",
+        ].join("\n"),
+      },
+      {
+        title: "Headless: which country is this point in?",
+        note: "Bounding boxes first, so tagging thousands of points is cheap.",
+        code: [
+          'import { loadCountries } from "@acc/decho-countries";',
+          "",
+          "const data = await loadCountries();",
+          "const index = await data.index();",
+          'index.countryAt(2.35, 48.85); // "FRA"',
         ].join("\n"),
       },
     ],

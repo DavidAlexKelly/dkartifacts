@@ -36,6 +36,7 @@ import {
   type ExtensionMap,
 } from "@acc/decho-basemap";
 import { elevation } from "@acc/decho-elevation/extension";
+import { countries } from "@acc/decho-countries/extension";
 import { tacticGraphics } from "@acc/app6d/extension";
 import { APP6D_CATALOG } from "@acc/app6d/symbols";
 
@@ -79,6 +80,27 @@ beforeAll(() => {
     platformClient: {} as unknown as Parameters<
       typeof configureBasemap
     >[0]["platformClient"],
+  });
+});
+
+describe("countries with elevation on one map", () => {
+  // The built-in world: no dataset, no network.
+  const build = async () =>
+    mergeExtensionStyle(
+      baseStyle(),
+      await collectStyleContributions([elevation({ hillshade: true }), countries()], ctx),
+    );
+
+  it("merges, with the country outlines under the labels and over the relief", async () => {
+    const merged = await build();
+    const ids = asLayers(merged.layers).map((l) => l.id);
+    const labels = ids.indexOf("place-labels");
+    for (const id of ["countries-fill", "countries-border", "countries-selected"]) {
+      expect(ids.indexOf(id), id).toBeGreaterThan(-1);
+      expect(ids.indexOf(id), id).toBeLessThan(labels);
+    }
+    expect(ids.indexOf("elevation-hillshade")).toBeLessThan(ids.indexOf("countries-fill"));
+    expect(merged.sources["countries-outlines"]).toMatchObject({ type: "geojson" });
   });
 });
 

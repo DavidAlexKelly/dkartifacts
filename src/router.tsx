@@ -5,6 +5,7 @@ import MapPage from "@/PackageApps/dechoBasemap/MapPage";
 import SymbolsPage from "@/PackageApps/tacticalGraphics/SymbolsPage";
 import MilMapPage from "@/mil/MilMapPage";
 import ElevationPage from "@/PackageApps/dechoElevation/ElevationPage";
+import CountriesPage from "@/PackageApps/dechoCountries/CountriesPage";
 import CompositeDemoPage from "@/demo/CompositeDemoPage";
 import EventsPage from "@/demo/events/EventsPage";
 import UnitSymbolPickerPage from "@/PackageApps/unitSymbolPicker/UnitSymbolPickerPage";
@@ -46,6 +47,12 @@ export const router = createBrowserRouter(
           // added from outside it.
           path: "/elevation",
           element: <ElevationPage />,
+        },
+        {
+          // @acc/decho-countries — clickable country outlines and their
+          // facts, another extension added from outside the basemap.
+          path: "/countries",
+          element: <CountriesPage />,
         },
         {
           // Every package at once — the composition the extension contract
