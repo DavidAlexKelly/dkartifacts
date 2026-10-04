@@ -1,0 +1,67 @@
+{
+  "name": "@acc/decho-countries",
+  "version": "0.1.0",
+  "description": "Country outlines and facts from Foundry: borders under several points of view, region schemes, population, area and GDP, point-in-country lookup, and a clickable layer for @acc/decho-basemap. Ships a low-detail world that works with no dataset at all.",
+  "license": "UNLICENSED",
+  "private": false,
+  "type": "module",
+  "sideEffects": false,
+  "files": [
+    "dist",
+    "src",
+    "scripts",
+    "foundry",
+    "!**/*.test.ts",
+    "!**/*.test.tsx",
+    "!src/testing",
+    "README.md",
+    "CHANGELOG.md",
+    "!**/*.tsbuildinfo"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./extension": {
+      "types": "./dist/extension/index.d.ts",
+      "import": "./dist/extension/index.js"
+    },
+    "./react": {
+      "types": "./dist/react/index.d.ts",
+      "import": "./dist/react/index.js"
+    }
+  },
+  "types": "./dist/index.d.ts",
+  "publishConfig": {
+    "registry": "https://accenture.palantirfoundry.com/artifacts/api/repositories/ri.artifacts.main.repository.df396b79-3da5-473f-91c2-7be67d95c46c/contents/release/npm/"
+  },
+  "scripts": {
+    "build": "tsc -b tsconfig.build.json",
+    "build-data": "node scripts/build-data.mjs",
+    "build-builtin": "node scripts/build-data.mjs --builtin src/builtin/world.ts",
+    "prepublishOnly": "npm test && npm run build",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@types/geojson": "^7946.0.16"
+  },
+  "peerDependencies": {
+    "@acc/decho-basemap": ">=0.8.0 <0.13.0",
+    "@acc/decho-foundry-bytes": "^0.1.0",
+    "react": "^18.0.0 || ^19.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@acc/decho-basemap": {
+      "optional": true
+    },
+    "react": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "polygon-clipping": "^0.15.7",
+    "typescript": "~5.5.4",
+    "vitest": "^3.2.4"
+  }
+}
