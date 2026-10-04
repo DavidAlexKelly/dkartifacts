@@ -54,14 +54,11 @@ GDAL to install.
 SET THE PATHS in the @transform decorator at the bottom.
 """
 
-from __future__ import annotations
-
 import csv
 import io
 import json
 import math
 import re
-from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Callable, Dict, Iterable, List, Optional, Tuple
 
@@ -266,13 +263,16 @@ def view_label(code: str, features: List[Dict]) -> str:
     return f"As seen by {code}"
 
 
-@dataclass
 class View:
-    id: str
-    label: str
-    description: str
-    file_key: str
-    assignment: List[str]
+    # A plain class, not a dataclass: dataclasses look their module up in
+    # sys.modules, which Foundry's transform discovery does not always fill in
+    # ("'NoneType' object has no attribute '__dict__'").
+    def __init__(self, id: str, label: str, description: str, file_key: str, assignment: List[str]):
+        self.id = id
+        self.label = label
+        self.description = description
+        self.file_key = file_key
+        self.assignment = assignment
 
 
 def plan_views(features: List[Dict], ids: Dict[str, str]) -> List[View]:
@@ -544,12 +544,12 @@ def add_outline_areas(records: List[Dict], high_default: Dict) -> None:
 # ── Build ────────────────────────────────────────────────────────────────────
 
 
-@dataclass
 class Result:
-    files: Dict[str, object] = field(default_factory=dict)  # path → JSON-able
-    table: List[Dict] = field(default_factory=list)
-    unmatched: List[str] = field(default_factory=list)
-    views: List[str] = field(default_factory=list)
+    def __init__(self, unmatched: List[str], views: List[str]):
+        self.files: Dict[str, object] = {}  # path → JSON-able
+        self.table: List[Dict] = []
+        self.unmatched = unmatched
+        self.views = views
 
 
 def build(files: RawFiles, log: Callable[[str], None] = print) -> Result:
