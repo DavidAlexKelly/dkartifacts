@@ -22,6 +22,20 @@ renamed to the new version number at release time.
 
 ## Unreleased
 
+### Added
+
+- `foundry/countries_transform.py`: builds the dataset as a Foundry Python
+  transform from the raw Natural Earth shapefiles and World Bank CSV exports,
+  plus a one-row-per-country table. Same records and views as
+  `build-data.mjs`.
+
+### Fixed
+
+- Outlines rounded to their output precision could cross themselves (six at
+  1:10m, Greenland and Russia among them), which MapLibre draws as slivers
+  across the country. `build-data.mjs` now repairs each rounded outline, and
+  the regenerated built-in world is valid throughout.
+
 ## 0.1.0
 
 First release.

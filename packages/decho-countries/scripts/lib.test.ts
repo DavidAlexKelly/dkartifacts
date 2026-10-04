@@ -83,6 +83,17 @@ describe("geometry", () => {
   });
 });
 
+describe("cleaning", () => {
+  it("turns a ring that rounding made cross itself into a valid outline", () => {
+    // A bow tie: the edges cross at (1, 1).
+    const bowTie = { type: "Polygon", coordinates: [[[0, 0], [2, 2], [2, 0], [0, 2], [0, 0]]] };
+    const cleaned = lib.clean(bowTie);
+    expect(cleaned.type).toBe("MultiPolygon");
+    expect(cleaned.coordinates).toHaveLength(2);
+    expect(lib.areaKm2(cleaned)).toBeGreaterThan(0);
+  });
+});
+
 describe("records", () => {
   it("take names, codes, regions and Natural Earth's figures", () => {
     const record = lib.recordFrom(

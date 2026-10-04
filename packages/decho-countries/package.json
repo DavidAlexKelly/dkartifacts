@@ -10,6 +10,7 @@
     "dist",
     "src",
     "scripts",
+    "foundry",
     "!**/*.test.ts",
     "!**/*.test.tsx",
     "!src/testing",

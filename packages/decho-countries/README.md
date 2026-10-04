@@ -82,6 +82,35 @@ draw identically share files), about 170 MB in all: 1.6 MB per view at 1:50m,
 
 `npm run build-builtin` regenerates the built-in world the same way.
 
+### Building it in Foundry instead
+
+`foundry/countries_transform.py` builds the same dataset as a Foundry Python
+transform, from the files as downloaded — no internet access needed in
+Foundry, and no Node:
+
+1. Upload the raw files to one dataset: the Natural Earth 1:10m
+   `ne_10m_admin_0_countries.*` and `ne_10m_populated_places.*` shapefiles
+   (`.shp`, `.shx`, `.dbf`, `.cpg`; the `VERSION.txt` is used if present), and
+   the World Bank CSV exports `API_SP.POP.TOTL_*.csv`,
+   `API_AG.LND.TOTL.K2_*.csv`, `API_AG.SRF.TOTL.K2_*.csv`,
+   `API_NY.GDP.MKTP.CD_*.csv`, `API_NY.GDP.PCAP.CD_*.csv` and one
+   `Metadata_Country_*.csv`. Names are matched loosely, so the version
+   numbers in them do not matter; the `Metadata_Indicator_*` and README files
+   are ignored.
+2. Copy the file into a Python transforms repository, set the three paths in
+   its `@transform` decorator, and add `shapely` and `pyshp` to the run
+   requirements (`pyshp` is pure Python — no GDAL).
+3. Build. Two outputs:
+
+| Output | |
+|---|---|
+| `countries_map` | Files, exactly what this package reads: `manifest.json`, `countries.json`, `views/<view>/low.geojson` (simplified, from zoom 0) and `high.geojson` (full 1:10m, from zoom 4). Its RID is the `datasetRid`. About 200 MB. |
+| `countries` | A table, one row per country: codes, names, the five region schemes, capital, label point, Wikidata id, every figure with its year and source, and the outline as a GeoJSON string. For Contour, the Ontology or joins. |
+
+The same file runs locally — `python countries_transform.py <raw folder>
+<out folder>` — and builds a dataset identical, record for record, to
+`build-data.mjs` given the same Natural Earth data.
+
 ### Data sources
 
 | Source | Gives | Licence |

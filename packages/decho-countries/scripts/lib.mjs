@@ -282,6 +282,19 @@ export function roundGeometry(geometry, decimals) {
   return kept.length === 1 ? { type: "Polygon", coordinates: kept[0] } : { type: "MultiPolygon", coordinates: kept };
 }
 
+/**
+ * Rounding each point on its own can put two nearby edges onto each other so
+ * they cross, and MapLibre draws a self-crossing ring as stray slivers across
+ * the country (Greenland and Russia at 1:10m, for two). A union of the shape
+ * with itself resolves the crossings into a valid outline.
+ */
+export function clean(geometry) {
+  if (!geometry) {return null;}
+  const merged = polygonClipping.union(coordinatesOf(geometry));
+  if (merged.length === 0) {return null;}
+  return merged.length === 1 ? { type: "Polygon", coordinates: merged[0] } : { type: "MultiPolygon", coordinates: merged };
+}
+
 function coordinatesOf(geometry) {
   return geometry.type === "Polygon" ? [geometry.coordinates] : geometry.coordinates;
 }
@@ -310,7 +323,7 @@ export function viewCollection(features, assignment, decimals) {
       const merged = polygonClipping.union(...geometries.map(coordinatesOf));
       geometry = merged.length === 1 ? { type: "Polygon", coordinates: merged[0] } : { type: "MultiPolygon", coordinates: merged };
     }
-    const rounded = roundGeometry(geometry, decimals);
+    const rounded = clean(roundGeometry(geometry, decimals));
     if (rounded) {out.push({ type: "Feature", properties: { id }, geometry: rounded });}
   }
   out.sort((a, b) => (a.properties.id < b.properties.id ? -1 : 1));
