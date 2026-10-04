@@ -377,19 +377,17 @@ export const PACKAGE_GUIDES: PackageGuide[] = [
     examplePath: "/countries",
     usage: [
       {
-        title: "An extension, with a card for what is clicked",
+        title: "An extension, telling you what is clicked",
         note: "The store is the countries_map dataset; the views and region schemes it carries appear on the controller handed to onReady.",
         code: [
           'import { DechoBasemap } from "@acc/decho-basemap/react";',
           'import { countries } from "@acc/decho-countries/extension";',
-          'import { CountryCard } from "@acc/decho-countries/react";',
           "",
           "const [selection, setSelection] = useState(null);",
           "",
           'const store = { kind: "dataset", datasetRid: "ri.foundry.main.dataset.…" };',
           "",
           "<DechoBasemap extensions={[countries({ store, onSelect: setSelection })]} />;",
-          "<CountryCard selection={selection} />;",
         ].join("\n"),
       },
       {

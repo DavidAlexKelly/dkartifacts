@@ -18,7 +18,17 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { describeBasemapError } from "@acc/decho-basemap";
 import { DechoBasemap } from "@acc/decho-basemap/react";
-import { flagEmoji, type CountriesStore, type CountryRecord } from "@acc/decho-countries";
+import {
+  FIGURE_LABELS,
+  figuresOf,
+  flagEmoji,
+  formatFigure,
+  orderedFigureKeys,
+  type CountriesStore,
+  type CountryRecord,
+  type Figure,
+  type SourceInfo,
+} from "@acc/decho-countries";
 import {
   countries,
   type CountriesController,
@@ -26,7 +36,6 @@ import {
   type CountrySelection,
   type FillMode,
 } from "@acc/decho-countries/extension";
-import { CountryCard } from "@acc/decho-countries/react";
 import {
   errorPanel,
   mapPanel,
@@ -77,6 +86,72 @@ const select: React.CSSProperties = {
   color: surface.text,
   font: "12px/1.4 sans-serif",
 };
+
+/**
+ * The facts about a selection, in this page's own style. Written here rather
+ * than taken from the package: the package supplies the data and the helpers
+ * (derived figures, labels, formatting, flags), and how a card looks is the
+ * app's call. Two things any version should keep: each figure's year — they
+ * differ by country and by figure — and the sources line, since the World
+ * Bank's licence (CC BY 4.0) asks for credit wherever its figures are shown.
+ */
+function SelectionFacts({
+  selection,
+  sources,
+  onClose,
+}: {
+  selection: CountrySelection;
+  sources: SourceInfo[];
+  onClose: () => void;
+}): React.ReactElement {
+  const country = selection.kind === "country" ? selection.country : null;
+  const figures: Record<string, Figure> = country ? figuresOf(country) : selection.kind === "region" ? selection.region.figures : {};
+  const title = country ? `${flagEmoji(country.iso2)} ${country.name}`.trim() : selection.kind === "region" ? selection.region.id : "";
+  const subtitle = country
+    ? [country.longName, selection.kind === "country" ? selection.region?.id : undefined, country.kind].filter(Boolean).join(" · ")
+    : selection.kind === "region"
+      ? `${selection.scheme.label} · ${selection.region.countries.length} countries`
+      : "";
+  const facts: Array<[string, string]> = [];
+  if (country?.capital) {facts.push(["Capital", country.capital.name]);}
+  const codes = country ? [country.iso2, country.iso3, country.isoNumeric].filter(Boolean).join(" / ") : "";
+  if (codes) {facts.push(["ISO codes", codes]);}
+  for (const key of orderedFigureKeys(figures)) {
+    const figure = figures[key];
+    facts.push([FIGURE_LABELS[key]?.label ?? key, `${formatFigure(key, figure)}${figure.year ? ` (${figure.year})` : ""}`]);
+  }
+  return (
+    <div aria-label={title}>
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ font: "600 15px/1.35 sans-serif" }}>{title}</div>
+          {subtitle && <div style={panelMuted}>{subtitle}</div>}
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close"
+          style={{ background: "none", border: 0, color: "inherit", cursor: "pointer", font: "16px/1 sans-serif" }}
+        >
+          ×
+        </button>
+      </div>
+      <dl style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: "3px 12px", margin: "8px 0 0" }}>
+        {facts.map(([label, value]) => (
+          <React.Fragment key={label}>
+            <dt style={panelMuted}>{label}</dt>
+            <dd style={{ margin: 0 }}>{value}</dd>
+          </React.Fragment>
+        ))}
+      </dl>
+      {sources.length > 0 && (
+        <div style={{ ...panelMuted, marginTop: 8, fontSize: 11 }}>
+          Sources: {sources.map((s) => (s.licence ? `${s.name} (${s.licence})` : s.name)).join(", ")}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function CountriesPage(): React.ReactElement {
   const [controller, setController] = useState<CountriesController | null>(null);
@@ -258,9 +333,9 @@ function CountriesPage(): React.ReactElement {
         {selection && (
           <>
             <div style={{ ...panelSeparator, margin: "8px 0" }} />
-            <CountryCard
+            <SelectionFacts
               selection={selection}
-              sources={controller?.data.manifest.sources}
+              sources={controller?.data.manifest.sources ?? []}
               onClose={() => controller?.select(null)}
             />
             <button

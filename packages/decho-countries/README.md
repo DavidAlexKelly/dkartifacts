@@ -14,14 +14,16 @@ Foundry, by the transform in `foundry/`, from files downloaded once by hand.
 ```tsx
 import { DechoBasemap } from "@acc/decho-basemap/react";
 import { countries } from "@acc/decho-countries/extension";
-import { CountryCard } from "@acc/decho-countries/react";
 
 const store = { kind: "dataset", datasetRid: "ri.foundry.main.dataset.…" }; // countries_map
 const [selection, setSelection] = useState(null);
 
 <DechoBasemap extensions={[countries({ store, onSelect: setSelection })]} />;
-<CountryCard selection={selection} />;
 ```
+
+`selection` is `{ kind: "country", country, region }` or
+`{ kind: "region", region, scheme }`. Showing it is the app's job — see
+[Showing a country's facts](#showing-a-countrys-facts).
 
 Like `decho-elevation`, it is a `BasemapExtension`: the basemap does not know
 it exists, and it composes with other extensions in the same array.
@@ -94,7 +96,44 @@ the folder it is given.
 | Source | Gives | Licence |
 |---|---|---|
 | Natural Earth | Outlines, points of view, region fields, names in 26 languages, capitals, Wikidata ids | Public domain |
-| World Bank | Population, areas, GDP, World Bank regions, income groups | CC BY 4.0 — credit it where shown; `CountryCard` does, from the dataset's manifest |
+| World Bank | Population, areas, GDP, World Bank regions, income groups | CC BY 4.0 — credit it wherever its figures are shown; the dataset's manifest lists the sources to credit |
+
+## Showing a country's facts
+
+The package has no card or panel: how it looks is the app's call. The core
+exports what one needs, so a panel in your own style is short:
+
+```tsx
+import { FIGURE_LABELS, figuresOf, flagEmoji, formatFigure, orderedFigureKeys } from "@acc/decho-countries";
+
+const figures = figuresOf(country);   // its figures plus density and GDP per person
+<h3>{flagEmoji(country.iso2)} {country.name}</h3>
+{orderedFigureKeys(figures).map((key) => (
+  <div key={key}>
+    {FIGURE_LABELS[key]?.label ?? key}: {formatFigure(key, figures[key])} ({figures[key].year})
+  </div>
+))}
+<small>Sources: {data.manifest.sources.map((s) => s.name).join(", ")}</small>
+```
+
+Two things worth keeping in any version: **each figure's year** (they differ
+by country and by figure) and **the sources line** (the World Bank's licence
+asks for credit wherever its figures appear). For a region, use
+`region.figures`: the sums over its members, each with how many contributed.
+The `/countries` demo page has a complete one.
+
+### Loading the data in a component
+
+`useCountries(store)` from `@acc/decho-countries/react` loads the data
+without a map — for a country list, a search box, a table, or tagging data
+with `countryAt` before it reaches the map:
+
+```tsx
+const { data, loading, error } = useCountries({ kind: "dataset", datasetRid });
+```
+
+With the map extension you do not need it: the extension's controller
+carries the same data as `controller.data`.
 
 ## Border views
 
@@ -168,7 +207,8 @@ read again.
    Developer Console. A missing Resource loses the country layer and reports
    it through `onError`; the map is unaffected.
 2. **Peers:** `@acc/decho-foundry-bytes@^0.1.0`; `@acc/decho-basemap` for
-   `./extension` (optional otherwise); `react` for `./react` (optional).
+   `./extension` (optional otherwise); `react` for the `./react` hook
+   (optional).
 
 ## Package notes
 
