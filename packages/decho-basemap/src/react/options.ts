@@ -11,6 +11,7 @@ import type { Flavor } from "@protomaps/basemaps";
 import type { Map as MaplibreMap } from "maplibre-gl";
 
 import type { AssetStore } from "../core/assets.js";
+import { CRT_FLAVOR } from "../core/flavors.js";
 import { defaultStores } from "../core/defaults.js";
 import type { TileStore } from "../core/stores.js";
 import type { BasemapHandle } from "../core/basemap.js";
@@ -18,7 +19,9 @@ import type { BasemapExtension } from "../core/extensions.js";
 import type { FeatureCollection } from "geojson";
 
 /**
- * The Protomaps flavors the bundled asset dataset ships sprites for.
+ * The named map styles: the Protomaps flavors the bundled asset dataset ships
+ * sprites for, and "crt", this package's own green-screen look
+ * (core/flavors.ts), which borrows the "black" sprite sheet.
  *
  * Deliberately not open-ended: a flavor whose sprite sheet is missing renders
  * every icon as a console error, which is the exact failure that cost a
@@ -34,6 +37,7 @@ export const MAP_STYLES = [
   "white",
   "grayscale",
   "black",
+  "crt",
 ] as const;
 
 export type MapStyleName = (typeof MAP_STYLES)[number];
@@ -247,5 +251,18 @@ export function resolveView(opts: UseBasemapOptions): {
  * mismatched sprite by accident.
  */
 export function spritePathForStyle(style: MapStyleName): string {
-  return `sprites/${style}`;
+  return `sprites/${SPRITE_FOR_STYLE[style] ?? style}`;
+}
+
+/** Our own styles have no sprite sheet of their own; these borrow one. */
+const SPRITE_FOR_STYLE: Partial<Record<MapStyleName, string>> = {
+  crt: "black",
+};
+
+/**
+ * The flavor for a style this package defines itself, or null for one of
+ * Protomaps' own (which `namedFlavor` from @protomaps/basemaps builds).
+ */
+export function ownFlavorForStyle(style: MapStyleName): Flavor | null {
+  return style === "crt" ? CRT_FLAVOR : null;
 }

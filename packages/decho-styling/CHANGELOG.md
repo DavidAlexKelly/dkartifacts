@@ -27,6 +27,15 @@ Two rules that hold regardless of version:
 
 ## Unreleased
 
+### Added
+
+- **`crt` — an eighth theme: phosphor green on black.** A vector terminal:
+  one green at different strengths for text and borders, monospace for
+  everything (system fonts only), square corners, a green glow in place of
+  shadows. Status colours step out of the green — red, orange, amber — so an
+  alert still stands out. Dark only. Pairs with `@acc/decho-basemap`'s
+  `mapStyle="crt"`.
+
 ### Internal
 
 - Built with `tsc -b` (composite project) so the sibling packages' builds can

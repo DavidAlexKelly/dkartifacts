@@ -7,7 +7,7 @@
  */
 
 import React from "react";
-import { panelFigures, panelMuted, panelSeparator, surface } from "@/components/mapPanel";
+import { panelFigures, panelMuted, panelSeparator, panelVar, surface } from "@/components/mapPanel";
 import { SEVERITY_COLOURS } from "./eventsLayer";
 import { categoryMeta, type CategoryRegistry } from "./categories";
 import { MediaPreview } from "./MediaPreview";
@@ -75,7 +75,7 @@ export function EventDetails({
         </button>
       </div>
 
-      <div style={{ font: "600 15px/1.35 sans-serif", marginTop: 6 }}>{event.title}</div>
+      <div style={{ font: `600 15px/1.35 ${panelVar.font}`, marginTop: 6 }}>{event.title}</div>
       <div style={panelMuted}>
         {capitalise(relativeTime(event.time, now))}
         {event.time != null && ` · ${absoluteTime(event.time)}`}
@@ -90,7 +90,7 @@ export function EventDetails({
           {event.metrics.map((metric) => (
             <div key={metric.label} style={metricTile}>
               <div style={panelMuted}>{metric.label}</div>
-              <div style={{ font: "600 14px/1.3 sans-serif" }}>{metric.value}</div>
+              <div style={{ font: `600 14px/1.3 ${panelVar.font}` }}>{metric.value}</div>
             </div>
           ))}
         </div>
@@ -160,7 +160,7 @@ export function AreaDetails({
           ×
         </button>
       </div>
-      <div style={{ font: "600 15px/1.35 sans-serif", marginTop: 6 }}>{area.name}</div>
+      <div style={{ font: `600 15px/1.35 ${panelVar.font}`, marginTop: 6 }}>{area.name}</div>
       <div style={panelMuted}>Area · {area.source}</div>
       <label style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6 }}>
         <span style={panelMuted}>Category</span>

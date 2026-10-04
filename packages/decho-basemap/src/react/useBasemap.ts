@@ -30,6 +30,7 @@ import {
 import { whenStyleLoaded } from "../core/styleReady.js";
 import { useDrawingTools, type DrawingToolsState } from "./useDrawingTools.js";
 import {
+  ownFlavorForStyle,
   resolveAssetStore,
   resolveTileStore,
   resolveView,
@@ -104,7 +105,10 @@ export function useBasemap(
           ? opts.layers(sourceId)
           : protomapsLayers(
               sourceId,
-              opts.flavor ?? namedFlavor(opts.mapStyle ?? "light"),
+              opts.flavor ??
+                ownFlavorForStyle(opts.mapStyle ?? "light") ??
+                // Narrowed by the line above: only Protomaps' own names reach here.
+                namedFlavor(opts.mapStyle ?? "light"),
               {
               lang: opts.lang ?? "en",
             });

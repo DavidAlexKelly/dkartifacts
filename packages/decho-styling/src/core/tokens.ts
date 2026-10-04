@@ -54,7 +54,7 @@
  */
 
 /**
- * The seven themes.
+ * The eight themes.
  *
  * `classic` is the default everywhere. Nothing changes skin implicitly, so a
  * consumer upgrading this package never wakes up in a different theme.
@@ -69,6 +69,9 @@
  *   command   Amber on near-black, sharp corners, opaque surfaces. For an ops
  *             room at night, and for anyone who finds glass distracting when
  *             the screen is the only light in the room.
+ *   crt       Phosphor green on black, monospace, square corners, glow for
+ *             shadow. A vector terminal; pairs with decho-basemap's
+ *             mapStyle="crt".
  *
  *   accenture-light / accenture-dark
  *             The corporate palette: Blue 3 for actions, Violet 3 for AI, the
@@ -100,6 +103,7 @@ export type DechoSkin =
   | "modern"
   | "daylight"
   | "command"
+  | "crt"
   | "accenture-standard"
   | "accenture-light"
   | "accenture-dark"
@@ -790,6 +794,116 @@ export const SKIN_OVERRIDES: Record<
   },
 
   /**
+   * `crt` — phosphor green on black, like a vector terminal.
+   *
+   * `command`'s sibling, taken further: one colour does almost all the work,
+   * at different strengths — bright for what you read, dim for what frames it
+   * — and the type is monospace throughout. Shadows are a glow in the
+   * phosphor rather than darkness, because on a screen that only lights what
+   * it draws there is nothing for a shadow to fall on.
+   *
+   * Pairs with `@acc/decho-basemap`'s `mapStyle="crt"`, drawn in the same
+   * green. Scanlines and text glow are not tokens: they are effects over the
+   * whole screen, and the app adds them if it wants them.
+   *
+   * The status colours leave the green on purpose: a red alert in a green
+   * interface is the one thing that has to stand out. `success` is the
+   * accent, since here green already means "fine".
+   */
+  crt: {
+    color: {
+      bg: "#020703",
+      surface: "#03110a",
+      surfaceRaised: "#06190e",
+      surfaceOverlay: "rgba(2, 12, 6, 0.86)",
+
+      border: "#145a2a",
+      borderSubtle: "#0b3318",
+      borderStrong: "rgba(51, 255, 102, 0.55)",
+      borderOverlay: "rgba(51, 255, 102, 0.28)",
+
+      text: "#5cff8a",
+      textMuted: "#2fbf5a",
+      textFaint: "#1f8a40",
+      // Black ink on a lit button, as on an inverted terminal cell.
+      onAccent: "#021006",
+
+      accent: "#33ff66",
+      accentHover: "#7dffa0",
+      accentSoft: "rgba(51, 255, 102, 0.14)",
+      accentOverMap: "#33ff66",
+
+      info: "#33ccff",
+      infoSoft: "rgba(51, 204, 255, 0.16)",
+      success: "#33ff66",
+      successSoft: "rgba(51, 255, 102, 0.16)",
+      warning: "#ffcc33",
+      warningSoft: "rgba(255, 204, 51, 0.16)",
+      danger: "#ff4d4d",
+      dangerSoft: "rgba(255, 77, 77, 0.16)",
+      neutralSoft: "rgba(51, 255, 102, 0.08)",
+
+      link: "#99ffbb",
+    },
+
+    gradient: {
+      app: "radial-gradient(120% 90% at 50% 0%, rgba(51, 255, 102, 0.08) 0%, rgba(2, 7, 3, 0) 65%)",
+      surface: "none",
+      raised: "none",
+      accent: "none",
+      hairline:
+        "linear-gradient(90deg, rgba(51, 255, 102, 0) 0%, rgba(51, 255, 102, 0.55) 50%, rgba(51, 255, 102, 0) 100%)",
+    },
+
+    shadow: {
+      sm: "0 0 4px rgba(51, 255, 102, 0.1)",
+      md: "0 0 10px rgba(51, 255, 102, 0.12)",
+      lg: "0 0 24px rgba(51, 255, 102, 0.16)",
+      card: "0 0 8px rgba(51, 255, 102, 0.08)",
+      cardHover: "0 0 16px rgba(51, 255, 102, 0.2)",
+      selected: "0 0 0 1px rgba(51, 255, 102, 0.7), 0 0 16px rgba(51, 255, 102, 0.35)",
+      panel: "0 0 0 1px rgba(51, 255, 102, 0.12), 0 0 18px rgba(51, 255, 102, 0.12)",
+      dot: "0 0 6px currentColor",
+    },
+
+    // Square, near enough: a character cell has no rounded corners.
+    radius: {
+      sm: "0px",
+      md: "1px",
+      lg: "2px",
+    },
+
+    // Monospace for everything, prose included. System fonts only: a theme
+    // that fetched a webfont would break inside Foundry, which allows none.
+    fontFamily: {
+      sans: "ui-monospace, SFMono-Regular, \"SF Mono\", Menlo, Consolas, \"Liberation Mono\", monospace",
+      mono: "ui-monospace, SFMono-Regular, \"SF Mono\", Menlo, Consolas, \"Liberation Mono\", monospace",
+    },
+
+    effect: {
+      blur: "blur(4px)",
+      surfaceBlur: "none",
+      transition: "80ms linear",
+      colorScheme: "dark",
+    },
+
+    status: {
+      critical: "#ff3b3b",
+      high: "#ff7a3d",
+      atRisk: "#ffcc33",
+      onTrack: "#33ff66",
+      complete: "#1fbf4c",
+      notAssessed: "#2fbf5a",
+      noData: "#1f8a40",
+    },
+
+    chart: {
+      axis: "rgba(51, 255, 102, 0.35)",
+      grid: "rgba(51, 255, 102, 0.12)",
+    },
+  },
+
+  /**
    * `accenture-light` — the corporate palette.
    *
    * Every value here is from the supplied reference, with the token's stated
@@ -1183,6 +1297,7 @@ export const THEME_MODES: Record<
   modern: { default: "dark", modes: ["dark"] },
   daylight: { default: "light", modes: ["light"] },
   command: { default: "dark", modes: ["dark"] },
+  crt: { default: "dark", modes: ["dark"] },
   // The pair, folded: `accenture-light` in dark mode IS `accenture-dark`, and a
   // test asserts that token for token. The old names stay as themes so nothing
   // breaks; new code should say `accenture` … which is what they are.

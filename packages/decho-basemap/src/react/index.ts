@@ -51,6 +51,7 @@ export {
 
 export {
   MAP_STYLES,
+  ownFlavorForStyle,
   resolveAssetStore,
   resolveTileStore,
   resolveView,

@@ -42,6 +42,7 @@ describe("the Workshop config", () => {
       ["eventStreamRids", "event-monitor-stream-rids"],
       ["eventCategories", "event-monitor-categories"],
       ["selectedEvent", "selected-event"],
+      ["eventTheme", "event-monitor-theme"],
       ["eventSpriteSet", "event-monitor-sprite-set"],
       ["eventStartLatitude", "event-monitor-start-latitude"],
       ["eventStartLongitude", "event-monitor-start-longitude"],
@@ -262,6 +263,7 @@ describe("the look-and-feel variables", () => {
   it("take what a module sets", () => {
     const { appearance, invalid } = resolveEventAppearance(
       withLook({
+        eventTheme: "CRT",
         eventSpriteSet: "dark",
         eventStartLatitude: 51.5,
         eventStartLongitude: -0.12,
@@ -279,6 +281,7 @@ describe("the look-and-feel variables", () => {
     );
     expect(invalid).toEqual([]);
     expect(appearance).toEqual({
+      theme: "crt",
       spritePath: "sprites/dark",
       startView: { lat: 51.5, lon: -0.12, zoom: 9 },
       globe: false,
@@ -304,6 +307,15 @@ describe("the look-and-feel variables", () => {
       ["event-monitor-start-zoom", "-1"],
       ["event-monitor-feed-length", "9000"],
     ]);
+  });
+
+  it("report a theme that is not one and use the default instead", () => {
+    const { appearance, invalid } = resolveEventAppearance(withLook({ eventTheme: "matrix" }));
+    expect(appearance.theme).toBe("standard");
+    expect(invalid).toEqual([
+      { variable: "event-monitor-theme", entry: "matrix", error: "not a theme (standard, crt)." },
+    ]);
+    expect(resolveEventAppearance(withLook({ eventTheme: " " })).invalid).toEqual([]);
   });
 
   it("read a sprite set by name or by path", () => {

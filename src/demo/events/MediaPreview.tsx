@@ -12,7 +12,7 @@
 
 import React, { useEffect, useState } from "react";
 import { getMediaItemByRid } from "@acc/decho-foundry-bytes";
-import { panelFigures, panelMuted } from "@/components/mapPanel";
+import { panelFigures, panelMuted, panelRadius } from "@/components/mapPanel";
 import { describeSourceError, type SourceProblem } from "./sources/foundry";
 import { previewKind, sniffMimeType, type MediaRef, type PreviewKind } from "./sources/media";
 import { actionButton, problemText } from "./styles";
@@ -119,7 +119,7 @@ const image: React.CSSProperties = {
   width: "100%",
   maxHeight: 240,
   objectFit: "contain",
-  borderRadius: 6,
+  borderRadius: panelRadius(6),
   border: "none",
   background: "rgba(0,0,0,0.25)",
 };
@@ -130,6 +130,6 @@ const placeholder: React.CSSProperties = {
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
-  borderRadius: 6,
+  borderRadius: panelRadius(6),
   background: "rgba(0,0,0,0.2)",
 };

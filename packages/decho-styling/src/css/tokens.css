@@ -459,6 +459,79 @@
 }
 
 /* ==========================================================================
+   undefined
+   ========================================================================== */
+
+.decho-crt,
+[data-decho-theme="crt"] {
+
+  --decho-color-bg: #020703;
+  --decho-color-surface: #03110a;
+  --decho-color-surface-raised: #06190e;
+  --decho-color-surface-overlay: rgba(2, 12, 6, 0.86);
+  --decho-color-border: #145a2a;
+  --decho-color-border-subtle: #0b3318;
+  --decho-color-border-strong: rgba(51, 255, 102, 0.55);
+  --decho-color-border-overlay: rgba(51, 255, 102, 0.28);
+  --decho-color-text: #5cff8a;
+  --decho-color-text-muted: #2fbf5a;
+  --decho-color-text-faint: #1f8a40;
+  --decho-color-on-accent: #021006;
+  --decho-color-accent: #33ff66;
+  --decho-color-accent-hover: #7dffa0;
+  --decho-color-accent-soft: rgba(51, 255, 102, 0.14);
+  --decho-color-accent-over-map: #33ff66;
+  --decho-color-info: #33ccff;
+  --decho-color-info-soft: rgba(51, 204, 255, 0.16);
+  --decho-color-success: #33ff66;
+  --decho-color-success-soft: rgba(51, 255, 102, 0.16);
+  --decho-color-warning: #ffcc33;
+  --decho-color-warning-soft: rgba(255, 204, 51, 0.16);
+  --decho-color-danger: #ff4d4d;
+  --decho-color-danger-soft: rgba(255, 77, 77, 0.16);
+  --decho-color-neutral-soft: rgba(51, 255, 102, 0.08);
+  --decho-color-link: #99ffbb;
+  --decho-color-accent-tint: rgb(10, 50, 23);
+  --decho-color-info-tint: rgb(11, 47, 49);
+  --decho-color-success-tint: rgb(11, 55, 25);
+  --decho-color-warning-tint: rgb(43, 47, 17);
+  --decho-color-danger-tint: rgb(43, 27, 21);
+  --decho-color-neutral-tint: rgb(7, 36, 17);
+
+  --decho-status-critical: #ff3b3b;
+  --decho-status-high: #ff7a3d;
+  --decho-status-at-risk: #ffcc33;
+  --decho-status-on-track: #33ff66;
+  --decho-status-complete: #1fbf4c;
+  --decho-status-not-assessed: #2fbf5a;
+  --decho-status-no-data: #1f8a40;
+
+  --decho-chart-axis: rgba(51, 255, 102, 0.35);
+  --decho-chart-grid: rgba(51, 255, 102, 0.12);
+
+  --decho-radius-sm: 0px;
+  --decho-radius-md: 1px;
+  --decho-radius-lg: 2px;
+
+  --decho-font-family-sans: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+
+  --decho-gradient-app: radial-gradient(120% 90% at 50% 0%, rgba(51, 255, 102, 0.08) 0%, rgba(2, 7, 3, 0) 65%);
+  --decho-gradient-hairline: linear-gradient(90deg, rgba(51, 255, 102, 0) 0%, rgba(51, 255, 102, 0.55) 50%, rgba(51, 255, 102, 0) 100%);
+
+  --decho-shadow-sm: 0 0 4px rgba(51, 255, 102, 0.1);
+  --decho-shadow-md: 0 0 10px rgba(51, 255, 102, 0.12);
+  --decho-shadow-lg: 0 0 24px rgba(51, 255, 102, 0.16);
+  --decho-shadow-card: 0 0 8px rgba(51, 255, 102, 0.08);
+  --decho-shadow-card-hover: 0 0 16px rgba(51, 255, 102, 0.2);
+  --decho-shadow-selected: 0 0 0 1px rgba(51, 255, 102, 0.7), 0 0 16px rgba(51, 255, 102, 0.35);
+  --decho-shadow-panel: 0 0 0 1px rgba(51, 255, 102, 0.12), 0 0 18px rgba(51, 255, 102, 0.12);
+  --decho-shadow-dot: 0 0 6px currentColor;
+
+  --decho-effect-blur: blur(4px);
+  --decho-effect-transition: 80ms linear;
+}
+
+/* ==========================================================================
    accenture-light — the corporate palette
    Blue 3 for primary actions and links, Blue 2 for hover, Blue 4 for focus
    rings, Blue 5 for tinted backgrounds, Violet 3 for AI, card borders Black at

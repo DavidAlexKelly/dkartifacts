@@ -75,6 +75,9 @@ import {
   type EventsSource,
 } from "./eventsLayer";
 import { buildRegistry, categoryMeta } from "./categories";
+import { EVENT_THEMES, type EventTheme } from "./appearance";
+import { CrtScreen } from "./CrtScreen";
+import { THEME_LABELS, lookFor } from "./theme";
 import {
   NO_OVERRIDES,
   applyOverrides,
@@ -316,6 +319,10 @@ function EventsPage(): React.ReactElement {
   useEffect(() => setGlobe(null), [look.globe]);
   const terrain = terrainChoice ?? look.terrain;
   const globe = globeChoice ?? look.globe;
+  const [themeChoice, setTheme] = useState<EventTheme | null>(null);
+  useEffect(() => setTheme(null), [look.theme]);
+  const theme = themeChoice ?? look.theme;
+  const themeLook = lookFor(theme);
 
   const [map, setMap] = useState<maplibregl.Map | null>(null);
   const [dem, setDem] = useState<DemSourceHandle | null>(null);
@@ -385,13 +392,14 @@ function EventsPage(): React.ReactElement {
   // start view, one rebuilt later (terrain toggled, say) where it was.
   const viewRef = useRef<View | null>(null);
 
-  const signature = [terrain, globe, look.spritePath, look.clustering, look.clusterRadius].join("|");
+  // The theme is in it because the map's style is fixed when it is built.
+  const signature = [theme, terrain, globe, look.spritePath, look.clustering, look.clusterRadius].join("|");
   const extensions = useMemo(
     () => [
       elevation({
         terrain: terrain ? { exaggeration: 1.5 } : false,
-        hillshade: true,
-        sky: terrain,
+        hillshade: themeLook.hillshade,
+        sky: terrain ? themeLook.sky : false,
         onReady: setDem,
       }),
       areasExtension(areasRef.current, registryRef.current),
@@ -766,13 +774,19 @@ function EventsPage(): React.ReactElement {
   const critical = visible.filter((event) => event.severity === "critical").length;
 
   return (
-    <div style={{ position: "relative", height: "100%" }}>
+    <div
+      data-theme={theme}
+      style={{ position: "relative", height: "100%", background: themeLook.pageBackground, ...themeLook.panels }}
+    >
+      {themeLook.scanlines && <CrtScreen />}
       {lookReady && (
         <DechoBasemap
           key={signature}
           rid={BASEMAP_RID}
           assetsRid={ASSETS_RID}
-          spritePath={look.spritePath}
+          // A named style brings its own sprite set; otherwise the variable's.
+          mapStyle={themeLook.mapStyle ?? undefined}
+          spritePath={themeLook.mapStyle ? undefined : look.spritePath}
           spawnLat={spawn.lat}
           spawnLong={spawn.lon}
           spawnZoom={spawn.zoom}
@@ -949,6 +963,20 @@ function EventsPage(): React.ReactElement {
 
             <div style={panelSeparator} />
 
+            <div style={sectionLabel}>Look</div>
+            <div style={segmented}>
+              {EVENT_THEMES.map((option) => (
+                <button
+                  key={option}
+                  type="button"
+                  style={segment(theme === option)}
+                  aria-pressed={theme === option}
+                  onClick={() => setTheme(option)}
+                >
+                  {THEME_LABELS[option]}
+                </button>
+              ))}
+            </div>
             <Toggle label="3D terrain" value={terrain} onChange={setTerrain} />
             <Toggle label="Globe" value={globe} onChange={setGlobe} />
             <div style={panelMuted}>

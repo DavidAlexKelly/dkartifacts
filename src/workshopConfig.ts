@@ -45,7 +45,7 @@
  *                      a module that sets it selects that event and flies to
  *                      it — as soon as it has loaded, if it has not yet.
  *
- *  eventSpriteSet, eventStart{Latitude,Longitude,Zoom}, eventGlobe,
+ *  eventTheme, eventSpriteSet, eventStart{Latitude,Longitude,Zoom}, eventGlobe,
  *  eventTerrain, eventFitToDataOnLoad, eventClustering, eventClusterRadius,
  *  eventShowSettings, eventAllowSourceEditing, eventAllowCategoryEditing,
  *  eventFeedLength
@@ -90,7 +90,9 @@ import {
   NUMBER_LIMITS,
   checkNumber,
   spritePathFrom,
+  themeFrom,
   type EventAppearance,
+  type EventTheme,
   type NumberLimit,
 } from "@/demo/events/appearance";
 
@@ -183,6 +185,21 @@ export const ARTIFACT_SHELL_CONFIG = [
       fieldValue: {
         type: "inputOutput" as const,
         variableType: { type: "string" as const },
+      },
+    },
+  },
+  {
+    fieldId: "eventTheme",
+    field: {
+      type: "single" as const,
+      label: "event-monitor-theme",
+      helperText:
+        "Event monitor (/events): the look the page opens in — standard, or " +
+        "crt (a green-screen terminal: green map, monospace panels, " +
+        "scanlines). Users can still switch it in settings.",
+      fieldValue: {
+        type: "inputOutput" as const,
+        variableType: { type: "string" as const, defaultValue: "standard" },
       },
     },
   },
@@ -415,6 +432,7 @@ const STANDALONE: ArtifactShellContext = {
       // Nobody to tell: writes go nowhere outside the provider.
       setLoadedValue: () => undefined,
     },
+    eventTheme: { fieldValue: { status: "LOADED", value: "standard" } },
     eventSpriteSet: { fieldValue: { status: "LOADED", value: "sprites/light" } },
     eventStartLatitude: { fieldValue: { status: "LOADED", value: 38 } },
     eventStartLongitude: { fieldValue: { status: "LOADED", value: 25 } },
@@ -586,6 +604,7 @@ export interface WorkshopEventAppearance {
 }
 
 type AppearanceField =
+  | "eventTheme"
   | "eventSpriteSet"
   | "eventStartLatitude"
   | "eventStartLongitude"
@@ -631,11 +650,20 @@ export function resolveEventAppearance(context: ArtifactShellContext): WorkshopE
     invalid.push({ variable: label(fieldId), entry: String(value), error: checked.error });
     return fallback;
   };
+  const theme = (): EventTheme => {
+    const value = read("eventTheme");
+    if (typeof value !== "string") {return DEFAULT_APPEARANCE.theme;}
+    const parsed = themeFrom(value);
+    if (parsed.ok) {return parsed.value ?? DEFAULT_APPEARANCE.theme;}
+    invalid.push({ variable: label("eventTheme"), entry: value, error: parsed.error });
+    return DEFAULT_APPEARANCE.theme;
+  };
   const sprite = read("eventSpriteSet");
   const defaults = DEFAULT_APPEARANCE;
   return {
     status: "ready",
     appearance: {
+      theme: theme(),
       spritePath: (typeof sprite === "string" && spritePathFrom(sprite)) || defaults.spritePath,
       startView: {
         lat: number("eventStartLatitude", NUMBER_LIMITS.lat, defaults.startView.lat),

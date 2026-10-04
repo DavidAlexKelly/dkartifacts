@@ -1,7 +1,7 @@
 /**
  * @acc/decho-styling — the design tokens.
  *
- * Seven themes, as values and as CSS custom properties, plus the helpers for
+ * Eight themes, as values and as CSS custom properties, plus the helpers for
  * re-tinting one and defining your own. No React, no components, no DOM: this
  * is safe in a widget, a test, a transform or a node script generating a
  * report.
