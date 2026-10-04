@@ -22,19 +22,28 @@ renamed to the new version number at release time.
 
 ## Unreleased
 
+### Breaking
+
+- **No data inside the package, and nothing fetched from anywhere but the
+  dataset.** The built-in 1:110m world and `{ kind: "builtin" }` are gone,
+  and `store` is now required — by `loadCountries`, `countries()` and
+  `useCountries`. Migration: build the `countries_map` dataset with
+  `foundry/countries_transform.py` and pass `{ kind: "dataset", datasetRid }`.
+- `scripts/build-data.mjs` is gone: it downloaded its sources, and the
+  dataset is now built in Foundry from files downloaded by hand.
+
 ### Added
 
 - `foundry/countries_transform.py`: builds the dataset as a Foundry Python
-  transform from the raw Natural Earth shapefiles and World Bank CSV exports,
-  plus a one-row-per-country table. Same records and views as
-  `build-data.mjs`.
+  transform from the raw Natural Earth shapefiles and World Bank CSV
+  downloads, plus a one-row-per-country table. Reads only its input dataset.
 
 ### Fixed
 
-- Outlines rounded to their output precision could cross themselves (six at
-  1:10m, Greenland and Russia among them), which MapLibre draws as slivers
-  across the country. `build-data.mjs` now repairs each rounded outline, and
-  the regenerated built-in world is valid throughout.
+- Outlines rounded to their output precision could cross themselves, which
+  MapLibre draws as slivers across the country. The transform snaps with
+  shapely's `set_precision`, which keeps every outline valid.
+- The transform loads under Foundry's transform discovery (no dataclasses).
 
 ## 0.1.0
 

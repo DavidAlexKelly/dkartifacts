@@ -4,23 +4,20 @@
  * WHERE THE DATA COMES FROM
  * -------------------------
  *   { kind: "dataset", datasetRid }   a Foundry dataset built by
- *                                     scripts/build-data.mjs (or anything in
- *                                     the same shape), read through
- *                                     @acc/decho-foundry-bytes like every
- *                                     other decho package. Needs
+ *                                     foundry/countries_transform.py (or
+ *                                     anything in the same shape), read
+ *                                     through @acc/decho-foundry-bytes like
+ *                                     every other decho package. Needs
  *                                     configureFoundryBytes (configureBasemap)
  *                                     first, and the dataset as a Resource on
  *                                     the app in Developer Console.
- *   { kind: "builtin" }               the low-detail world that ships inside
- *                                     this package: Natural Earth 1:110m, one
- *                                     view, figures as Natural Earth has them.
- *                                     Works with no Foundry setup at all; for
- *                                     demos, tests and a first look.
  *   { kind: "files", files }          files you already hold, by path — for
- *                                     tests, or data fetched some other way.
+ *                                     tests, or data read some other way.
  *
- * Whichever it is, everything is read through one `read(path)` and the rest
- * of the package cannot tell them apart.
+ * There is deliberately no data inside the package and nothing fetched from
+ * anywhere but the dataset: what the map shows is what the dataset holds.
+ * Either way, everything is read through one `read(path)` and the rest of the
+ * package cannot tell them apart.
  *
  * WHAT IS CACHED
  * --------------
@@ -45,7 +42,6 @@ import type {
 
 export type CountriesStore =
   | { kind: "dataset"; datasetRid: string; manifestPath?: string }
-  | { kind: "builtin" }
   | { kind: "files"; files: Record<string, unknown>; manifestPath?: string };
 
 export interface CountriesData {
@@ -75,9 +71,9 @@ function resolvePath(manifestPath: string, path: string): string {
   return slash === -1 ? path : `${manifestPath.slice(0, slash + 1)}${path}`;
 }
 
-async function readerFor(
+function readerFor(
   store: CountriesStore,
-): Promise<{ read: (path: string) => Promise<unknown>; manifestPath: string }> {
+): { read: (path: string) => Promise<unknown>; manifestPath: string } {
   if (store.kind === "dataset") {
     if (!store.datasetRid) {throw new CountriesDataError("a dataset store needs a datasetRid.");}
     return {
@@ -85,21 +81,18 @@ async function readerFor(
       manifestPath: store.manifestPath ?? DEFAULT_MANIFEST,
     };
   }
-  const files =
-    store.kind === "builtin"
-      ? (await import("../builtin/world.js")).BUILTIN_FILES
-      : store.files;
+  const { files } = store;
   return {
     read: async (path) => {
       if (!(path in files)) {throw new CountriesDataError(`no file "${path}" in the store.`);}
       return files[path];
     },
-    manifestPath: store.kind === "files" ? (store.manifestPath ?? DEFAULT_MANIFEST) : DEFAULT_MANIFEST,
+    manifestPath: store.manifestPath ?? DEFAULT_MANIFEST,
   };
 }
 
-export async function loadCountries(store: CountriesStore = { kind: "builtin" }): Promise<CountriesData> {
-  const { read, manifestPath } = await readerFor(store);
+export async function loadCountries(store: CountriesStore): Promise<CountriesData> {
+  const { read, manifestPath } = readerFor(store);
   const manifest = parseManifest(await read(manifestPath));
   const records = parseCountries(await read(resolvePath(manifestPath, manifest.countries))).sort((a, b) =>
     a.name.localeCompare(b.name),

@@ -50,7 +50,7 @@ export const EXAMPLE_APPS: ExampleApp[] = [
     label: "Countries",
     packageName: "@acc/decho-countries",
     blurb:
-      "The basemap with a country layer: outlines under the labels, coloured by region, highlighted on hover and selected on click, with a card of the country's facts — population, areas, GDP, capital, codes. Switch between border views (whose claims disputed territory follows) and region schemes without rebuilding the map, pick whole regions instead of countries, find a country by name, or colour by population density. Runs on the low-detail world built into the package until a countries dataset is set.",
+      "The basemap with a country layer: outlines under the labels, coloured by region, highlighted on hover and selected on click, with a card of the country's facts — population, areas, GDP, capital, codes. Switch between border views (whose claims disputed territory follows) and region schemes without rebuilding the map, pick whole regions instead of countries, find a country by name, or colour by population density. Reads the countries_map dataset built in Foundry from the Natural Earth and World Bank downloads; set its RID in the page.",
   },
   {
     path: "/events",

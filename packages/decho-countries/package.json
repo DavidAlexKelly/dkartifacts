@@ -1,7 +1,7 @@
 {
   "name": "@acc/decho-countries",
   "version": "0.1.0",
-  "description": "Country outlines and facts from Foundry: borders under several points of view, region schemes, population, area and GDP, point-in-country lookup, and a clickable layer for @acc/decho-basemap. Ships a low-detail world that works with no dataset at all.",
+  "description": "Country outlines and facts from a Foundry dataset: borders under several points of view, region schemes, population, area and GDP, point-in-country lookup, and a clickable layer for @acc/decho-basemap.",
   "license": "UNLICENSED",
   "private": false,
   "type": "module",
@@ -9,7 +9,6 @@
   "files": [
     "dist",
     "src",
-    "scripts",
     "foundry",
     "!**/*.test.ts",
     "!**/*.test.tsx",
@@ -38,8 +37,6 @@
   },
   "scripts": {
     "build": "tsc -b tsconfig.build.json",
-    "build-data": "node scripts/build-data.mjs",
-    "build-builtin": "node scripts/build-data.mjs --builtin src/builtin/world.ts",
     "prepublishOnly": "npm test && npm run build",
     "test": "vitest run"
   },
@@ -60,7 +57,6 @@
     }
   },
   "devDependencies": {
-    "polygon-clipping": "^0.15.7",
     "typescript": "~5.5.4",
     "vitest": "^3.2.4"
   }

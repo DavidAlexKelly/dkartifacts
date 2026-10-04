@@ -17,9 +17,10 @@ export interface UseCountriesResult {
   loading: boolean;
 }
 
-export function useCountries(store: CountriesStore = { kind: "builtin" }): UseCountriesResult {
-  // Keyed on content, so an inline object literal does not reload every render.
-  const key = store.kind === "dataset" ? `dataset:${store.datasetRid}:${store.manifestPath ?? ""}` : store.kind;
+export function useCountries(store: CountriesStore): UseCountriesResult {
+  // Keyed on content, so an inline object literal does not reload every
+  // render. A files store is keyed on its object: pass a stable one.
+  const key = store.kind === "dataset" ? `dataset:${store.datasetRid}:${store.manifestPath ?? ""}` : store.files;
   const [result, setResult] = useState<UseCountriesResult>({ data: null, error: null, loading: true });
 
   useEffect(() => {

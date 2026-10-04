@@ -81,13 +81,6 @@ describe("geometry", () => {
     expect(index.bounds("B")).toEqual([10, 0, 20, 10]);
     expect(index.bounds("nowhere")).toBeNull();
   });
-
-  it("agrees with the build script's area", async () => {
-    // @ts-expect-error — a plain .mjs module without types.
-    const lib = await import("../../scripts/lib.mjs");
-    const shape: CountryGeometry = { type: "Polygon", coordinates: [[[-5, 40], [8, 41], [3, 51], [-5, 48], [-5, 40]]] };
-    expect(lib.areaKm2(shape)).toBeCloseTo(areaKm2(shape), 6);
-  });
 });
 
 describe("loadCountries", () => {
@@ -146,30 +139,6 @@ describe("loadCountries", () => {
     delete raw["views/claimed/low.geojson"];
     const data = await loadCountries({ kind: "files", files: raw });
     await expect(data.geometry("claimed")).rejects.toThrow(/no file "views\/claimed\/low.geojson"/);
-  });
-});
-
-describe("the built-in world", () => {
-  it("has a record for every outline, unique ids, and figures with their year", async () => {
-    const data = await loadCountries();
-    const outlines = await data.geometry();
-    const ids = outlines.features.map((f) => f.properties.id);
-    expect(new Set(ids).size).toBe(ids.length);
-    expect(ids.filter((id) => !data.country(id))).toEqual([]);
-    expect(data.records.length).toBeGreaterThan(170);
-    const france = data.country("FRA")!;
-    expect(france).toMatchObject({ iso2: "FR", capital: { name: "Paris" }, regions: { "un-region": "Europe" } });
-    expect(france.figures.population.year).toBeGreaterThan(2000);
-    expect(data.manifest.sources[0].licence).toBe("Public domain");
-  });
-
-  it("puts well-known points in the right country", async () => {
-    const index = await (await loadCountries()).index();
-    expect(index.countryAt(2.35, 48.85)).toBe("FRA");
-    // Inland: at 1:110m a coastal city can fall just outside its outline.
-    expect(index.countryAt(-98, 38.5)).toBe("USA");
-    expect(index.countryAt(133.9, -23.7)).toBe("AUS");
-    expect(index.countryAt(-30, 30)).toBeNull();
   });
 });
 

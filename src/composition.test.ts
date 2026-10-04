@@ -84,11 +84,35 @@ beforeAll(() => {
 });
 
 describe("countries with elevation on one map", () => {
-  // The built-in world: no dataset, no network.
+  // A one-country dataset in memory: no Foundry, no network.
+  const store = {
+    kind: "files" as const,
+    files: {
+      "manifest.json": {
+        schema: 1,
+        countries: "countries.json",
+        views: [{ id: "default", label: "Default", files: [{ path: "outlines.geojson", minZoom: 0 }] }],
+        defaultView: "default",
+        regionSchemes: [{ id: "un-region", label: "UN regions" }],
+        sources: [],
+      },
+      "countries.json": { countries: [{ id: "AAA", name: "Testland", regions: { "un-region": "Europe" }, figures: {} }] },
+      "outlines.geojson": {
+        type: "FeatureCollection",
+        features: [
+          {
+            type: "Feature",
+            properties: { id: "AAA" },
+            geometry: { type: "Polygon", coordinates: [[[0, 0], [1, 0], [1, 1], [0, 1], [0, 0]]] },
+          },
+        ],
+      },
+    },
+  };
   const build = async () =>
     mergeExtensionStyle(
       baseStyle(),
-      await collectStyleContributions([elevation({ hillshade: true }), countries()], ctx),
+      await collectStyleContributions([elevation({ hillshade: true }), countries({ store })], ctx),
     );
 
   it("merges, with the country outlines under the labels and over the relief", async () => {
