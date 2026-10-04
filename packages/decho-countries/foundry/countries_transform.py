@@ -683,9 +683,9 @@ if transform is not None:
     import pandas as pd
 
     @transform(
-        countries_map=Output("/CHANGE_ME/countries/countries_map"),
-        countries=Output("/CHANGE_ME/countries/countries"),
-        raw=Input("/CHANGE_ME/countries/countries_raw"),
+        countries_map=Output("/Accenture/[DK] Project Space/Offline World/Data/Artifact Backing Data/[MAP]Countries Map"),
+        countries=Output("/Accenture/[DK] Project Space/Offline World/Data/Artifact Backing Data/[MAP]Countries"),
+        raw=Input("ri.foundry.main.dataset.4392d090-87da-4a81-aaac-f571a7f194c6"),
     )
     def compute(countries_map, countries, raw):
         fs = raw.filesystem()
