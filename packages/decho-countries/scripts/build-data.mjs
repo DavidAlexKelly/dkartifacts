@@ -81,19 +81,65 @@ function parseArgs(argv) {
   return args;
 }
 
+// ── Network and files ───────────────────────────────────────────────────────
+//
+// Every fetch and every file read or write goes through the four helpers
+// below, and each checks what it is given: fetches only reach the two
+// sources this script reads, and files only land inside the folder they were
+// meant for. The code scan's rules for these (SSRF, non-literal fs paths)
+// match on syntax, so the one line in each helper that makes the call is
+// marked `nosemgrep` — `nosemgrep` must be the line immediately above it.
+
+/** The only origins this script fetches from. */
+const ALLOWED_ORIGINS = new Set([new URL(NE_BASE).origin, new URL(WB_BASE).origin]);
+
+async function fetchAllowed(url) {
+  const parsed = new URL(url);
+  if (!ALLOWED_ORIGINS.has(parsed.origin)) {
+    throw new Error(`refusing to fetch ${parsed.origin}: not one of this script's sources`);
+  }
+  // Origin checked against ALLOWED_ORIGINS just above; paths are built from constants.
+  // nosemgrep
+  return fetch(parsed);
+}
+
+/** `file` resolved against `base`, provided it stays inside `base`. */
+function inside(base, file) {
+  const root = path.resolve(base);
+  const target = path.resolve(root, file);
+  if (target !== root && !target.startsWith(root + path.sep)) {
+    throw new Error(`refusing to touch ${target}: it is outside ${root}`);
+  }
+  return target;
+}
+
+async function readText(base, file) {
+  const target = inside(base, file);
+  // Contained by inside() just above.
+  // nosemgrep
+  return fs.readFile(target, "utf8");
+}
+
+async function writeText(base, file, text) {
+  const target = inside(base, file);
+  // Contained by inside() just above.
+  // nosemgrep
+  await fs.mkdir(path.dirname(target), { recursive: true });
+  // nosemgrep
+  await fs.writeFile(target, text);
+}
+
 async function download(url, cacheDir, name) {
-  const cached = path.join(cacheDir, name);
   try {
-    return JSON.parse(await fs.readFile(cached, "utf8"));
+    return JSON.parse(await readText(cacheDir, name));
   } catch {
     // Not cached yet.
   }
   console.log(`  downloading ${url}`);
-  const response = await fetch(url);
+  const response = await fetchAllowed(url);
   if (!response.ok) {throw new Error(`${url}: HTTP ${response.status}`);}
   const text = await response.text();
-  await fs.mkdir(cacheDir, { recursive: true });
-  await fs.writeFile(cached, text);
+  await writeText(cacheDir, name, text);
   return JSON.parse(text);
 }
 
@@ -101,7 +147,7 @@ const naturalEarth = (cache, file) => download(`${NE_BASE}/geojson/${file}.geojs
 
 async function naturalEarthVersion() {
   try {
-    const response = await fetch(`${NE_BASE}/VERSION`);
+    const response = await fetchAllowed(`${NE_BASE}/VERSION`);
     return response.ok ? (await response.text()).trim() : undefined;
   } catch {
     return undefined;
@@ -112,7 +158,7 @@ async function naturalEarthVersion() {
 async function worldBankList(url) {
   const rows = [];
   for (let page = 1; ; page++) {
-    const response = await fetch(`${url}${url.includes("?") ? "&" : "?"}format=json&per_page=1000&page=${page}`);
+    const response = await fetchAllowed(`${url}${url.includes("?") ? "&" : "?"}format=json&per_page=1000&page=${page}`);
     if (!response.ok) {throw new Error(`${url}: HTTP ${response.status}`);}
     const [meta, list] = await response.json();
     rows.push(...(list ?? []));
@@ -174,10 +220,7 @@ function addOutlineAreas(records, collection, scaleName) {
   }
 }
 
-async function writeJson(file, value) {
-  await fs.mkdir(path.dirname(file), { recursive: true });
-  await fs.writeFile(file, JSON.stringify(value));
-}
+const writeJson = (base, file, value) => writeText(base, file, JSON.stringify(value));
 
 async function buildBuiltin(args) {
   console.log("Building the built-in 1:110m world");
@@ -217,8 +260,8 @@ async function buildBuiltin(args) {
     ");",
     "",
   ].join("\n");
-  await fs.mkdir(path.dirname(args.builtin), { recursive: true });
-  await fs.writeFile(args.builtin, body);
+  // Inside the folder it is run from: the package, via npm run build-builtin.
+  await writeText(process.cwd(), args.builtin, body);
   console.log(`Wrote ${args.builtin}: ${records.length} countries, ${geometry.features.length} outlines, ${(body.length / 1024).toFixed(0)} KB`);
 }
 
@@ -266,7 +309,7 @@ async function buildDataset(args) {
       // and each scale has its own features.
       const assignment = assignmentFor(features, adm0ToId, view.id === "default" ? null : view.id.toUpperCase());
       const collection = viewCollection(features, assignment, SCALES[name].decimals);
-      await writeJson(path.join(args.out, "views", view.fileKey, `${name}.geojson`), collection);
+      await writeJson(args.out, path.join("views", view.fileKey, `${name}.geojson`), collection);
       if (view.id === "default" && name === scaleNames.at(-1)) {addOutlineAreas(records, collection, name);}
     }
     console.log(`  ${name}: ${written.size} distinct outline sets for ${views.length} views`);
@@ -278,8 +321,8 @@ async function buildDataset(args) {
     sources,
     generatedAt: new Date().toISOString(),
   });
-  await writeJson(path.join(args.out, "manifest.json"), manifest);
-  await writeJson(path.join(args.out, "countries.json"), { countries: records });
+  await writeJson(args.out, "manifest.json", manifest);
+  await writeJson(args.out, "countries.json", { countries: records });
   console.log(`Wrote ${args.out}: ${records.length} countries, ${views.length} views (${views.map((v) => v.id).join(", ")})`);
   console.log("Upload the whole folder to a Foundry dataset, keeping its structure.");
 }
