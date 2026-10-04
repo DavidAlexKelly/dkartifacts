@@ -13,8 +13,9 @@
  *                     its record in countries.json.
  *
  * Nothing here is specific to Natural Earth or the World Bank. Those are what
- * scripts/build-data.mjs reads, but any dataset in this shape works — which is
- * what lets the data decide which border views and region schemes exist.
+ * foundry/countries_transform.py reads, but any dataset in this shape works —
+ * which is what lets the data decide which border views and region schemes
+ * exist.
  */
 
 import type { Feature, FeatureCollection, MultiPolygon, Polygon } from "geojson";

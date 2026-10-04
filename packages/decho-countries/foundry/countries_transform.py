@@ -29,8 +29,7 @@ OUTPUTS: two datasets.
                      every figure with its year, capital, and the outline as
                      a GeoJSON string — for Contour, the Ontology, or joins.
 
-WHAT IT DOES (the same rules as scripts/build-data.mjs, so either builds the
-same dataset):
+WHAT IT DOES:
 
   - Ids: the ISO alpha-3 code where there is one (ISO_A3_EH, not ISO_A3,
     which is -99 for France and Norway), else Natural Earth's ADM0_A3

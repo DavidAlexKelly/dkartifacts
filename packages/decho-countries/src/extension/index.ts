@@ -5,8 +5,8 @@
  *
  * WHAT IT DRAWS
  * -------------
- * Country outlines from a countries dataset (or the built-in low-detail world
- * when no store is given): a translucent fill, coloured by region unless told
+ * Country outlines from a countries dataset: a translucent fill, coloured by
+ * region unless told
  * otherwise, and the borders over it — all under the basemap's labels, so
  * place names stay readable. Hovering highlights a country, or its whole
  * region in region mode; clicking selects it.
@@ -14,7 +14,7 @@
  * WHAT THE DATA DECIDES
  * ---------------------
  * Which border views and region schemes exist. A dataset built with
- * scripts/build-data.mjs carries Natural Earth's de facto view and one per
+ * foundry/countries_transform.py carries Natural Earth's de facto view and one per
  * point of view that draws disputed territory differently, and five region
  * schemes; another dataset may carry others. `view` and `regionScheme` choose
  * among them at start, and the controller handed to `onReady` switches them
@@ -94,8 +94,8 @@ export interface CountriesController {
 }
 
 export interface CountriesOptions {
-  /** Where the data comes from. Default: the built-in 1:110m world. */
-  store?: CountriesStore;
+  /** Where the data comes from: the countries dataset. */
+  store: CountriesStore;
   /** Border view id; the dataset's default when omitted. */
   view?: string;
   /** Region scheme id; the dataset's default when omitted. */
@@ -147,7 +147,7 @@ interface PointerEvent {
 
 const DEFAULT_REGIONS_BELOW_ZOOM = 3;
 
-export function countries(options: CountriesOptions = {}): BasemapExtension {
+export function countries(options: CountriesOptions): BasemapExtension {
   const prefix = options.id ?? "countries";
   const ids = layerIds(prefix);
   const appearance: Appearance = {

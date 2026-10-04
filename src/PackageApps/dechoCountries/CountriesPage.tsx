@@ -8,12 +8,11 @@
  *
  * DATA
  * ----
- * COUNTRIES_DATASET_RID below is the Foundry dataset built by
- * packages/decho-countries/scripts/build-data.mjs. Left empty, the page uses
- * the low-detail world built into the package (one border view), so it works
- * before the dataset exists. Fill it in, add the dataset as a Resource on the
- * app in Developer Console, and every view the dataset carries appears in the
- * panel.
+ * COUNTRIES_DATASET_RID below is the `countries_map` dataset built by
+ * packages/decho-countries/foundry/countries_transform.py. Fill it in and add
+ * the dataset as a Resource on the app in Developer Console; every view the
+ * dataset carries then appears in the panel. Left empty, the page shows the
+ * plain basemap and says so — the package carries no data of its own.
  */
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
@@ -38,12 +37,12 @@ import {
   surface,
 } from "@/components/mapPanel";
 
-/** The countries dataset. Empty: the package's built-in 1:110m world. */
+/** The `countries_map` dataset built by the package's Foundry transform. */
 const COUNTRIES_DATASET_RID = "";
 
-const STORE: CountriesStore = COUNTRIES_DATASET_RID
+const STORE: CountriesStore | null = COUNTRIES_DATASET_RID
   ? { kind: "dataset", datasetRid: COUNTRIES_DATASET_RID }
-  : { kind: "builtin" };
+  : null;
 
 const SPAWN = { lat: 25, lon: 15, zoom: 1.6 };
 
@@ -95,7 +94,7 @@ function CountriesPage(): React.ReactElement {
   const fill = FILLS.find((option) => option.id === fillId)?.fill ?? "region";
   const handlers = useRef({ setSelection, setHover, setController, setError });
   const extensions = useMemo(
-    () => [
+    () => !STORE ? [] : [
       countries({
         store: STORE,
         fill,
@@ -159,7 +158,9 @@ function CountriesPage(): React.ReactElement {
       <div style={{ ...mapPanel, display: "block", top: 12, left: 12, width: 290, maxHeight: "calc(100% - 24px)", overflowY: "auto" }}>
         <div style={panelHeading}>Countries</div>
         <div style={panelMuted}>
-          {COUNTRIES_DATASET_RID ? "From the countries dataset" : "Built-in 1:110m world — set COUNTRIES_DATASET_RID for more"}
+          {STORE
+            ? "From the countries dataset"
+            : "No countries dataset set. Put the countries_map dataset's RID in COUNTRIES_DATASET_RID (src/PackageApps/dechoCountries/CountriesPage.tsx)."}
           {controller && ` · ${controller.data.records.length} countries`}
         </div>
         {error && <div style={{ color: "#ff9a92", marginTop: 6 }}>{error}</div>}

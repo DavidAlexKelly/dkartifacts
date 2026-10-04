@@ -373,12 +373,12 @@ export const PACKAGE_GUIDES: PackageGuide[] = [
   {
     ...base(countriesPackage),
     platform:
-      "Nothing, to start: the package carries a low-detail world. For full detail and several border views, build a dataset with the package's scripts/build-data.mjs, upload it, and add it as a Resource on your app in Developer Console — without that the country layer is missing and onError says why, while the map itself is unaffected.",
+      "The countries_map dataset, built in Foundry by the package's foundry/countries_transform.py from the Natural Earth and World Bank downloads, and added as a Resource on your app in Developer Console. The package carries no data of its own and fetches nothing else; without the Resource the country layer is missing and onError says why, while the map itself is unaffected.",
     examplePath: "/countries",
     usage: [
       {
         title: "An extension, with a card for what is clicked",
-        note: "No store means the built-in world. Pass { kind: \"dataset\", datasetRid } for your own; the views and region schemes it carries appear on the controller handed to onReady.",
+        note: "The store is the countries_map dataset; the views and region schemes it carries appear on the controller handed to onReady.",
         code: [
           'import { DechoBasemap } from "@acc/decho-basemap/react";',
           'import { countries } from "@acc/decho-countries/extension";',
@@ -386,7 +386,9 @@ export const PACKAGE_GUIDES: PackageGuide[] = [
           "",
           "const [selection, setSelection] = useState(null);",
           "",
-          "<DechoBasemap extensions={[countries({ onSelect: setSelection })]} />;",
+          'const store = { kind: "dataset", datasetRid: "ri.foundry.main.dataset.…" };',
+          "",
+          "<DechoBasemap extensions={[countries({ store, onSelect: setSelection })]} />;",
           "<CountryCard selection={selection} />;",
         ].join("\n"),
       },
@@ -396,7 +398,7 @@ export const PACKAGE_GUIDES: PackageGuide[] = [
         code: [
           'import { loadCountries } from "@acc/decho-countries";',
           "",
-          "const data = await loadCountries();",
+          'const data = await loadCountries({ kind: "dataset", datasetRid: "ri.foundry.main.dataset.…" });',
           "const index = await data.index();",
           'index.countryAt(2.35, 48.85); // "FRA"',
         ].join("\n"),

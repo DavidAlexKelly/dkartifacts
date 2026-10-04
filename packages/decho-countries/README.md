@@ -5,9 +5,9 @@ stack: borders under several points of view, regions under several schemes,
 population, area and GDP, a "which country is this point in" lookup, and a
 clickable country layer for `@acc/decho-basemap`.
 
-It ships a low-detail world (Natural Earth 1:110m) inside the package, so it
-works before you have a dataset — and with one, nothing is fetched from the
-public internet.
+**Everything comes from one Foundry dataset.** The package carries no data of
+its own and fetches nothing from anywhere else: the dataset is built in
+Foundry, by the transform in `foundry/`, from files downloaded once by hand.
 
 ## Quick start
 
@@ -16,16 +16,10 @@ import { DechoBasemap } from "@acc/decho-basemap/react";
 import { countries } from "@acc/decho-countries/extension";
 import { CountryCard } from "@acc/decho-countries/react";
 
+const store = { kind: "dataset", datasetRid: "ri.foundry.main.dataset.…" }; // countries_map
 const [selection, setSelection] = useState(null);
 
-<DechoBasemap
-  extensions={[
-    countries({
-      store: { kind: "dataset", datasetRid: "ri.foundry.main.dataset.…" }, // omit for the built-in world
-      onSelect: setSelection,
-    }),
-  ]}
-/>;
+<DechoBasemap extensions={[countries({ store, onSelect: setSelection })]} />;
 <CountryCard selection={selection} />;
 ```
 
@@ -52,76 +46,60 @@ fine.
 
 | Store | What it is |
 |---|---|
-| `{ kind: "builtin" }` (default) | Natural Earth 1:110m inside the package: one view, five region schemes, Natural Earth's figures (2019 estimates), areas from the 1:50m outlines. About 106 KB gzipped, loaded on first use. |
-| `{ kind: "dataset", datasetRid }` | A Foundry dataset built by `scripts/build-data.mjs`. Read through `@acc/decho-foundry-bytes`, so `configureFoundryBytes` (`configureBasemap`) must have run, and the dataset must be a **Resource** on the app in Developer Console. |
-| `{ kind: "files", files }` | Files you already hold, by path. For tests, or data fetched some other way. |
+| `{ kind: "dataset", datasetRid }` | The `countries_map` dataset (below). Read through `@acc/decho-foundry-bytes`, so `configureFoundryBytes` (`configureBasemap`) must have run, and the dataset must be a **Resource** on the app in Developer Console. |
+| `{ kind: "files", files }` | The same files held in memory, by path. For tests. |
 
-### Building a dataset
+### Building the dataset in Foundry
 
-On a machine with internet access:
+`foundry/countries_transform.py` is a Foundry Python transform. It reads the
+raw files as downloaded and needs no internet access:
 
-```sh
-cd packages/decho-countries
-npm install                       # polygon-clipping, used to merge outlines
-node scripts/build-data.mjs --out ./countries-data --world-bank
-```
+1. **Download** (once, by hand) and upload to one Foundry dataset:
+   - Natural Earth 1:10m [admin 0 countries](https://www.naturalearthdata.com/downloads/10m-cultural-vectors/10m-admin-0-countries/)
+     and [populated places](https://www.naturalearthdata.com/downloads/10m-cultural-vectors/10m-populated-places/):
+     the `ne_10m_admin_0_countries.*` and `ne_10m_populated_places.*`
+     shapefiles (`.shp`, `.shx`, `.dbf`, `.cpg`; `VERSION.txt` is used if
+     present).
+   - World Bank CSV downloads of
+     [population](https://data.worldbank.org/indicator/SP.POP.TOTL),
+     [land area](https://data.worldbank.org/indicator/AG.LND.TOTL.K2),
+     [surface area](https://data.worldbank.org/indicator/AG.SRF.TOTL.K2),
+     [GDP](https://data.worldbank.org/indicator/NY.GDP.MKTP.CD) and
+     [GDP per person](https://data.worldbank.org/indicator/NY.GDP.PCAP.CD):
+     the `API_*.csv` files and one `Metadata_Country_*.csv`.
 
-Then upload everything in `./countries-data` to a Foundry dataset, **keeping
-the folder structure**, and pass its RID as `datasetRid`.
-
-| Option | |
-|---|---|
-| `--scales 50m,10m` | Natural Earth scales, least detailed first. Default: 1:50m from zoom 0, 1:10m from zoom 5. |
-| `--views all` | `all`: the de facto view and every point of view that draws differently. `default`: one view. Or a list: `US,IN,CN`. |
-| `--world-bank` | Use the World Bank's latest population, land and total area, GDP and GDP per person, and its income groups, instead of Natural Earth's 2019 estimates. Lists any sovereign country it could not match. |
-| `--cache <dir>` | Keep and reuse downloads (default `.ne-cache`). |
-
-With the defaults that is 32 views (15 distinct sets of outlines — views that
-draw identically share files), about 170 MB in all: 1.6 MB per view at 1:50m,
-10 MB at 1:10m. The map only ever reads the view and detail on screen.
-
-`npm run build-builtin` regenerates the built-in world the same way.
-
-### Building it in Foundry instead
-
-`foundry/countries_transform.py` builds the same dataset as a Foundry Python
-transform, from the files as downloaded — no internet access needed in
-Foundry, and no Node:
-
-1. Upload the raw files to one dataset: the Natural Earth 1:10m
-   `ne_10m_admin_0_countries.*` and `ne_10m_populated_places.*` shapefiles
-   (`.shp`, `.shx`, `.dbf`, `.cpg`; the `VERSION.txt` is used if present), and
-   the World Bank CSV exports `API_SP.POP.TOTL_*.csv`,
-   `API_AG.LND.TOTL.K2_*.csv`, `API_AG.SRF.TOTL.K2_*.csv`,
-   `API_NY.GDP.MKTP.CD_*.csv`, `API_NY.GDP.PCAP.CD_*.csv` and one
-   `Metadata_Country_*.csv`. Names are matched loosely, so the version
-   numbers in them do not matter; the `Metadata_Indicator_*` and README files
-   are ignored.
-2. Copy the file into a Python transforms repository, set the three paths in
-   its `@transform` decorator, and add `shapely` and `pyshp` to the run
-   requirements (`pyshp` is pure Python — no GDAL).
-3. Build. Two outputs:
+   Names are matched loosely, so the version numbers in them do not matter;
+   `Metadata_Indicator_*`, README and `.prj` files are ignored.
+2. **Set up** a Python transforms repository: copy the file in, set the three
+   paths in its `@transform` decorator, and add `shapely` (2.0 or later) and
+   `pyshp` to the run requirements. `pyshp` is pure Python — no GDAL.
+3. **Build.** Two outputs:
 
 | Output | |
 |---|---|
-| `countries_map` | Files, exactly what this package reads: `manifest.json`, `countries.json`, `views/<view>/low.geojson` (simplified, from zoom 0) and `high.geojson` (full 1:10m, from zoom 4). Its RID is the `datasetRid`. About 200 MB. |
+| `countries_map` | Files, exactly what this package reads: `manifest.json`, `countries.json`, `views/<view>/low.geojson` (simplified, from zoom 0) and `high.geojson` (full 1:10m, from zoom 4). Its RID is the `datasetRid`. About 200 MB, but the map only reads the view and detail on screen. |
 | `countries` | A table, one row per country: codes, names, the five region schemes, capital, label point, Wikidata id, every figure with its year and source, and the outline as a GeoJSON string. For Contour, the Ontology or joins. |
 
-The same file runs locally — `python countries_transform.py <raw folder>
-<out folder>` — and builds a dataset identical, record for record, to
-`build-data.mjs` given the same Natural Earth data.
+The figures are each World Bank series' most recent year, per country;
+Natural Earth's 2019 estimates where the World Bank has nothing (Taiwan,
+Somaliland, Northern Cyprus); total area from the outline where neither has it.
+The build lists any sovereign country the World Bank had no figures for.
 
-### Data sources
+The same file runs on a laptop, for checking a build before uploading —
+`python countries_transform.py <raw folder> <out folder>` — and reads only
+the folder it is given.
+
+### Licences
 
 | Source | Gives | Licence |
 |---|---|---|
-| [Natural Earth](https://www.naturalearthdata.com/) — [admin 0 countries](https://www.naturalearthdata.com/downloads/10m-cultural-vectors/10m-admin-0-countries/), [populated places](https://www.naturalearthdata.com/downloads/10m-cultural-vectors/10m-populated-places/), files read from [nvkelso/natural-earth-vector](https://github.com/nvkelso/natural-earth-vector/tree/master/geojson) | Outlines at 1:110m/50m/10m, points of view, region fields, names in 26 languages, capitals, Wikidata ids | Public domain |
-| [World Bank Indicators API](https://datahelpdesk.worldbank.org/knowledgebase/articles/889392-about-the-indicators-api-documentation) — [population](https://data.worldbank.org/indicator/SP.POP.TOTL), [land area](https://data.worldbank.org/indicator/AG.LND.TOTL.K2), [surface area](https://data.worldbank.org/indicator/AG.SRF.TOTL.K2), [GDP](https://data.worldbank.org/indicator/NY.GDP.MKTP.CD), [GDP per person](https://data.worldbank.org/indicator/NY.GDP.PCAP.CD), [country list](https://api.worldbank.org/v2/country?format=json) | Figures, income groups, capitals where Natural Earth has none | CC BY 4.0 — credit it where shown; `CountryCard` does |
+| Natural Earth | Outlines, points of view, region fields, names in 26 languages, capitals, Wikidata ids | Public domain |
+| World Bank | Population, areas, GDP, World Bank regions, income groups | CC BY 4.0 — credit it where shown; `CountryCard` does, from the dataset's manifest |
 
 ## Border views
 
 Where territory is disputed, a view decides whose claim the map follows. The
-build script makes one per Natural Earth point of view that differs from the
+transform makes one per Natural Earth point of view that differs from the
 de facto lines — e.g. under `in`, Western Sahara is part of Morocco and
 Kosovo of Serbia; under `cn`, Taiwan is part of China; under `us`, Somaliland
 is part of Somalia. Which views exist is the dataset's business; the package
@@ -143,7 +121,7 @@ Somaliland into it.
 
 ## Regions
 
-Region schemes come from the data too. The build script writes five:
+Region schemes come from the data too. The transform writes five:
 `un-region` (default), `un-subregion`, `wb-region`, `continent` and `income`.
 A record says which region it is in under each; regions and their summed
 figures are worked out from the records, so no region outlines are needed —
@@ -163,7 +141,7 @@ countries({ regionScheme: "wb-region", mode: "auto", regionsBelowZoom: 3 });
 
 | Option | Default | |
 |---|---|---|
-| `store` | built-in | See above. |
+| `store` | required | See above. |
 | `view`, `regionScheme` | the dataset's defaults | Starting choices; the controller changes them later. |
 | `mode`, `regionsBelowZoom` | `countries`, 3 | |
 | `fill` | `"region"` | `"country"`, `"uniform"`, `"none"`, or `(record, region) => colour` for a choropleth. |
@@ -196,9 +174,3 @@ read again.
 
 - Built like its siblings: `tsc -b tsconfig.build.json`, `NodeNext`, so `dist`
   loads under Node's own loader as well as bundlers.
-- The built-in world is `src/builtin/world.ts`, generated — do not edit it.
-  It is one `JSON.parse` of a string, which engines load faster than an
-  object literal and which keeps TypeScript from inferring a type for every
-  coordinate.
-- `scripts/` ships in the tarball so a consumer can build a dataset from the
-  installed package.
