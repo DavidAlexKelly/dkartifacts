@@ -1,8 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 
+import { namedFlavor } from "@protomaps/basemaps";
+
 import { ASSET_STORE, PLANET_STORE, THEATRE_STORE } from "../core/defaults.js";
+import { CRT_FLAVOR, phosphorFlavor } from "../core/flavors.js";
 import {
   MAP_STYLES,
+  ownFlavorForStyle,
   resolveAssetStore,
   resolveTileStore,
   resolveView,
@@ -105,21 +109,52 @@ describe("resolveAssetStore", () => {
 });
 
 describe("MAP_STYLES", () => {
-  it("lists only styles the bundled asset dataset ships sprites for", () => {
-    // The bundle contains sprites/{black,dark,grayscale,light,white}. Offering
-    // a name with no sprite would produce one console error per missing icon.
-    expect([...MAP_STYLES].sort()).toEqual([
-      "black",
-      "dark",
-      "grayscale",
-      "light",
-      "white",
-    ]);
+  // The bundle contains sprites/{black,dark,grayscale,light,white}. Offering
+  // a name with no sprite would produce one console error per missing icon.
+  const BUNDLED_SPRITES = ["black", "dark", "grayscale", "light", "white"];
+
+  it("lists the bundled flavors and our own crt", () => {
+    expect([...MAP_STYLES].sort()).toEqual([...BUNDLED_SPRITES, "crt"].sort());
   });
 
-  it("maps every style to a sprite path", () => {
+  it("maps every style to a sprite the bundle has", () => {
     for (const style of MAP_STYLES) {
-      expect(spritePathForStyle(style)).toBe(`sprites/${style}`);
+      expect(BUNDLED_SPRITES.map((s) => `sprites/${s}`)).toContain(spritePathForStyle(style));
     }
+    expect(spritePathForStyle("dark")).toBe("sprites/dark");
+    expect(spritePathForStyle("crt")).toBe("sprites/black");
+  });
+
+  it("builds crt itself and leaves the others to Protomaps", () => {
+    expect(ownFlavorForStyle("crt")).toBe(CRT_FLAVOR);
+    for (const style of MAP_STYLES.filter((s) => s !== "crt")) {
+      expect(ownFlavorForStyle(style)).toBeNull();
+    }
+  });
+
+  it("gives crt the black sprite through the asset store too", () => {
+    expect(resolveAssetStore({ mapStyle: "crt" })?.spritePath).toBe("sprites/black");
+  });
+});
+
+describe("phosphorFlavor", () => {
+  it("has a colour for every key the black flavor has", () => {
+    expect(Object.keys(CRT_FLAVOR).sort()).toEqual(Object.keys(namedFlavor("black")).sort());
+    for (const value of Object.values(CRT_FLAVOR)) {
+      expect(value).toMatch(/^#[0-9a-f]{6}$/);
+    }
+  });
+
+  it("is green, with water darker than land and borders brighter than roads", () => {
+    const g = (hex: string) => parseInt(hex.slice(3, 5), 16);
+    expect(CRT_FLAVOR.boundaries).toBe("#1c8c38");
+    expect(g(CRT_FLAVOR.water)).toBeLessThan(g(CRT_FLAVOR.earth));
+    expect(g(CRT_FLAVOR.boundaries)).toBeGreaterThan(g(CRT_FLAVOR.highway));
+  });
+
+  it("takes another phosphor, and refuses one it cannot read", () => {
+    expect(phosphorFlavor("#ffb000").city_label).toBe("#d99600");
+    expect(phosphorFlavor("fb0").earth).toBe(phosphorFlavor("#ffbb00").earth);
+    expect(() => phosphorFlavor("green")).toThrow(/hex colour/);
   });
 });

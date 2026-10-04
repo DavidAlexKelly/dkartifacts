@@ -1,6 +1,6 @@
 # @acc/decho-styling
 
-The shared look, as values: design tokens in seven themes, so that a widget
+The shared look, as values: design tokens in eight themes, so that a widget
 written in one code repository and a widget written in another are recognisably
 the same product.
 
@@ -15,7 +15,7 @@ transform, a test or a node script generating a report can take it, which is
 the point — a design system that can only be released after something else is a
 design system nobody upgrades.
 
-Seven themes:
+Eight themes:
 
 | | |
 |---|---|
@@ -23,6 +23,7 @@ Seven themes:
 | **`modern`** | The indigo command-centre look. Translucent glass over a lit background, a gradient hairline catching the top edge of every surface, selection that glows. |
 | **`daylight`** | The light theme. Depth from shadow rather than luminance, status colours darkened to stay legible on white. |
 | **`command`** | Amber on near-black, 2px corners, opaque surfaces, no blur. The night watch. |
+| **`crt`** | Phosphor green on black, like a vector terminal: monospace throughout, square corners, glow where other themes have shadow, and red and amber kept for alerts. Pairs with `@acc/decho-basemap`'s `mapStyle="crt"`. Scanlines are not a token — an app adds them over the screen if it wants them. |
 | **`accenture-light`** | The corporate palette: Blue 3 for actions, Violet 3 for AI, Black-at-20% card borders, the fixed RAG scale, the ten-colour brand series for charts. |
 | **`accenture-dark`** | The same on Black and Dark Gray 1. Tones lightened where the reference has no dark-legible member; the RAG scale deliberately unchanged. |
 | **`accenture-sap`** | Accenture purple on white — the look the SAP migration estate (Ignite, PRISM, FloX) already draws with. `purpleDark` for every action, the brand purple for decoration that holds no text, Zinc greys, 10px cards, 6px controls, a purple-cast shadow. Not `accenture-light`: that is the corporate palette as specified, in blue; this is what one programme built on top of it. |
@@ -327,7 +328,7 @@ stylesheet:
 npm run build && node scripts/gen-tokens-css.mjs
 ```
 
-`src/css/tokens.css` is generated from `src/core/tokens.ts` — seven themes is
+`src/css/tokens.css` is generated from `src/core/tokens.ts` — eight themes is
 well over 400 declarations, and transcribing those by hand to satisfy the drift
 test is precisely the work that should not be done by hand. Edit the
 TypeScript, run the script, commit both; the test fails if you forget.
@@ -541,7 +542,7 @@ does so silently.
 | Entry point | Contents |
 |---|---|
 | `@acc/decho-styling` | `DECHO_TOKENS`, `SKIN_OVERRIDES`, `tokensFor`, `skinVariables`, `tokenVariables`, `tokenVariableName`, `themeVariables`, `withTheme`, `withAccent`, `accentVariables`, `ACCENT_TOKENS`, `defineTheme`, `statusColor`, `chartSeries`, `toneColors`, and the colour maths: `parseColor` `hue` `luminance` `shade` `toHex` `readableOn` `contrastRatio` |
-| `@acc/decho-styling/tokens.css` | The custom properties, all seven themes |
+| `@acc/decho-styling/tokens.css` | The custom properties, all eight themes |
 | `@acc/decho-styling/blueprint.css` | Blueprint 5 wearing the tokens. Import after Blueprint's own CSS |
 | `@acc/decho-styling/compat/military.css` | Legacy variable names aliased onto the tokens |
 | `@acc/decho-styling/tokens.json` | Every theme's resolved tokens, as data, for Figma / Style Dictionary |

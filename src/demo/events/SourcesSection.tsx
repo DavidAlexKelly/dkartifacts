@@ -4,7 +4,7 @@
  */
 
 import React, { useState } from "react";
-import { panelCheckbox, panelFigures, panelMuted, panelToggle } from "@/components/mapPanel";
+import { panelCheckbox, panelFigures, panelMuted, panelToggle, panelVar } from "@/components/mapPanel";
 import { categoryMeta, type CategoryRegistry } from "./categories";
 import type { CategoryOverrides } from "./categoryOverrides";
 import type { EventCategory } from "./mockEvents";
@@ -101,7 +101,7 @@ export function SourcesSection({
       <summary style={disclosure}>
         Sources · {states.length}
         {live && " · live"}
-        {problems > 0 && <span style={{ color: "#ff9a92" }}> · {problems} with problems</span>}
+        {problems > 0 && <span style={{ color: panelVar.danger }}> · {problems} with problems</span>}
       </summary>
       <div style={{ display: "flex", flexDirection: "column", gap: 4, marginTop: 4 }}>
         {allowSourceEditing && (

@@ -12,7 +12,22 @@ export interface StartView {
   zoom: number;
 }
 
+/**
+ * The page's look as a whole: map, panels and screen.
+ *
+ *   standard  The light basemap and the dark translucent panels every map
+ *             page shares.
+ *   crt       A green-screen terminal: decho-basemap's mapStyle="crt", the
+ *             panels in decho-styling's `crt` theme, and scanlines over the
+ *             lot. The sprite set variable does not apply: the map brings its
+ *             own.
+ */
+export const EVENT_THEMES = ["standard", "crt"] as const;
+export type EventTheme = (typeof EVENT_THEMES)[number];
+
 export interface EventAppearance {
+  /** Starting look; the settings can still switch it. */
+  theme: EventTheme;
   /** Sprite set inside the basemap's assets, e.g. "sprites/light". */
   spritePath: string;
   startView: StartView;
@@ -35,6 +50,7 @@ export interface EventAppearance {
 }
 
 export const DEFAULT_APPEARANCE: EventAppearance = {
+  theme: "standard",
   spritePath: "sprites/light",
   // Europe and the Middle East in view, the rest of the globe a drag away.
   startView: { lat: 38, lon: 25, zoom: 2.3 },
@@ -61,6 +77,19 @@ export function spritePathFrom(text: string): string | null {
   const trimmed = text.slice(start, end);
   if (trimmed === "") {return null;}
   return trimmed.includes("/") ? trimmed : `sprites/${trimmed}`;
+}
+
+/**
+ * A theme as a module might write it, any case. Null when blank; an error for
+ * a name that is not one.
+ */
+export function themeFrom(text: string): { ok: true; value: EventTheme | null } | { ok: false; error: string } {
+  const name = text.trim().toLowerCase();
+  if (name === "") {return { ok: true, value: null };}
+  const theme = EVENT_THEMES.find((candidate) => candidate === name);
+  return theme
+    ? { ok: true, value: theme }
+    : { ok: false, error: `not a theme (${EVENT_THEMES.join(", ")}).` };
 }
 
 /** Numeric variables: their range, and whether they are whole numbers. */

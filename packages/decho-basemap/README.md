@@ -35,6 +35,7 @@ import { DechoBasemap } from "@acc/decho-basemap/react";
 | `mediaSetRid` | Media set holding the same layout, when there is no dataset |
 | `assetsRid`, `spritePath` | Glyph/sprite bundle |
 | `spawnLat`, `spawnLong`, `spawnZoom` | Opening view |
+| `mapStyle` | `light` (default), `dark`, `white`, `grayscale`, `black`, or `crt` — picks the colours and the matching sprite sheet |
 
 All optional — with no props at all you get the preset planet basemap. The
 `spawn*` props are flat scalars because that is what callers usually have to
@@ -54,6 +55,25 @@ import { THEATRE_STORE } from "@acc/decho-basemap";
 
 `tiles` wins over `rid` if both are given, and `assets` over `assetsRid`.
 Passing `assets={null}` means "no labels", which is different from omitting it.
+
+### The green-screen style
+
+`mapStyle="crt"` draws the map like a vector terminal: near-black ground,
+everything else in one phosphor green at different strengths — water darkest,
+land a shade up, roads dim, borders and labels bright. It is this package's
+own flavor (the other five are Protomaps'), and it uses the `black` sprite
+sheet, so it needs nothing extra in the assets dataset.
+
+It is one colour and a table of strengths, so other phosphors are one call:
+
+```tsx
+import { phosphorFlavor } from "@acc/decho-basemap";
+
+<DechoBasemap flavor={phosphorFlavor("#ffb000")} spritePath="sprites/black" />  // amber
+```
+
+Only the map. Panels in the same look are `@acc/decho-styling`'s `crt` theme;
+scanlines and glow over the whole screen are the app's to add.
 
 ## Three layers, pick your altitude
 

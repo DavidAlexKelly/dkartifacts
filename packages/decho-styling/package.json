@@ -1,7 +1,7 @@
 {
   "name": "@acc/decho-styling",
   "version": "1.3.1",
-  "description": "The Decho design tokens: seven themes as values and as CSS custom properties, with helpers for re-tinting a theme and defining your own. No React and no components — those are @acc/decho-components, which depends on neither this package nor a stylesheet. Ships its own adoption codemod, Blueprint adapter and lint rule.",
+  "description": "The Decho design tokens: eight themes as values and as CSS custom properties, with helpers for re-tinting a theme and defining your own. No React and no components — those are @acc/decho-components, which depends on neither this package nor a stylesheet. Ships its own adoption codemod, Blueprint adapter and lint rule.",
   "license": "UNLICENSED",
   "private": false,
   "type": "module",

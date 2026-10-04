@@ -4,7 +4,7 @@
  */
 
 import type React from "react";
-import { errorPanel, mapPanel, panelMuted, surface } from "@/components/mapPanel";
+import { errorPanel, mapPanel, panelMuted, panelRadius, panelVar, surface } from "@/components/mapPanel";
 
 /**
  * The scrolling container. Block, not flex: a flex column of fixed height
@@ -40,9 +40,9 @@ export const settingsButton = (open: boolean): React.CSSProperties => ({
   gap: 6,
   padding: "5px 10px",
   cursor: "pointer",
-  font: "600 12px/1.6 sans-serif",
+  font: `600 12px/1.6 ${panelVar.font}`,
   background: open ? surface.accent : surface.background,
-  color: open ? "#fff" : surface.text,
+  color: open ? panelVar.onAccent : surface.text,
 });
 
 /** Settings drop down from the button, over the map's right-hand side. */
@@ -83,10 +83,10 @@ export const sectionLabel: React.CSSProperties = {
 };
 
 export const mockBadge: React.CSSProperties = {
-  font: "600 9px/1 sans-serif",
+  font: `600 9px/1 ${panelVar.font}`,
   letterSpacing: 0.6,
   padding: "3px 5px",
-  borderRadius: 4,
+  borderRadius: panelRadius(4),
   border: `1px solid ${surface.border}`,
   color: surface.muted,
 };
@@ -100,11 +100,11 @@ export function segment(active: boolean, colour?: string): React.CSSProperties {
   return {
     flex: 1,
     padding: "4px 0",
-    borderRadius: 5,
+    borderRadius: panelRadius(5),
     border: `1px solid ${active ? colour ?? surface.accent : surface.border}`,
-    background: active ? "rgba(255,255,255,0.12)" : "transparent",
+    background: active ? panelVar.highlight : "transparent",
     color: active ? surface.text : surface.muted,
-    font: "11px/1.4 sans-serif",
+    font: `11px/1.4 ${panelVar.font}`,
     cursor: "pointer",
   };
 }
@@ -137,12 +137,12 @@ export function feedRow(active: boolean): React.CSSProperties {
     alignItems: "flex-start",
     textAlign: "left",
     padding: "5px 6px",
-    borderRadius: 5,
+    borderRadius: panelRadius(5),
     border: "none",
-    background: active ? "rgba(255,255,255,0.12)" : "transparent",
+    background: active ? panelVar.highlight : "transparent",
     color: surface.text,
     cursor: "pointer",
-    font: "12px/1.4 sans-serif",
+    font: `12px/1.4 ${panelVar.font}`,
   };
 }
 
@@ -155,11 +155,11 @@ export const feedTitle: React.CSSProperties = {
 
 export const actionButton: React.CSSProperties = {
   padding: "6px 10px",
-  borderRadius: 6,
+  borderRadius: panelRadius(6),
   border: `1px solid ${surface.border}`,
-  background: "rgba(255,255,255,0.08)",
+  background: panelVar.well,
   color: surface.text,
-  font: "12px/1.4 sans-serif",
+  font: `12px/1.4 ${panelVar.font}`,
   cursor: "pointer",
 };
 
@@ -186,16 +186,16 @@ export const detailsStripe: React.CSSProperties = {
   left: 0,
   right: 0,
   height: 4,
-  borderRadius: "8px 8px 0 0",
+  borderRadius: `${panelRadius(8)} ${panelRadius(8)} 0 0`,
 };
 
 export function chip(colour: string): React.CSSProperties {
   return {
     padding: "2px 7px",
-    borderRadius: 10,
+    borderRadius: panelRadius(10),
     border: `1px solid ${colour}`,
     color: colour,
-    font: "600 10px/1.5 sans-serif",
+    font: `600 10px/1.5 ${panelVar.font}`,
     letterSpacing: 0.3,
   };
 }
@@ -205,7 +205,7 @@ export const closeButton: React.CSSProperties = {
   border: "none",
   background: "transparent",
   color: surface.muted,
-  font: "18px/1 sans-serif",
+  font: `18px/1 ${panelVar.font}`,
   cursor: "pointer",
   padding: 2,
 };
@@ -218,8 +218,8 @@ export const metricsGrid: React.CSSProperties = {
 
 export const metricTile: React.CSSProperties = {
   padding: "6px 8px",
-  borderRadius: 6,
-  background: "rgba(255,255,255,0.06)",
+  borderRadius: panelRadius(6),
+  background: panelVar.well,
 };
 
 export const facts: React.CSSProperties = {
@@ -263,8 +263,8 @@ export const sourceRow: React.CSSProperties = {
   flexDirection: "column",
   gap: 2,
   padding: "6px 8px",
-  borderRadius: 6,
-  background: "rgba(255,255,255,0.05)",
+  borderRadius: panelRadius(6),
+  background: panelVar.well,
 };
 
 export const sourceHeader: React.CSSProperties = {
@@ -284,21 +284,21 @@ export const sourceName: React.CSSProperties = {
 };
 
 export const kindBadge: React.CSSProperties = {
-  font: "600 9px/1 sans-serif",
+  font: `600 9px/1 ${panelVar.font}`,
   letterSpacing: 0.5,
   textTransform: "uppercase",
   padding: "3px 4px",
-  borderRadius: 3,
-  background: "rgba(255,255,255,0.1)",
+  borderRadius: panelRadius(3),
+  background: panelVar.well,
   color: surface.muted,
   flex: "none",
 };
 
 export const liveBadge: React.CSSProperties = {
-  font: "700 9px/1 sans-serif",
+  font: `700 9px/1 ${panelVar.font}`,
   letterSpacing: 0.6,
   padding: "2px 4px",
-  borderRadius: 3,
+  borderRadius: panelRadius(3),
   background: "#e5484d",
   color: "#ffffff",
   flex: "none",
@@ -309,7 +309,7 @@ export const iconButton: React.CSSProperties = {
   background: "transparent",
   color: surface.muted,
   cursor: "pointer",
-  font: "13px/1 sans-serif",
+  font: `13px/1 ${panelVar.font}`,
   padding: "2px 3px",
   flex: "none",
 };
@@ -318,32 +318,32 @@ export const input: React.CSSProperties = {
   width: "100%",
   boxSizing: "border-box",
   padding: "5px 7px",
-  borderRadius: 5,
+  borderRadius: panelRadius(5),
   border: `1px solid ${surface.border}`,
-  background: "rgba(0,0,0,0.25)",
+  background: panelVar.field,
   color: surface.text,
-  font: "11px/1.4 ui-monospace, monospace",
+  font: `11px/1.4 ${panelVar.mono}`,
 };
 
 export const select: React.CSSProperties = {
   ...input,
-  font: "11px/1.4 sans-serif",
+  font: `11px/1.4 ${panelVar.font}`,
 };
 
 export const problemText: React.CSSProperties = {
-  font: "11px/1.45 sans-serif",
-  color: "#ff9a92",
+  font: `11px/1.45 ${panelVar.font}`,
+  color: panelVar.danger,
 };
 
 export const warningText: React.CSSProperties = {
-  font: "11px/1.45 sans-serif",
-  color: "#e0b64a",
+  font: `11px/1.45 ${panelVar.font}`,
+  color: panelVar.warning,
 };
 
 export const fieldsTable: React.CSSProperties = {
   width: "100%",
   borderCollapse: "collapse",
-  font: "11px/1.45 sans-serif",
+  font: `11px/1.45 ${panelVar.font}`,
 };
 
 export const fieldKey: React.CSSProperties = {

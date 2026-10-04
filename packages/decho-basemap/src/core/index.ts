@@ -245,6 +245,8 @@ export {
   type ResidentCache,
 } from "@acc/decho-foundry-bytes";
 
+export { CRT_FLAVOR, PHOSPHOR_GREEN, phosphorFlavor } from "./flavors.js";
+
 // ── Compatibility aliases ───────────────────────────────────────────────────
 //
 // The names this surface had before the extraction. Every one of these is the

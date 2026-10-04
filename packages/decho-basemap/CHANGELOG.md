@@ -37,6 +37,11 @@ renamed to the new version number at release time.
 
 ### Added
 
+- `mapStyle="crt"`: a green-screen map, near-black with everything drawn in
+  one phosphor green. Uses the `black` sprite sheet. Built by the new
+  `phosphorFlavor(colour)`, also exported with `CRT_FLAVOR`, for other
+  phosphors (amber, say). `ownFlavorForStyle` tells the named styles this
+  package draws itself from Protomaps' own.
 - Supports `maplibre-gl` 6 as well as 5: the peer is now `^5.0.0 || ^6.0.0`.
   - `maplibre-gl` is imported as a namespace (`import * as maplibregl`), since 6
     is ESM-only and has no default export. Works on both.
