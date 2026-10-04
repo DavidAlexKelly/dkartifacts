@@ -4,7 +4,7 @@
  * This entry is headless: no map, no React. Load a dataset, then ask which
  * country a point is in, read a country's figures, or group countries into
  * regions. The map add-on is
- * "@acc/decho-countries/extension"; a React card and hook are
+ * "@acc/decho-countries/extension"; a React hook to load the data is
  * "@acc/decho-countries/react".
  */
 

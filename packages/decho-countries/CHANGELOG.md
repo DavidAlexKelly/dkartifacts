@@ -31,6 +31,11 @@ renamed to the new version number at release time.
   `foundry/countries_transform.py` and pass `{ kind: "dataset", datasetRid }`.
 - `scripts/build-data.mjs` is gone: it downloaded its sources, and the
   dataset is now built in Foundry from files downloaded by hand.
+- `CountryCard` is gone from `./react`: how a country's facts look is the
+  app's call. Migration: build the panel from the core's `figuresOf`,
+  `orderedFigureKeys`, `FIGURE_LABELS`, `formatFigure` and `flagEmoji` (the
+  README has a short example), keeping each figure's year and the sources
+  line. `useCountries` stays.
 
 ### Added
 
