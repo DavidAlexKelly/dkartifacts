@@ -1,0 +1,252 @@
+{
+ "schema": "decho-layer/1",
+ "id": "contours",
+ "kind": "vector-tiles",
+ "title": "Contours (20 m)",
+ "attribution": "",
+ "bounds": [
+  6.0,
+  61.0,
+  10.0,
+  63.0
+ ],
+ "encoding": {
+  "tileType": "mvt",
+  "compression": "gzip",
+  "sourceLayer": "contours",
+  "elevationProperty": "ELEV",
+  "indexProperty": "index"
+ },
+ "provenance": {
+  "source": "dem-cells",
+  "generator": "terrain-gen 0.1.0",
+  "generatedAt": "2026-11-13T12:19:10+00:00",
+  "parameters": {
+   "interval": 20,
+   "indexEvery": 5,
+   "minZoom": 8,
+   "maxZoom": 12,
+   "targetBytes": 4000000
+  }
+ },
+ "version": 2,
+ "gridOrigin": {
+  "lon": -180.0,
+  "lat": 85.0
+ },
+ "layers": [
+  {
+   "id": "z8",
+   "minZoom": 8,
+   "maxZoom": 8,
+   "type": "single",
+   "path": "z8.pmtiles",
+   "bytes": 2606927,
+   "sha256": "24cfcc7fc3b6d2bb031f691668638593887701600acd6d1be537228f14d878ec"
+  },
+  {
+   "id": "z9",
+   "minZoom": 9,
+   "maxZoom": 9,
+   "type": "grid",
+   "cellDeg": 4.0,
+   "pathTemplate": "z9/c{col}_r{row}.pmtiles",
+   "cells": [
+    {
+     "col": 46,
+     "row": 5,
+     "bytes": 2905480,
+     "sha256": "2060b35ed0493219babe387d3ca82656cd02479137f86f59639006084a892415"
+    },
+    {
+     "col": 47,
+     "row": 5,
+     "bytes": 1257956,
+     "sha256": "78594cac761a04387bf3548302cdcf766636d1da20a11f78d326cb62b0d6f333"
+    }
+   ]
+  },
+  {
+   "id": "z10-z11",
+   "minZoom": 10,
+   "maxZoom": 11,
+   "type": "grid",
+   "cellDeg": 1.0,
+   "pathTemplate": "z10-z11/c{col}_r{row}.pmtiles",
+   "cells": [
+    {
+     "col": 185,
+     "row": 22,
+     "bytes": 294154,
+     "sha256": "a8ed3ca6d0ab3cca570f7eacf617d5756259da68b0920acb96dc14f5daa821c5"
+    },
+    {
+     "col": 185,
+     "row": 23,
+     "bytes": 527649,
+     "sha256": "76e8fb5b4d0a6432a603545cb67e21ea9d166ef226c7731e2c7bb6e87cc0182d"
+    },
+    {
+     "col": 186,
+     "row": 21,
+     "bytes": 1821,
+     "sha256": "c83ce5ca742b524e0368264f50cbe1a38114caa00a45e97d623cde2452f4a0a6"
+    },
+    {
+     "col": 186,
+     "row": 22,
+     "bytes": 1651541,
+     "sha256": "f7eff39f524f7604a0005c2f8994308255cc1c66db4d0893045158adc5ea06b5"
+    },
+    {
+     "col": 186,
+     "row": 23,
+     "bytes": 2301931,
+     "sha256": "29b3f8a596d054a6e60bf338a95939c65fd647841267fbdb5c784f9663dac329"
+    },
+    {
+     "col": 187,
+     "row": 21,
+     "bytes": 59611,
+     "sha256": "d89105a54dd070a323faee9332d628c00c2bd754090ec9247dcd4b8fd43c73d2"
+    },
+    {
+     "col": 187,
+     "row": 22,
+     "bytes": 2712911,
+     "sha256": "5057eb964cb4b6d638970915836a3ac62e65f4b12c7a93976bcfc916ca495979"
+    },
+    {
+     "col": 187,
+     "row": 23,
+     "bytes": 2690513,
+     "sha256": "de90778d9e268341cccbb9173a92a0484656b7afe33fd414a21d499d74499a44"
+    },
+    {
+     "col": 188,
+     "row": 21,
+     "bytes": 70491,
+     "sha256": "514bbf63a0505e0562829c4c2d1196b14fcceaf2a2ec9d4102aa5e00bcf1a9eb"
+    },
+    {
+     "col": 188,
+     "row": 22,
+     "bytes": 2106364,
+     "sha256": "1b4b6679066eae9f3c5315d3b72d8ab20b41ffec7d4a899484f0494f3258925d"
+    },
+    {
+     "col": 188,
+     "row": 23,
+     "bytes": 1850034,
+     "sha256": "1839ac67e82b7c33ad9cd1a13dbca1335071a0a40300b07679c0b95fda53f3a1"
+    },
+    {
+     "col": 189,
+     "row": 21,
+     "bytes": 50033,
+     "sha256": "cfe829991ab8bff583908b9b1c9962b680faad4cb4b2902a798e84a49be7506c"
+    },
+    {
+     "col": 189,
+     "row": 22,
+     "bytes": 1270095,
+     "sha256": "9a96d61b011a24f6cdd3f21432cd64a621eb9d1d5b0ff630216486cd516d1494"
+    },
+    {
+     "col": 189,
+     "row": 23,
+     "bytes": 1092602,
+     "sha256": "f50035090944e7419f23e5d0b6f2809f9bd79be6add32fb2f1783c60a035e719"
+    }
+   ]
+  },
+  {
+   "id": "z12",
+   "minZoom": 12,
+   "maxZoom": 12,
+   "type": "grid",
+   "cellDeg": 1.0,
+   "pathTemplate": "z12/c{col}_r{row}.pmtiles",
+   "cells": [
+    {
+     "col": 185,
+     "row": 22,
+     "bytes": 64889,
+     "sha256": "04903a0e4a960dcb458d5b3736f850fe94b93527fe58be6a1814dd526cc716a9"
+    },
+    {
+     "col": 185,
+     "row": 23,
+     "bytes": 152404,
+     "sha256": "b7c20358bba27fb6c9af11ea367bda7a412fa87ea0465be191bba9f3060f8d7a"
+    },
+    {
+     "col": 186,
+     "row": 22,
+     "bytes": 1647579,
+     "sha256": "6b87e84c6c6b0f5fa27d35e972928553d8e4ab0e1b5578dfdd9ab7c8e2206bf3"
+    },
+    {
+     "col": 186,
+     "row": 23,
+     "bytes": 2699259,
+     "sha256": "aa3fc9cf8d0b89212141d7e92c08c0dea6cb7daf69036bdc0569ce5414b927d0"
+    },
+    {
+     "col": 187,
+     "row": 21,
+     "bytes": 7718,
+     "sha256": "158834d84548cb6184f907a07f3dcce19ccdf66079f7c3dfe64157c20e032160"
+    },
+    {
+     "col": 187,
+     "row": 22,
+     "bytes": 2534018,
+     "sha256": "6d63dacbf5cd6f4ccb86300a4caa38a8addec608c168f7028e8eadfd36557887"
+    },
+    {
+     "col": 187,
+     "row": 23,
+     "bytes": 2682533,
+     "sha256": "7ea17baa4446bae4e51ee9c873a0bce205c1ccbc5fc0e5507b8d4d8766893522"
+    },
+    {
+     "col": 188,
+     "row": 21,
+     "bytes": 15020,
+     "sha256": "6b3dc295622a43dabaa1cfdea455c55309140a0542493fb20f529ffe5652026a"
+    },
+    {
+     "col": 188,
+     "row": 22,
+     "bytes": 1854767,
+     "sha256": "4cd32bdcf8dd1b39839269ec9bb26202045cc119316906b1caa029db2172b22f"
+    },
+    {
+     "col": 188,
+     "row": 23,
+     "bytes": 1719138,
+     "sha256": "bf480742c4bf8bb87caac060e7848ea3de30b9a78dc765c633cae9c31e7bece8"
+    },
+    {
+     "col": 189,
+     "row": 21,
+     "bytes": 11640,
+     "sha256": "9ea1ac4cdb6d9aa0aa98833539c8f64899b7dad242bb1c216ef0a73628ad9514"
+    },
+    {
+     "col": 189,
+     "row": 22,
+     "bytes": 1366002,
+     "sha256": "184be4d6ba3c408305793f98c64579823f994e636782d37f27c3306776ad93bf"
+    },
+    {
+     "col": 189,
+     "row": 23,
+     "bytes": 1229148,
+     "sha256": "d2084965343a1f2f70429b4d7b21c55cb804806aadabecff082592221f0d760f"
+    }
+   ]
+  }
+ ]
+}

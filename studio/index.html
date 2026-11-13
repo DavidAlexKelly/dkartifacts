@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- Filled from .env at build time. Empty means "not hosted on Foundry". -->
+    <meta name="osdk-foundryUrl" content="%VITE_FOUNDRY_API_URL%" />
+    <meta name="osdk-clientId" content="%VITE_FOUNDRY_CLIENT_ID%" />
+    <meta name="osdk-redirectUrl" content="%VITE_FOUNDRY_REDIRECT_URL%" />
+    <meta name="studio-catalogRid" content="%VITE_STUDIO_CATALOG_RID%" />
+    <title>Decho Studio</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

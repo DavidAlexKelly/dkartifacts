@@ -1,0 +1,68 @@
+{
+ "schema": "decho-layer/1",
+ "id": "terrain",
+ "kind": "raster-dem",
+ "title": "Terrain (Terrarium)",
+ "attribution": "Copernicus DEM \u00a9 DLR e.V. 2010-2014 and \u00a9 Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved",
+ "bounds": [
+  6.0,
+  61.0,
+  10.0,
+  63.0
+ ],
+ "encoding": {
+  "tileType": "webp",
+  "compression": "none",
+  "rasterDem": "terrarium",
+  "tileSize": 256
+ },
+ "provenance": {
+  "source": "dem-cells",
+  "generator": "terrain-gen 0.1.0",
+  "generatedAt": "2026-11-13T12:18:22+00:00",
+  "parameters": {
+   "minZoom": 0,
+   "maxZoom": 10,
+   "precisionM": 0.25,
+   "targetBytes": 4000000
+  }
+ },
+ "version": 2,
+ "gridOrigin": {
+  "lon": -180.0,
+  "lat": 85.0
+ },
+ "layers": [
+  {
+   "id": "z0-z9",
+   "minZoom": 0,
+   "maxZoom": 9,
+   "type": "single",
+   "path": "z0-z9.pmtiles",
+   "bytes": 3201028,
+   "sha256": "a299346c22a3c4eaa9e30ad1db7f5114a7d4d83503555c75ebbf2c212169e3ce"
+  },
+  {
+   "id": "z10",
+   "minZoom": 10,
+   "maxZoom": 10,
+   "type": "grid",
+   "cellDeg": 4.0,
+   "pathTemplate": "z10/c{col}_r{row}.pmtiles",
+   "cells": [
+    {
+     "col": 46,
+     "row": 5,
+     "bytes": 3789247,
+     "sha256": "a26aebc2056b0f19f5f26585e47fc6abccb9a61f6846aaa2f43a6c8c5e4a62aa"
+    },
+    {
+     "col": 47,
+     "row": 5,
+     "bytes": 3214070,
+     "sha256": "413950c762cb19036a9d542b856248237e247a4eb3af2fd1bd36b810b5de2eb7"
+    }
+   ]
+  }
+ ]
+}
