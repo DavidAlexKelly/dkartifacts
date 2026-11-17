@@ -142,6 +142,8 @@ export interface Project {
   assets: DatasetSource | null;
   view: MapView;
   globe: boolean;
+  /** A coordinate grid drawn over the map. */
+  grid?: "none" | "latlon" | "mgrs";
   /** The time slider's window, in ms since the epoch; null shows everything. */
   timeWindow?: [number, number] | null;
   /** Bottom to top: index 0 is drawn first. The layer panel shows it reversed. */

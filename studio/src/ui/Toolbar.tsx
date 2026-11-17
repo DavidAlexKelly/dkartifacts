@@ -43,6 +43,10 @@ interface Props {
   onExportPng(): void;
   onExportLayer(format: "geojson" | "csv" | "kml" | "kmz" | "shapefile" | "geopackage"): void;
   onAnalysis(tab: "processing" | "select" | "calculate" | "stats"): void;
+  onGoto(text: string): boolean;
+  grid: "none" | "latlon" | "mgrs";
+  onGrid(g: "none" | "latlon" | "mgrs"): void;
+  onPrint(): void;
 }
 
 const EXPORTS = [
@@ -79,7 +83,8 @@ export function Toolbar(p: Props) {
           {item("Add from the Ontology…", p.onOntology, !p.foundryReady, "Object types with a location, and editable feature collections")}
           {item("Import file…", () => importInput.current?.click(), false, "GeoJSON, CSV, KML/KMZ, GPX, Shapefile, GeoPackage, DXF — or drop files on the map")}
           {EXPORTS.map(([f, label]) => <span key={f}>{item(`Export layer as ${label}`, () => p.onExportLayer(f), !p.hasVector)}</span>)}
-          {item("Export map as PNG", p.onExportPng, false, "The current view, with title, legend, scale bar and north arrow")}
+          {item("Print / export map…", p.onPrint, false, "PDF or PNG at paper size and DPI: legend, scale bar, north arrow, grid, atlas")}
+          {item("Quick PNG of the view", p.onExportPng, false, "The current view, with title, legend, scale bar and north arrow")}
         </div>
       </details>
       <details className="menu">
@@ -106,6 +111,14 @@ export function Toolbar(p: Props) {
       <button type="button" className={p.snapping ? "icon on" : "icon"} aria-pressed={p.snapping} onClick={() => p.onSnapping(!p.snapping)} title="Snap to vertices of the active layer"><Icon name="magnet" /></button>
       <button type="button" className={p.globe ? "icon on" : "icon"} aria-pressed={p.globe} onClick={() => p.onGlobe(!p.globe)} title="Globe projection"><Icon name="globe" /></button>
       <button type="button" className={p.tableOpen ? "icon on" : "icon"} aria-pressed={p.tableOpen} onClick={() => p.onTable(!p.tableOpen)} title="Attribute table"><Icon name="table" /></button>
+      <form className="goto" onSubmit={(e) => { e.preventDefault(); const input = (e.currentTarget.elements.namedItem("goto") as HTMLInputElement); if (p.onGoto(input.value)) {input.value = "";} }}>
+        <input name="goto" placeholder="Go to: 61.63 8.31 · 32V MP 63562 33868" aria-label="Go to coordinate" title="Decimal degrees, DMS, MGRS or UTM" />
+      </form>
+      <select className="grid-select" value={p.grid} onChange={(e) => p.onGrid(e.target.value as "none" | "latlon" | "mgrs")} aria-label="Grid" title="Coordinate grid over the map">
+        <option value="none">No grid</option>
+        <option value="latlon">Lat/lon grid</option>
+        <option value="mgrs">MGRS grid</option>
+      </select>
       <input ref={openInput} type="file" accept=".json,.decho.json" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) {p.onOpen(f);} e.target.value = ""; }} />
       <input ref={importInput} type="file" multiple accept=".geojson,.json,.csv,.tsv,.txt,.kml,.kmz,.gpx,.shp,.shx,.dbf,.prj,.cpg,.zip,.gpkg,.dxf" hidden onChange={(e) => { if (e.target.files?.length) {p.onImport(e.target.files);} e.target.value = ""; }} />
     </header>

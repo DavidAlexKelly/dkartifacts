@@ -15,12 +15,16 @@ import { OntologyDialog, ProjectsDialog } from "./ui/FoundryDialogs";
 import { AnalysisDialog, type AnalysisTab, type ProcessingRun } from "./ui/AnalysisDialog";
 import { CrsDialog } from "./ui/CrsDialog";
 import { TimeSlider } from "./ui/TimeSlider";
+import { PrintDialog } from "./ui/PrintDialog";
+import type { CoordSystem } from "./coords/format";
+import { parseCoord } from "./coords/parse";
+import { graticule, mgrsGrid } from "./coords/grid";
 import { download, safeName } from "./formats/vector";
 import type { ExportFormat } from "./formats/import";
 import { renderLayout } from "./formats/print";
 import { bbox, lengthM, midpoints, polygonAreaM2, vertices } from "./map/geometry";
 import { MapView } from "./map/MapView";
-import { OVERLAY, buildStyle, catalogKind, layerIdOf } from "./map/style";
+import { GRID, OVERLAY, buildStyle, catalogKind, layerIdOf } from "./map/style";
 import { SKETCH_TOOLS, attachTools, type Draft, type Tool, type ToolContext } from "./map/tools";
 import { autosave, clearAutosave, loadAutosave, parseProject, serializeProject } from "./project/io";
 import { fieldsOf, historyReducer, type Action, type History } from "./project/reducer";
@@ -126,7 +130,23 @@ export default function App() {
   const [los, setLos] = useState<(LineOfSightResult & { from: Position; to: Position }) | null>(null);
   const [viewshedSettings, setViewshedSettings] = useState<ViewshedSettings>({ radiusKm: 5, observerM: 2, targetM: 0 });
   const [analysisBusy, setAnalysisBusy] = useState<string | null>(null);
-  const [dialog, setDialog] = useState<null | "projects" | "ontology" | "analysis">(null);
+  const [dialog, setDialog] = useState<null | "projects" | "ontology" | "analysis" | "print">(null);
+  const [coordSystem, setCoordSystemState] = useState<CoordSystem>(() => {
+    try {
+      return (localStorage.getItem("decho-studio:coords") as CoordSystem | null) ?? "dms";
+    } catch {
+      return "dms";
+    }
+  });
+  const setCoordSystem = (c: CoordSystem) => {
+    setCoordSystemState(c);
+    try {
+      localStorage.setItem("decho-studio:coords", c);
+    } catch {
+      /* ignore */
+    }
+  };
+  const [gotoPoint, setGotoPoint] = useState<Position | null>(null);
   const [analysisTab, setAnalysisTab] = useState<AnalysisTab>("processing");
   const [processingHistory, setProcessingHistory] = useState<ProcessingRun[]>([]);
   // Per-layer load state for Foundry-backed layers: a message, or an error.
@@ -382,6 +402,7 @@ export default function App() {
     setProfilePoints(null);
     setIdentify(null);
     setLos(null);
+    setGotoPoint(null);
     if (map) {
       if (SKETCH_TOOLS.has(t)) {map.doubleClickZoom.disable();}
       else {map.doubleClickZoom.enable();}
@@ -548,7 +569,7 @@ export default function App() {
     () => buildStyle(project, { entries, manifests, glyphs, overlay: { type: "FeatureCollection", features: [] }, selection, background }),
     // view changes do not change the style
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [project.layers, project.globe, project.timeWindow, entries, manifests, glyphs, selection, background],
+    [project.layers, project.globe, project.timeWindow, project.grid, entries, manifests, glyphs, selection, background],
   );
 
   const overlay = useMemo((): FeatureCollection => {
@@ -581,6 +602,7 @@ export default function App() {
       }
     }
     if (identify) {out.push(pt(identify.at, "vertex"));}
+    if (gotoPoint) {out.push(pt(gotoPoint, "handle"));}
     if (los) {
       // The sight line, green where the target-height line is in view and red where it is not.
       const total = los.profile[los.profile.length - 1]?.distanceM ?? 0;
@@ -596,7 +618,27 @@ export default function App() {
     }
     if (cursor?.snapped) {out.push(pt(cursor.lngLat, "snap"));}
     return { type: "FeatureCollection", features: out };
-  }, [tool, sketch, cursor, measured, activeVector, selection, draft, identify, los]);
+  }, [tool, sketch, cursor, measured, activeVector, selection, draft, identify, los, gotoPoint]);
+
+  // The coordinate grid depends on the view, so it is recomputed on every
+  // move and pushed straight into its source, like the overlay.
+  useEffect(() => {
+    if (!map || !project.grid || project.grid === "none") {return;}
+    const kind = project.grid;
+    const update = () => {
+      const b = map.getBounds();
+      const bounds: [number, number, number, number] = [b.getWest(), Math.max(-85, b.getSouth()), b.getEast(), Math.min(85, b.getNorth())];
+      const data = kind === "mgrs" ? mgrsGrid(bounds, map.getZoom()) : graticule(bounds, map.getZoom());
+      (map.getSource(GRID) as { setData?(d: unknown): void } | undefined)?.setData?.(data);
+    };
+    update();
+    map.on("moveend", update);
+    map.on("styledata", update);
+    return () => {
+      map.off("moveend", update);
+      map.off("styledata", update);
+    };
+  }, [map, project.grid]);
 
   // The overlay changes on every mouse move, so it bypasses the style diff
   // and is pushed straight into its source.
@@ -818,6 +860,19 @@ export default function App() {
         onExportPng={() => void exportPng()}
         onExportLayer={(f) => void exportLayer(f)}
         onAnalysis={(tab) => { setAnalysisTab(tab); setDialog("analysis"); }}
+        onPrint={() => setDialog("print")}
+        grid={project.grid ?? "none"}
+        onGrid={(g) => dispatch({ type: "setGrid", grid: g })}
+        onGoto={(text) => {
+          const p = parseCoord(text);
+          if (!p) {
+            say(`Could not read “${text}” as a coordinate. Try 61.636 8.312, 61°38'11"N 8°18'45"E, 32V MP 63562 33868 or 32V 463563 6833868.`, "error");
+            return false;
+          }
+          setGotoPoint([p.lon, p.lat]);
+          map?.flyTo({ center: [p.lon, p.lat], zoom: Math.max(map.getZoom(), 12) });
+          return true;
+        }}
       />
       <aside className="left">
         <LayersPanel
@@ -980,6 +1035,9 @@ export default function App() {
           onClose={() => setDialog(null)}
         />
       )}
+      {dialog === "print" && map && (
+        <PrintDialog map={map} project={project} onClose={() => setDialog(null)} onMessage={say} />
+      )}
       {crsRequest && (
         <CrsDialog
           names={crsRequest.names}
@@ -1013,6 +1071,8 @@ export default function App() {
         sketchLength={sketch.length}
         message={message}
         onDismiss={() => setMessage(null)}
+        coordSystem={coordSystem}
+        onCoordSystem={setCoordSystem}
       />
     </div>
   );

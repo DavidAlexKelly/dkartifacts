@@ -21,6 +21,7 @@ import { aspectSource, slopeSource } from "../analysis/derivedtiles";
 import { decorate, modeOf } from "./symbology";
 
 export const OVERLAY = "__overlay";
+export const GRID = "__grid";
 
 export interface StyleContext {
   entries: Map<string, CatalogEntry>;
@@ -332,6 +333,27 @@ function vectorLayers(node: VectorLayerNode, ctx: StyleContext, sources: Record<
   }
 }
 
+function gridLayers(ctx: StyleContext, sources: Record<string, SourceSpecification>, out: LayerSpecification[]) {
+  // Data is pushed by the app on every move (it depends on the view).
+  sources[GRID] = { type: "geojson", data: { type: "FeatureCollection", features: [] } };
+  const level = ["get", "level"] as unknown as ExpressionSpecification;
+  out.push({
+    id: `${GRID}::lines`, type: "line", source: GRID, filter: ["==", ["geometry-type"], "LineString"],
+    paint: {
+      "line-color": ["match", level, "gzd", "#1b3a8a", "100km", "#1d4fd8", "#3b6fe0"],
+      "line-width": ["match", level, "gzd", 2, "100km", 1.4, "10km", 0.9, 0.6],
+      "line-opacity": 0.75,
+    },
+  });
+  if (ctx.glyphs) {
+    out.push({
+      id: `${GRID}::labels`, type: "symbol", source: GRID, filter: ["==", ["geometry-type"], "Point"],
+      layout: { "text-field": ["get", "label"], "text-font": ["Noto Sans Regular"], "text-size": ["match", level, "gzd", 14, "100km", 13, 11], "text-allow-overlap": false },
+      paint: { "text-color": "#1b3a8a", "text-halo-color": "#ffffff", "text-halo-width": 1.6 },
+    });
+  }
+}
+
 function overlayLayers(ctx: StyleContext, sources: Record<string, SourceSpecification>, out: LayerSpecification[]) {
   sources[OVERLAY] = { type: "geojson", data: ctx.overlay };
   const role = (r: string): ExpressionSpecification => ["==", ["get", "role"], r];
@@ -356,6 +378,7 @@ export function buildStyle(project: Project, ctx: StyleContext): StyleSpecificat
     if (node.kind === "catalog") {catalogLayers(node, ctx, sources, layers, extra);}
     else {vectorLayers(node, ctx, sources, layers, project.timeWindow);}
   }
+  if (project.grid && project.grid !== "none") {gridLayers(ctx, sources, layers);}
   overlayLayers(ctx, sources, layers);
   return {
     version: 8,

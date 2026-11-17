@@ -14,6 +14,7 @@
  * implementation for jsPDF and one for a 2D canvas. Tests drive the pure
  * parts with a recording painter.
  */
+import { legendFor } from "../map/symbology";
 import type { Feature } from "geojson";
 import type { jsPDF } from "jspdf";
 import type { Map as MlMap } from "maplibre-gl";
@@ -682,9 +683,10 @@ export function legendFromProject(project: Project): LegendItem[] {
       const v = node as VectorLayerNode;
       const geoms = new Set(v.data.features.map((f) => f.geometry?.type.replace("Multi", "")));
       const kind = geoms.has("Polygon") ? "fill" : geoms.has("LineString") ? "line" : "point";
-      if (v.style.categorize) {
-        out.push({ label: `${v.title} — ${v.style.categorize.field}`, color: "#000", kind: "heading" });
-        for (const [k, c] of Object.entries(v.style.categorize.colors)) {out.push({ label: k, color: c, kind });}
+      const classes = legendFor(v);
+      if (classes.length) {
+        out.push({ label: v.title, color: "#000", kind: "heading" });
+        for (const e of classes) {out.push({ label: e.label, color: e.color, kind });}
       } else {
         out.push({ label: v.title, color: v.style.color, kind, strokeColor: v.style.strokeColor });
       }

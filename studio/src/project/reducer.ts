@@ -15,6 +15,7 @@ export type Action =
   | { type: "setView"; view: MapView }
   | { type: "setGlobe"; globe: boolean }
   | { type: "setTimeWindow"; window: [number, number] | null }
+  | { type: "setGrid"; grid: "none" | "latlon" | "mgrs" }
   | { type: "addLayer"; layer: LayerNode; at?: number }
   | { type: "removeLayer"; id: string }
   | { type: "moveLayer"; id: string; delta: number }
@@ -85,6 +86,8 @@ export function apply(p: Project, a: Action): Project {
       return { ...p, view: a.view };
     case "setGlobe":
       return { ...p, globe: a.globe };
+    case "setGrid":
+      return { ...p, grid: a.grid };
     case "setTimeWindow":
       return { ...p, timeWindow: a.window };
     case "addLayer": {

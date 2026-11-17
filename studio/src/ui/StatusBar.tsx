@@ -1,6 +1,7 @@
 import type { Position } from "geojson";
 import { cacheStats } from "../data/cache";
 import type { Tool } from "../map/tools";
+import { COORD_SYSTEMS, formatCoord, type CoordSystem } from "../coords/format";
 
 interface Props {
   cursor: Position | null;
@@ -10,6 +11,8 @@ interface Props {
   sketchLength: number;
   message: { text: string; kind: "info" | "error" } | null;
   onDismiss(): void;
+  coordSystem: CoordSystem;
+  onCoordSystem(s: CoordSystem): void;
 }
 
 const TOOL_HINT: Partial<Record<Tool, string>> = {
@@ -33,7 +36,7 @@ function dms(v: number, pos: string, neg: string): string {
   return `${d}°${String(m).padStart(2, "0")}′${s.toFixed(1).padStart(4, "0")}″${v >= 0 ? pos : neg}`;
 }
 
-export function StatusBar({ cursor, elevation, zoom, tool, sketchLength, message, onDismiss }: Props) {
+export function StatusBar({ cursor, elevation, zoom, tool, sketchLength, message, onDismiss, coordSystem, onCoordSystem }: Props) {
   return (
     <footer className="status">
       {message ? (
@@ -45,10 +48,13 @@ export function StatusBar({ cursor, elevation, zoom, tool, sketchLength, message
       )}
       <span className="spacer" />
       {cursor && (
-        <span title={`${cursor[1].toFixed(6)}, ${cursor[0].toFixed(6)}`}>
-          {dms(cursor[1], "N", "S")} {dms(cursor[0], "E", "W")}
+        <span className="coord" title={`${cursor[1].toFixed(6)}, ${cursor[0].toFixed(6)}`}>
+          {coordSystem === "dms" ? `${dms(cursor[1], "N", "S")} ${dms(cursor[0], "E", "W")}` : formatCoord(cursor[0], cursor[1], coordSystem)}
         </span>
       )}
+      <select className="coord-system" value={coordSystem} onChange={(e) => onCoordSystem(e.target.value as CoordSystem)} aria-label="Coordinate format">
+        {COORD_SYSTEMS.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
+      </select>
       {elevation !== null && <span>{Math.round(elevation)} m</span>}
       <span>z{zoom.toFixed(1)}</span>
       <span className="muted" title="Files read: from the network / from the persistent cache (keyed by content hash) / from memory">

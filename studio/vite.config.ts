@@ -48,6 +48,10 @@ export default defineConfig(({ mode }) => {
       fakeFoundry({ enabled: env.STUDIO_FAKE_FOUNDRY === "1", dataDir: env.STUDIO_DATA, statePath: env.STUDIO_FAKE_STATE }),
     ],
     server: { port: 8080 },
+    // Libraries the app loads lazily. Pre-bundled so the dev server does not
+    // discover them mid-session and reload the page (which would, say, kill a
+    // print in progress). Production builds are unaffected.
+    optimizeDeps: { include: ["jspdf", "milsymbol", "proj4", "mgrs", "sql.js", "@turf/turf"] },
     build: { chunkSizeWarningLimit: 2000 },
     test: { environment: "jsdom" },
   };
