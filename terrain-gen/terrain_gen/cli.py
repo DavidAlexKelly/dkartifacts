@@ -233,6 +233,16 @@ def cmd_all(args):
     unknown = set(products) - set(PRODUCTS)
     if unknown:
         sys.exit(f"unknown products: {', '.join(sorted(unknown))}")
+    # Check external tools before the slow steps, not after them.
+    import shutil
+
+    needed = {"contours": ("tippecanoe", "brew install tippecanoe / apt install tippecanoe"),
+              "basemap": ("pmtiles", "https://github.com/protomaps/go-pmtiles/releases")}
+    missing = [f"  {tool} (for {p}): {how}" for p, (tool, how) in needed.items() if p in products and not shutil.which(tool)]
+    if missing:
+        sys.exit("Missing tools — install them, or leave those products out with --products:\n" + "\n".join(missing))
+    if "basemap" in products and not args.source:
+        sys.exit("--source is required for the basemap: https://build.protomaps.com/YYYYMMDD.pmtiles or a local .pmtiles")
     # Each step's own zoom defaults apply; `all` does not share one --max-zoom.
     defaults = vars(build_parser().parse_args(["terrain"]))
     def step(name, fn, **over):
