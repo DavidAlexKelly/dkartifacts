@@ -18,6 +18,7 @@ export function parseProject(text: string): Project {
   return {
     ...base,
     ...raw,
+    assets: raw.assets ?? null,
     view: { ...base.view, ...(raw.view ?? {}) },
     layers: Array.isArray(raw.layers) ? raw.layers : [],
   } as Project;

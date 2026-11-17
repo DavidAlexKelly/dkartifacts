@@ -3,7 +3,10 @@ import type { CatalogEntry, Connection, Library } from "../data/library";
 import { Icon } from "./Icon";
 
 interface Props {
-  library: Library | null;
+  library: Library;
+  onAddDataset(text: string): Promise<void>;
+  labels: { title: string } | null;
+  onRemoveLabels(): void;
   error: string | null;
   loading: boolean;
   connection: Connection | null;
@@ -22,8 +25,14 @@ const KIND_LABEL: Record<string, string> = {
 
 const mb = (b?: number) => (b === undefined ? "" : b >= 1e9 ? `${(b / 1e9).toFixed(1)} GB` : `${(b / 1e6).toFixed(1)} MB`);
 
-/** The catalog: where the data comes from, and what is in it. */
-export function BrowserPanel({ library, error, loading, connection, foundryAvailable, onConnect, onAdd }: Props) {
+/**
+ * Where data comes from. Normally: paste a dataset ID and it is added — the
+ * dataset's own manifest says what it is. A catalog (one ID listing many
+ * datasets) is an optional shortcut below that.
+ */
+export function BrowserPanel({ library, onAddDataset, labels, onRemoveLabels, error, loading, connection, foundryAvailable, onConnect, onAdd }: Props) {
+  const [datasetText, setDatasetText] = useState("");
+  const [adding, setAdding] = useState(false);
   const [kind, setKind] = useState<Connection["kind"]>(connection?.kind ?? (foundryAvailable ? "foundry" : "http"));
   const [value, setValue] = useState(connection ? (connection.kind === "http" ? connection.baseUrl : connection.catalogRid) : "");
   useEffect(() => {
@@ -39,9 +48,44 @@ export function BrowserPanel({ library, error, loading, connection, foundryAvail
     onConnect(kind === "http" ? { kind, baseUrl: v } : { kind, catalogRid: v });
   };
 
+  const add = async () => {
+    const text = datasetText.trim();
+    if (!text) {return;}
+    setAdding(true);
+    try {
+      await onAddDataset(text);
+      setDatasetText("");
+    } catch {
+      /* the app reports it */
+    } finally {
+      setAdding(false);
+    }
+  };
+
+  const hasCatalog = !!connection && library.catalog.layers.length > 0;
   return (
-    <section className="panel" aria-label="Catalog">
-      <div className="panel-head"><h2>Catalog</h2></div>
+    <section className="panel" aria-label="Data">
+      <div className="panel-head"><h2>Add data</h2></div>
+      <form className="connect two" onSubmit={(e) => { e.preventDefault(); void add(); }}>
+        <input
+          value={datasetText}
+          onChange={(e) => setDatasetText(e.target.value)}
+          placeholder={foundryAvailable ? "ri.foundry.main.dataset.…" : "Folder URL, e.g. /data/terrain/"}
+          aria-label="Dataset ID or folder URL"
+        />
+        <button type="submit" className="small" disabled={adding || !datasetText.trim()}><Icon name="plus" size={14} /> {adding ? "Adding…" : "Add"}</button>
+      </form>
+      <p className="hint">
+        Any dataset terrain-gen made: terrain, hillshade, contours, DEM cells, basemap. Add the <em>assets</em> dataset to turn labels on.
+        Files (GeoJSON, CSV, KML, GPX) go in through Data → Import, or drop them on the map.
+      </p>
+      <p className="labels-status">
+        {labels ? <>Labels: <strong>{labels.title}</strong> <button type="button" className="link" onClick={onRemoveLabels}>remove</button></> : <span className="muted">Labels: off — no assets dataset added</span>}
+      </p>
+
+      <details className="catalog" open={hasCatalog}>
+        <summary>Catalog <span className="muted">(optional)</span></summary>
+        <p className="hint">One ID that lists many datasets at once — terrain-gen's <em>catalog</em> folder.</p>
       <form className="connect" onSubmit={(e) => { e.preventDefault(); submit(); }}>
         <select value={kind} onChange={(e) => setKind(e.target.value as Connection["kind"])} aria-label="Source type">
           <option value="foundry" disabled={!foundryAvailable}>Foundry dataset</option>
@@ -52,7 +96,8 @@ export function BrowserPanel({ library, error, loading, connection, foundryAvail
       </form>
       {loading && <p className="empty">Loading catalog…</p>}
       {error && <p className="error-box">{error}</p>}
-      {library && (
+      {connection && !loading && !error && library.catalog.layers.length === 0 && <p className="empty">This catalog lists no datasets.</p>}
+      {library.catalog.layers.length > 0 && (
         <ul className="catalog-list">
           {library.catalog.layers.filter((e) => e.kind !== "assets").map((entry) => {
             const why = library.unavailable(entry);
@@ -73,6 +118,7 @@ export function BrowserPanel({ library, error, loading, connection, foundryAvail
           {library.catalog.layers.some((e) => e.kind === "assets") && <li className="note">Glyphs and sprites: available, used for labels.</li>}
         </ul>
       )}
+      </details>
     </section>
   );
 }

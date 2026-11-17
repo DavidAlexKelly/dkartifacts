@@ -18,7 +18,11 @@ let registered = false;
 
 export function setProtocolLibrary(lib: Library | null): void {
   library = lib;
-  assetsId = lib?.catalog.layers.find((l) => l.kind === "assets")?.id ?? null;
+}
+
+/** The dataset glyphs and sprites are read from — an "assets" dataset — or null for no labels. */
+export function setAssetsDataset(id: string | null): void {
+  assetsId = id;
 }
 
 export function hasAssets(): boolean {
@@ -70,7 +74,7 @@ export function registerProtocols(): void {
   });
 
   maplibregl.addProtocol("decho-glyphs", async (params) => {
-    if (!library || !assetsId) {throw new Error("no assets layer in the catalog");}
+    if (!library || !assetsId) {throw new Error("no glyphs/sprites dataset added");}
     const rest = params.url.slice("decho-glyphs://".length);
     const slash = rest.lastIndexOf("/");
     const stack = decodeURIComponent(rest.slice(0, slash)).split(",")[0].trim();
@@ -80,7 +84,7 @@ export function registerProtocols(): void {
   });
 
   maplibregl.addProtocol("decho-sprite", async (params) => {
-    if (!library || !assetsId) {throw new Error("no assets layer in the catalog");}
+    if (!library || !assetsId) {throw new Error("no glyphs/sprites dataset added");}
     const name = decodeURIComponent(params.url.slice("decho-sprite://".length));
     const data = await library.readFile(assetsId, `sprites/${name}`);
     if (!data) {throw new Error(`sprite ${name} not found`);}

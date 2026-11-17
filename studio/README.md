@@ -11,7 +11,7 @@ all come from the catalog's datasets.
 
 | | |
 |---|---|
-| **Catalog** | Open a catalog from a Foundry dataset RID, or from a folder URL for local work. Every layer is listed with its kind, size and file count; add one to the map with a click. A fresh project starts with the basemap, terrain and contours. |
+| **Adding data** | Paste a dataset ID (or, locally, a folder URL) into **Add data** and it becomes a layer: the dataset's own `manifest.json` says what it is. Adding the `assets` dataset turns labels on. Optionally, open a **catalog**, one ID that lists many datasets, and add them with a click; a fresh project on a catalog starts with the basemap, terrain and contours. |
 | **Layers** | Layer tree with visibility, opacity, reordering, zoom-to and remove. Catalog layers: basemap (five Protomaps styles), terrain (hillshade and 3D terrain with exaggeration), contours (colour, width, height labels), raster overlays, DEM-cell footprints. |
 | **Vector data** | Import GeoJSON, CSV (lat/lon or WKT columns), KML and GPX by menu or by dropping files on the map. Style by single colour or categorised by a field, with labels. |
 | **Editing** | Draw points, lines and polygons; select (shift adds); drag vertices, drag a midpoint to insert one, alt-click to delete one; snapping to the active layer's vertices; Delete removes the selection. Editable attribute table: filter, sort, edit cells, add and remove fields. Undo and redo for everything (Ctrl+Z / Ctrl+Shift+Z). |
@@ -21,11 +21,12 @@ all come from the catalog's datasets.
 ## How it reads the data
 
 ```
-catalog.json ──► layer entry ──► manifest.json ──► pathForTile(z,x,y) ──► archive.pmtiles ──► tile
+dataset ID ──► manifest.json ──► pathForTile(z,x,y) ──► archive.pmtiles ──► tile
 ```
 
-- **One catalog RID** configures everything. Each catalog entry names the
-  dataset (Foundry) or folder (HTTP) holding that layer.
+- **A dataset ID is all a layer needs.** The project remembers each layer's
+  dataset, so a saved project reopens without anything else. A catalog is an
+  optional shortcut: one ID that lists many datasets.
 - **The resolver** (`src/data/manifest.ts`) is a port of decho-basemap's
   `manifestResolver`. A test runs it over tiles that terrain-gen chunked and
   checks that both put every tile in the same archive.
@@ -49,26 +50,27 @@ npm install
 STUDIO_DATA=../terrain-gen/out npm run dev     # serves that folder at /data/
 ```
 
-Open http://localhost:8080. It connects to `/data/` by default; another folder
-or a Foundry catalog can be opened from the Catalog panel, or with
-`?data=<url>` / `?catalog=<rid>` in the address. `?fresh` ignores the
+Open http://localhost:8080 and add layers by folder URL: `/data/terrain/`,
+`/data/contours/`, `/data/assets/` for labels, and so on. If the folder also
+has terrain-gen's `catalog/`, it opens automatically. `?fresh` ignores the
 autosaved project.
 
 ## Host it on Foundry
 
 1. Register an OSDK application in Developer Console with the
    `api:use-datasets-read` scope.
-2. Add **every** dataset as a Resource on the app: the catalog and each layer
-   in it. The scope alone returns 403. The error message names the dataset.
+2. Add **every** dataset you will open as a Resource on the app. The scope
+   alone returns 403. The error message names the dataset.
 3. Copy `.env.example` to `.env` and fill in `VITE_FOUNDRY_API_URL`,
-   `VITE_FOUNDRY_CLIENT_ID`, `VITE_FOUNDRY_REDIRECT_URL` and, optionally,
-   `VITE_STUDIO_CATALOG_RID`.
+   `VITE_FOUNDRY_CLIENT_ID` and `VITE_FOUNDRY_REDIRECT_URL`.
 4. `npm run build` and host `dist/` the way the repo's other OSDK app is
    hosted. The redirect URL's path is handled by the app itself.
+5. In the app, paste each dataset's ID into **Add data**.
 
-The catalog needs dataset RIDs: after uploading terrain-gen's folders, rebuild
-it with `python -m terrain_gen catalog --rids rids.json` and upload
-`out/catalog`.
+Only if you want a catalog: rebuild it with the dataset IDs
+(`python -m terrain_gen catalog --rids rids.json`), upload `out/catalog`, and
+either open it from the panel or set `VITE_STUDIO_CATALOG_RID` so the app
+opens on it.
 
 ## Check it
 

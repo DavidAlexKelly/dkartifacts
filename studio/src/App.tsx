@@ -2,9 +2,9 @@ import type { Feature, FeatureCollection, Geometry, Position } from "geojson";
 import type { LngLatBoundsLike, Map as MlMap, MapGeoJSONFeature } from "maplibre-gl";
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { elevationAt, profile as sampleProfile, type ProfilePoint } from "./data/elevation";
-import { Library, type CatalogEntry, type Connection } from "./data/library";
+import { Library, parseSource, sourceId, type CatalogEntry, type Connection, type DatasetSource } from "./data/library";
 import type { LayerManifest } from "./data/manifest";
-import { hasAssets, registerProtocols, setProtocolLibrary } from "./data/protocols";
+import { hasAssets, registerProtocols, setAssetsDataset, setProtocolLibrary } from "./data/protocols";
 import { configuredCatalogRid, foundry } from "./foundry/auth";
 import { download, importFile, safeName, toCsv, toGeoJson, toKml } from "./formats/vector";
 import { renderLayout } from "./formats/print";
@@ -33,7 +33,11 @@ import { Toolbar } from "./ui/Toolbar";
 
 registerProtocols();
 
-/** Where the catalog is, when the project does not say: URL, then build config, then the dev folder. */
+/**
+ * An optional catalog to open at start: from the URL, then the build config,
+ * then (local development only) the /data/ folder. None is needed: datasets
+ * can be added one at a time.
+ */
 function defaultConnection(): Connection | null {
   const params = new URLSearchParams(window.location.search);
   const data = params.get("data");
@@ -48,16 +52,17 @@ function initHistory(): History {
   const params = new URLSearchParams(window.location.search);
   const saved = params.has("fresh") ? null : loadAutosave();
   const project = saved ?? newProject(defaultConnection());
-  if (!project.connection) {project.connection = defaultConnection();}
+  if (!project.connection && !saved) {project.connection = defaultConnection();}
   return { past: [], present: project, future: [] };
 }
 
-function catalogNode(entry: CatalogEntry): CatalogLayerNode {
+function catalogNode(entry: CatalogEntry, source?: DatasetSource): CatalogLayerNode {
   const kind = catalogKind(entry);
   return {
     kind: "catalog",
     id: newId("cat"),
     catalogId: entry.id,
+    ...(source ? { source } : {}),
     title: entry.title,
     visible: true,
     opacity: 1,
@@ -75,7 +80,13 @@ const ADD_ORDER = ["basemap", "raster-dem", "raster", "contours", "vector-tiles"
 export default function App() {
   const [history, dispatch] = useReducer(historyReducer, undefined, initHistory);
   const project = history.present;
-  const [library, setLibrary] = useState<Library | null>(null);
+  const [library, setLibrary] = useState<Library>(() => {
+    const lib = Library.empty(foundry);
+    setProtocolLibrary(lib);
+    return lib;
+  });
+  // Bumped whenever datasets are added to the library, which mutates in place.
+  const [libraryVersion, setLibraryVersion] = useState(0);
   const [libraryError, setLibraryError] = useState<string | null>(null);
   const [libraryLoading, setLibraryLoading] = useState(false);
   const [manifests, setManifests] = useState<Map<string, LayerManifest>>(new Map());
@@ -100,18 +111,19 @@ export default function App() {
 
   const say = useCallback((text: string, kind: "info" | "error" = "info") => setMessage({ text, kind }), []);
 
-  // ── Catalog ────────────────────────────────────────────────────────────
+  // ── Data: an optional catalog, plus datasets added on their own ─────────
   const connectionKey = JSON.stringify(project.connection);
   useEffect(() => {
     const connection = project.connection;
-    if (!connection) {
-      setLibrary(null);
-      return;
-    }
     let cancelled = false;
-    setLibraryLoading(true);
     setLibraryError(null);
-    Library.open(connection, foundry)
+    const opened = connection ? Library.open(connection, foundry) : Promise.resolve(Library.empty(foundry));
+    setLibraryLoading(!!connection);
+    opened
+      .catch((err: unknown) => {
+        if (!cancelled) {setLibraryError(err instanceof Error ? err.message : String(err));}
+        return Library.empty(foundry);
+      })
       .then((lib) => {
         if (cancelled) {return;}
         setProtocolLibrary(lib);
@@ -119,7 +131,6 @@ export default function App() {
         setManifestErrors(new Map());
         setLibrary(lib);
       })
-      .catch((err: unknown) => !cancelled && setLibraryError(err instanceof Error ? err.message : String(err)))
       .finally(() => !cancelled && setLibraryLoading(false));
     return () => {
       cancelled = true;
@@ -127,10 +138,28 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [connectionKey]);
 
+  // Datasets the project added on their own (layers and the labels dataset)
+  // are re-registered whenever the library is new: after loading a project,
+  // reloading the page, or switching catalogs.
+  useEffect(() => {
+    const wanted: DatasetSource[] = [
+      ...project.layers.flatMap((l) => (l.kind === "catalog" && l.source ? [l.source] : [])),
+      ...(project.assets ? [project.assets] : []),
+    ];
+    for (const src of wanted) {
+      const id = sourceId(src);
+      if (library.entry(id) || manifestErrors.has(id)) {continue;}
+      library
+        .addDataset(src)
+        .then(() => setLibraryVersion((v) => v + 1))
+        .catch((err: unknown) => setManifestErrors((prev) => new Map(prev).set(id, err instanceof Error ? err.message : String(err))));
+    }
+  }, [library, project.layers, project.assets, manifestErrors]);
+
   // A fresh project on a fresh catalog starts with the obvious layers.
   const seeded = useRef(false);
   useEffect(() => {
-    if (!library || seeded.current || project.layers.length > 0) {return;}
+    if (!library.connection || seeded.current || project.layers.length > 0) {return;}
     seeded.current = true;
     const entries = library.catalog.layers
       .filter((e) => !library.unavailable(e) && ["basemap", "raster-dem", "contours"].includes(catalogKind(e)))
@@ -140,21 +169,64 @@ export default function App() {
     if (bounds && map) {map.fitBounds(bounds as LngLatBoundsLike, { padding: 40, duration: 0 });}
   }, [library, project.layers.length, map]);
 
-  // Manifests for every catalog layer on the map.
+  // Manifests for every dataset layer on the map.
   useEffect(() => {
-    if (!library) {return;}
     for (const node of project.layers) {
       if (node.kind !== "catalog" || manifests.has(node.catalogId) || manifestErrors.has(node.catalogId)) {continue;}
+      if (!library.entry(node.catalogId)) {continue;} // a standalone dataset still registering
       library
         .manifest(node.catalogId)
         .then((m) => setManifests((prev) => new Map(prev).set(node.catalogId, m)))
         .catch((err: unknown) => setManifestErrors((prev) => new Map(prev).set(node.catalogId, err instanceof Error ? err.message : String(err))));
     }
-  }, [library, project.layers, manifests, manifestErrors]);
+  }, [library, libraryVersion, project.layers, manifests, manifestErrors]);
 
-  const entries = useMemo(() => new Map((library?.catalog.layers ?? []).map((e) => [e.id, e])), [library]);
-  const terrainId = useMemo(() => library?.catalog.layers.find((e) => e.kind === "raster-dem" && !library.unavailable(e))?.id ?? null, [library]);
-  const glyphs = !!library && hasAssets();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const entries = useMemo(() => new Map(library.entries().map((e) => [e.id, e])), [library, libraryVersion]);
+  const terrainId = useMemo(() => {
+    // Prefer terrain that is on the map; otherwise any terrain the catalog offers.
+    const onMap = project.layers.find((l) => l.kind === "catalog" && entries.get(l.catalogId)?.kind === "raster-dem");
+    if (onMap && onMap.kind === "catalog") {return onMap.catalogId;}
+    return library.entries().find((e) => e.kind === "raster-dem" && !library.unavailable(e))?.id ?? null;
+  }, [library, entries, project.layers]);
+
+  // Labels: the project's own glyphs dataset, else one the catalog lists.
+  const assetsId = project.assets ? sourceId(project.assets) : (library.entries().find((e) => e.kind === "assets")?.id ?? null);
+  const assetsReady = !!assetsId && entries.get(assetsId)?.kind === "assets";
+  setAssetsDataset(assetsReady ? assetsId : null);
+  const glyphs = assetsReady && hasAssets();
+
+  /** Add one dataset by ID or folder URL: a layer, the labels dataset, or a whole catalog. */
+  const addDataset = async (text: string) => {
+    const src = parseSource(text);
+    try {
+      const entry = await library.addDataset(src);
+      setLibraryVersion((v) => v + 1);
+      if (entry.kind === "assets") {
+        dispatch({ type: "setAssets", assets: src });
+        say(`Labels on: glyphs and sprites from ${entry.title}.`);
+        return;
+      }
+      if (entry.kind === "catalog") {
+        // A catalog was pasted: open it rather than adding it as a layer.
+        const connection: Connection = "datasetRid" in src
+          ? { kind: "foundry", catalogRid: src.datasetRid }
+          : { kind: "http", baseUrl: new URL("../", new URL(sourceId(src), window.location.href)).href };
+        seeded.current = project.layers.length > 0;
+        dispatch({ type: "setConnection", connection });
+        say("That is a catalog — opened it.");
+        return;
+      }
+      const node = catalogNode(entry, src);
+      dispatch({ type: "addLayer", layer: node, at: catalogKind(entry) === "basemap" ? 0 : undefined });
+      setActiveId(node.id);
+      if (entry.bounds && map && project.layers.length === 0) {map.fitBounds(entry.bounds as LngLatBoundsLike, { padding: 40 });}
+      say(`Added ${entry.title}.`);
+    } catch (err) {
+      say(err instanceof Error ? err.message : String(err), "error");
+      throw err;
+    }
+  };
 
   // ── Project state ──────────────────────────────────────────────────────
   useEffect(() => autosave(project), [project]);
@@ -515,6 +587,10 @@ export default function App() {
           layers={project.layers}
           activeId={activeId}
           errors={manifestErrors}
+          kindOf={(id) => {
+            const k = catalogKind(entries.get(id), manifests.get(id));
+            return { basemap: "basemap", contours: "contours", "vector-tiles": "vector tiles", "raster-dem": "terrain", raster: "raster", "dem-cells": "DEM cells", other: "loading…" }[k];
+          }}
           onActivate={setActiveId}
           onZoomTo={zoomToLayer}
           onNewLayer={() => {
@@ -530,6 +606,12 @@ export default function App() {
         />
         <BrowserPanel
           library={library}
+          onAddDataset={addDataset}
+          labels={assetsReady && assetsId ? { title: entries.get(assetsId)?.title ?? "assets" } : null}
+          onRemoveLabels={() => {
+            if (project.assets) {dispatch({ type: "setAssets", assets: null });}
+            else {say("These labels come from the catalog; close the catalog to turn them off.");}
+          }}
           error={libraryError}
           loading={libraryLoading}
           connection={project.connection}

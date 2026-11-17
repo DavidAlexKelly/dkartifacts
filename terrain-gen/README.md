@@ -72,13 +72,19 @@ into an existing manifest, so you can grow a dataset one region at a time.
 ## Upload
 
 Each folder in `out/` is one Foundry dataset. Upload its contents as they are,
-keeping the folder structure. Then put the dataset RIDs in a file:
+keeping the folder structure: the manifests refer to paths like
+`z10/c093_r005.pmtiles`. Each dataset describes itself in its own
+`manifest.json`, so a dataset ID is all the studio needs to add it as a layer.
+
+The catalog is optional: one ID that lists all of them. To use it, put the
+dataset IDs in a file
 
 ```json
 { "dem-cells": "ri.foundry.main.dataset.…", "terrain": "ri.foundry.main.dataset.…" }
 ```
 
-and rebuild the catalog with them: `python -m terrain_gen catalog --rids rids.json`.
+rebuild it with `python -m terrain_gen catalog --rids rids.json`, and upload
+`out/catalog`.
 
 `dem-cells` replaces the current Elevation dataset as-is: same file names, same
 grid, same TIFF encoding. Set `manifestPath: "manifest.json"` on its DemStore to

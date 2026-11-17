@@ -1,7 +1,15 @@
 /**
- * The Library: one connection to a catalog, and everything read through it.
+ * The Library: every dataset the studio can read, and everything read through it.
  *
- * A connection is either
+ * Datasets get in two ways:
+ *
+ *   one at a time   addDataset({ datasetRid }) or addDataset({ baseUrl }):
+ *                   the dataset's own manifest.json says what it is, so a
+ *                   dataset ID (or folder URL) is all a layer needs.
+ *   from a catalog  optional: one catalog.json listing many datasets, so a
+ *                   single ID can stand for a whole set of layers.
+ *
+ * A catalog connection is either
  *   { kind: "http", baseUrl }        terrain-gen's out/ folder over HTTP:
  *                                    catalog/catalog.json, then one folder
  *                                    per layer, named by the entry's `folder`
@@ -20,12 +28,29 @@ import { FoundryDatasetStore, HttpStore, type FileStore } from "./stores";
 
 export type Connection = { kind: "http"; baseUrl: string } | { kind: "foundry"; catalogRid: string };
 
+/** Where one dataset lives: a Foundry dataset, or a folder over HTTP. */
+export type DatasetSource = { datasetRid: string } | { baseUrl: string };
+
+export function sourceId(src: DatasetSource): string {
+  return "datasetRid" in src ? src.datasetRid : src.baseUrl.endsWith("/") ? src.baseUrl : `${src.baseUrl}/`;
+}
+
+/** A dataset ID, or anything else as a folder URL. */
+export function parseSource(text: string): DatasetSource {
+  const t = text.trim();
+  return /^ri\.[\w-]+\.main\.dataset\.[0-9a-f-]+$/i.test(t) ? { datasetRid: t } : { baseUrl: t };
+}
+
 export interface CatalogEntry {
   id: string;
   kind: string;
   title: string;
   folder?: string;
   datasetRid?: string | null;
+  /** Set for a dataset added on its own over HTTP, rather than through a catalog. */
+  baseUrl?: string;
+  /** Added on its own rather than listed by a catalog. */
+  standalone?: boolean;
   manifestPath?: string;
   manifestSha256?: string;
   bounds?: [number, number, number, number] | null;
@@ -41,7 +66,8 @@ export interface Catalog {
   layers: CatalogEntry[];
 }
 
-export function describeConnection(c: Connection): string {
+export function describeConnection(c: Connection | null): string {
+  if (!c) {return "no catalog";}
   return c.kind === "http" ? c.baseUrl : `Foundry ${c.catalogRid}`;
 }
 
@@ -71,19 +97,25 @@ class WholeFileSource implements Source {
 
 export class Library {
   readonly catalog: Catalog;
-  private readonly root: FileStore;
+  private readonly root: FileStore | null;
+  private standalone: CatalogEntry[] = [];
   private manifests = new Map<string, Promise<LayerManifest>>();
   private resolvers = new Map<string, PyramidResolver>();
   private archives = new Map<string, PMTiles>();
 
   private constructor(
-    readonly connection: Connection,
+    readonly connection: Connection | null,
     private readonly foundry: FoundryConfig | null,
-    root: FileStore,
+    root: FileStore | null,
     catalog: Catalog,
   ) {
     this.root = root;
     this.catalog = catalog;
+  }
+
+  /** A library with no catalog: datasets are added one at a time. */
+  static empty(foundry: FoundryConfig | null): Library {
+    return new Library(null, foundry, null, { title: "", layers: [] });
   }
 
   static async open(connection: Connection, foundry: FoundryConfig | null): Promise<Library> {
@@ -103,12 +135,47 @@ export class Library {
     return new Library(connection, foundry, root, { title: raw.title ?? "Catalog", layers: raw.layers });
   }
 
+  /** Catalog entries and datasets added on their own. */
+  entries(): CatalogEntry[] {
+    return [...this.catalog.layers, ...this.standalone];
+  }
+
   entry(id: string): CatalogEntry | undefined {
-    return this.catalog.layers.find((l) => l.id === id);
+    return this.standalone.find((l) => l.id === id) ?? this.catalog.layers.find((l) => l.id === id);
+  }
+
+  /**
+   * Add one dataset by its ID or folder URL. Its manifest.json says what it
+   * is, so nothing else is needed. Adding the same dataset twice is a no-op.
+   */
+  async addDataset(src: DatasetSource): Promise<CatalogEntry> {
+    const id = sourceId(src);
+    const existing = this.entry(id);
+    if (existing) {
+      await this.manifest(id);
+      return existing;
+    }
+    if ("datasetRid" in src && !this.foundry) {
+      throw new Error("This build is not set up for Foundry (no osdk-* settings in .env), so it cannot read dataset IDs. Use a folder URL, or configure Foundry.");
+    }
+    const entry: CatalogEntry = { id, kind: "unknown", title: id, standalone: true, ...src };
+    this.standalone.push(entry);
+    try {
+      const m = await this.manifest(id);
+      Object.assign(entry, { kind: m.kind, title: m.title, bounds: m.bounds, encoding: m.encoding, attribution: m.attribution });
+      return entry;
+    } catch (err) {
+      this.standalone = this.standalone.filter((e) => e !== entry);
+      const where = "datasetRid" in src ? src.datasetRid : src.baseUrl;
+      const why = err instanceof Error ? err.message : String(err);
+      throw new Error(`${where}: ${/not found/.test(why) ? "no manifest.json — is this a terrain-gen output folder or dataset?" : why}`);
+    }
   }
 
   /** Why an entry cannot be read, or null if it can. */
   unavailable(entry: CatalogEntry): string | null {
+    if (entry.standalone) {return null;}
+    if (!this.connection) {return "No catalog.";}
     if (this.connection.kind === "foundry" && !entry.datasetRid) {
       return "No dataset RID in the catalog yet — upload it and rebuild the catalog with --rids.";
     }
@@ -117,7 +184,8 @@ export class Library {
   }
 
   storeFor(entry: CatalogEntry): FileStore {
-    if (this.connection.kind === "http") {
+    if (entry.standalone && entry.baseUrl) {return new HttpStore(entry.baseUrl);}
+    if (this.connection?.kind === "http" && !entry.standalone && this.root) {
       return new HttpStore(new URL(`${encodeURIComponent(entry.folder ?? entry.id)}/`, new URL(this.root.key, window.location.href)).href);
     }
     if (!entry.datasetRid || !this.foundry) {throw new Error(this.unavailable(entry) ?? "no Foundry config");}

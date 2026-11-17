@@ -1,7 +1,9 @@
 """
 catalog: one small dataset listing every layer.
 
-Apps are configured with the catalog's RID and nothing else; everything they
+Optional. Every dataset already describes itself in its own manifest.json,
+so an app can add any of them by ID alone. A catalog is a shortcut: apps
+configured with the catalog's RID find everything else from it; everything they
 need to find a layer — which dataset, which manifest, what kind of thing it is,
 what it needs — comes from here. It is also the list a startup check walks to
 tell a user exactly which dataset is missing its Resource grant.
@@ -79,5 +81,9 @@ def build_catalog(out_root: Path, rids: dict[str, str] | None = None) -> dict:
     (out_root / "catalog" / "catalog.json").write_text(json.dumps(catalog, indent=2) + "\n")
     missing = [layer["id"] for layer in layers if not layer["datasetRid"]]
     if missing:
-        log.info("catalog: no RID yet for %s — upload them, then rerun with --rids", ", ".join(missing))
+        log.info(
+            "catalog written. It is optional: the studio can add each dataset by its own ID. "
+            "To use the catalog instead, rerun with --rids once these are uploaded: %s",
+            ", ".join(missing),
+        )
     return catalog

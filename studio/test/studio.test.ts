@@ -227,3 +227,13 @@ describe("basemap layers", () => {
     expect(style.sprite).toBeUndefined();
   });
 });
+
+describe("adding a dataset on its own", () => {
+  it("tells a Foundry dataset ID from a folder URL", async () => {
+    const { parseSource, sourceId } = await import("../src/data/library");
+    expect(parseSource(" ri.foundry.main.dataset.35f5ccc8-2cd1-4133-bb56-f87527ef314a ")).toEqual({ datasetRid: "ri.foundry.main.dataset.35f5ccc8-2cd1-4133-bb56-f87527ef314a" });
+    expect(parseSource("/data/terrain")).toEqual({ baseUrl: "/data/terrain" });
+    // One identity per folder, with or without the trailing slash.
+    expect(sourceId({ baseUrl: "/data/terrain" })).toBe(sourceId({ baseUrl: "/data/terrain/" }));
+  });
+});

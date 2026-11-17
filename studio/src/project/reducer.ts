@@ -4,13 +4,14 @@
  * heavy data is tiles in Foundry), so snapshots are cheap and undo is exact.
  */
 import type { Geometry } from "geojson";
-import type { Connection } from "../data/library";
+import type { Connection, DatasetSource } from "../data/library";
 import type { LayerNode, MapView, Project, StudioFeature, VectorLayerNode } from "./types";
 
 export type Action =
   | { type: "replace"; project: Project }
   | { type: "setTitle"; title: string }
   | { type: "setConnection"; connection: Connection | null }
+  | { type: "setAssets"; assets: DatasetSource | null }
   | { type: "setView"; view: MapView }
   | { type: "setGlobe"; globe: boolean }
   | { type: "addLayer"; layer: LayerNode; at?: number }
@@ -55,6 +56,8 @@ export function apply(p: Project, a: Action): Project {
       return { ...p, title: a.title };
     case "setConnection":
       return { ...p, connection: a.connection };
+    case "setAssets":
+      return { ...p, assets: a.assets };
     case "setView":
       return { ...p, view: a.view };
     case "setGlobe":

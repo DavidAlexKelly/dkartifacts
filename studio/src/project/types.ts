@@ -6,7 +6,7 @@
  * MapLibre what it currently shows.
  */
 import type { Feature, Geometry } from "geojson";
-import type { Connection } from "../data/library";
+import type { Connection, DatasetSource } from "../data/library";
 
 export type BasemapFlavor = "light" | "dark" | "white" | "grayscale" | "black";
 
@@ -27,6 +27,8 @@ export interface CatalogLayerNode {
   kind: "catalog";
   id: string;
   catalogId: string;
+  /** Where the dataset is, when it was added on its own rather than from a catalog. */
+  source?: DatasetSource;
   title: string;
   visible: boolean;
   opacity: number;
@@ -73,7 +75,10 @@ export interface MapView {
 export interface Project {
   format: "decho-studio-project/1";
   title: string;
+  /** An optional catalog listing many datasets at once. */
   connection: Connection | null;
+  /** The glyphs-and-sprites dataset labels are drawn with (terrain-gen's assets), if any. */
+  assets: DatasetSource | null;
   view: MapView;
   globe: boolean;
   /** Bottom to top: index 0 is drawn first. The layer panel shows it reversed. */
@@ -101,6 +106,7 @@ export function newProject(connection: Connection | null = null): Project {
     format: "decho-studio-project/1",
     title: "Untitled map",
     connection,
+    assets: null,
     view: { center: [10, 60], zoom: 4, bearing: 0, pitch: 0 },
     globe: false,
     layers: [],
