@@ -262,6 +262,14 @@ button.primary:hover:not(:disabled) { background: var(--accent); filter: brightn
 .goto input { width: 230px; padding: 3px 8px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel-2); }
 .grid-select, .coord-system { padding: 2px 4px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel-2); font-size: 12px; }
 .status .coord { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
-@media (max-width: 1750px) { .goto input { width: 160px; } }
+@media (max-width: 1750px) { .goto input { width: 150px; } }
+.coord-system { max-width: 170px; }
 
 .print-cover { position: fixed; inset: 0; z-index: 60; display: grid; place-content: center; gap: 8px; text-align: center; background: rgba(0,0,0,0.45); color: #fff; font-size: 15px; }
+
+.props input.bad { border-color: var(--danger); }
+.field-rules { margin: 8px 0; font-size: 12px; }
+.field-rules summary { cursor: pointer; color: var(--muted); font-weight: 600; }
+.rules-table { width: 100%; border-collapse: collapse; margin-top: 4px; }
+.rules-table td, .rules-table th { padding: 2px 3px; border-bottom: 1px solid var(--line); font-size: 11px; }
+.rules-table input:not([type]), .rules-table select { width: 100%; min-width: 0; padding: 1px 3px; border: 1px solid var(--line); border-radius: 4px; background: var(--panel-2); font-size: 11px; }

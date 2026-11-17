@@ -13,6 +13,8 @@ const TOOLS: Array<{ tool: Tool; label: string; hint: string }> = [
   { tool: "measure-area", label: "Area", hint: "Measure an area" },
   { tool: "profile", label: "Profile", hint: "Draw a line to see the terrain along it" },
   { tool: "los", label: "Sight", hint: "Line of sight: click the observer, then the target" },
+  { tool: "route", label: "Route", hint: "Terrain-aware route: click the start, then the destination (needs the pathfinding graphs in Foundry)" },
+  { tool: "split", label: "Split", hint: "Draw a line across features of the active layer to split them; double-click to finish" },
   { tool: "viewshed", label: "Viewshed", hint: "Click a point to see what can be seen from it (settings in the panel on the right)" },
 ];
 
@@ -44,9 +46,11 @@ interface Props {
   onExportLayer(format: "geojson" | "csv" | "kml" | "kmz" | "shapefile" | "geopackage"): void;
   onAnalysis(tab: "processing" | "select" | "calculate" | "stats"): void;
   onGoto(text: string): boolean;
-  grid: "none" | "latlon" | "mgrs";
-  onGrid(g: "none" | "latlon" | "mgrs"): void;
   onPrint(): void;
+  onCopy(): void;
+  onPaste(): void;
+  onMerge(): void;
+  onDelete(): void;
 }
 
 const EXPORTS = [
@@ -88,6 +92,16 @@ export function Toolbar(p: Props) {
         </div>
       </details>
       <details className="menu">
+        <summary>Edit</summary>
+        <div className="menu-items">
+          {item("Copy selected features", p.onCopy, false, "Ctrl+C")}
+          {item("Paste into the active layer", p.onPaste, false, "Ctrl+V")}
+          {item("Merge selected features", p.onMerge, false, "Into one feature, keeping the first one's attributes")}
+          {item("Delete selected features", p.onDelete, false, "Delete")}
+          {item("Check topology of the active layer…", () => p.onAnalysis("processing"), false, "Overlaps and gaps between polygons (Processing → Check topology)")}
+        </div>
+      </details>
+      <details className="menu">
         <summary>Analysis</summary>
         <div className="menu-items">
           {item("Processing toolbox…", () => p.onAnalysis("processing"), false, "Buffer, clip, intersect, dissolve, spatial join, nearest, …")}
@@ -114,11 +128,6 @@ export function Toolbar(p: Props) {
       <form className="goto" onSubmit={(e) => { e.preventDefault(); const input = (e.currentTarget.elements.namedItem("goto") as HTMLInputElement); if (p.onGoto(input.value)) {input.value = "";} }}>
         <input name="goto" placeholder="Go to: 61.63 8.31 · 32V MP 63562 33868" aria-label="Go to coordinate" title="Decimal degrees, DMS, MGRS or UTM" />
       </form>
-      <select className="grid-select" value={p.grid} onChange={(e) => p.onGrid(e.target.value as "none" | "latlon" | "mgrs")} aria-label="Grid" title="Coordinate grid over the map">
-        <option value="none">No grid</option>
-        <option value="latlon">Lat/lon grid</option>
-        <option value="mgrs">MGRS grid</option>
-      </select>
       <input ref={openInput} type="file" accept=".json,.decho.json" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) {p.onOpen(f);} e.target.value = ""; }} />
       <input ref={importInput} type="file" multiple accept=".geojson,.json,.csv,.tsv,.txt,.kml,.kmz,.gpx,.shp,.shx,.dbf,.prj,.cpg,.zip,.gpkg,.dxf" hidden onChange={(e) => { if (e.target.files?.length) {p.onImport(e.target.files);} e.target.value = ""; }} />
     </header>

@@ -41,7 +41,17 @@ function localData(dir: string | undefined): Plugin {
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
+  const pkg = (name: string) => resolve(__dirname, "../packages", name, "src/index.ts");
   return {
+    resolve: {
+      // The repo's own packages, used from source (routing).
+      alias: {
+        "@acc/decho-pathfinding": pkg("decho-pathfinding"),
+        "@acc/decho-foundry-bytes": pkg("decho-foundry-bytes"),
+      },
+      // Their own imports resolve from the studio's node_modules.
+      dedupe: ["@osdk/client", "@osdk/foundry.datasets", "@osdk/foundry.mediasets"],
+    },
     plugins: [
       react(),
       localData(env.STUDIO_DATA),

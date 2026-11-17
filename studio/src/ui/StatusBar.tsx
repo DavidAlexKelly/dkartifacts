@@ -13,6 +13,8 @@ interface Props {
   onDismiss(): void;
   coordSystem: CoordSystem;
   onCoordSystem(s: CoordSystem): void;
+  grid: "none" | "latlon" | "mgrs";
+  onGrid(g: "none" | "latlon" | "mgrs"): void;
 }
 
 const TOOL_HINT: Partial<Record<Tool, string>> = {
@@ -26,6 +28,8 @@ const TOOL_HINT: Partial<Record<Tool, string>> = {
   identify: "Click to identify",
   los: "Click the observer, then the target",
   viewshed: "Click where the observer stands",
+  route: "Click the start, then the destination",
+  split: "Draw a line across the features to split · double-click to finish",
 };
 
 function dms(v: number, pos: string, neg: string): string {
@@ -36,7 +40,7 @@ function dms(v: number, pos: string, neg: string): string {
   return `${d}°${String(m).padStart(2, "0")}′${s.toFixed(1).padStart(4, "0")}″${v >= 0 ? pos : neg}`;
 }
 
-export function StatusBar({ cursor, elevation, zoom, tool, sketchLength, message, onDismiss, coordSystem, onCoordSystem }: Props) {
+export function StatusBar({ cursor, elevation, zoom, tool, sketchLength, message, onDismiss, coordSystem, onCoordSystem, grid, onGrid }: Props) {
   return (
     <footer className="status">
       {message ? (
@@ -52,6 +56,11 @@ export function StatusBar({ cursor, elevation, zoom, tool, sketchLength, message
           {coordSystem === "dms" ? `${dms(cursor[1], "N", "S")} ${dms(cursor[0], "E", "W")}` : formatCoord(cursor[0], cursor[1], coordSystem)}
         </span>
       )}
+      <select className="grid-select" value={grid} onChange={(e) => onGrid(e.target.value as "none" | "latlon" | "mgrs")} aria-label="Grid" title="Coordinate grid over the map">
+        <option value="none">No grid</option>
+        <option value="latlon">Lat/lon grid</option>
+        <option value="mgrs">MGRS grid</option>
+      </select>
       <select className="coord-system" value={coordSystem} onChange={(e) => onCoordSystem(e.target.value as CoordSystem)} aria-label="Coordinate format">
         {COORD_SYSTEMS.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
       </select>

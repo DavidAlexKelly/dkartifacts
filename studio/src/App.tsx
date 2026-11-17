@@ -8,6 +8,9 @@ import { getProtocolLibrary, hasAssets, registerProtocols, setAssetsDataset, set
 import { registerDerivedProtocols } from "./data/derived";
 import { createHeightSource, type HeightSource } from "./analysis/heightgrid";
 import { lineOfSight, viewshed, type LineOfSightResult } from "./analysis/terrain";
+import { mergeFeatures, splitByLine } from "./analysis/processing";
+import { selectByLocation } from "./analysis/select";
+import { defaultGraphDataset, type ProfileName } from "./foundry/routing";
 import { configuredCatalogRid, foundry } from "./foundry/auth";
 import { commitEdits, deleteProject as deleteFoundryProject, loadBacked, openProject as openFoundryProject, publishLayer, saveProject as saveFoundryProject } from "./foundry/layers";
 import { OntologyClient, type ObjectTypeDef } from "./foundry/ontology";
@@ -15,6 +18,7 @@ import { OntologyDialog, ProjectsDialog } from "./ui/FoundryDialogs";
 import { AnalysisDialog, type AnalysisTab, type ProcessingRun } from "./ui/AnalysisDialog";
 import { CrsDialog } from "./ui/CrsDialog";
 import { TimeSlider } from "./ui/TimeSlider";
+import { invalidFeatures } from "./ui/FeatureForm";
 import { PrintDialog } from "./ui/PrintDialog";
 import type { CoordSystem } from "./coords/format";
 import { parseCoord } from "./coords/parse";
@@ -130,6 +134,8 @@ export default function App() {
   const [los, setLos] = useState<(LineOfSightResult & { from: Position; to: Position }) | null>(null);
   const [viewshedSettings, setViewshedSettings] = useState<ViewshedSettings>({ radiusKm: 5, observerM: 2, targetM: 0 });
   const [analysisBusy, setAnalysisBusy] = useState<string | null>(null);
+  const [routeSettings, setRouteSettings] = useState<{ profile: ProfileName; dataset: string }>({ profile: "tracked", dataset: defaultGraphDataset });
+  const clipboard = useRef<StudioFeature[]>([]);
   const [dialog, setDialog] = useState<null | "projects" | "ontology" | "analysis" | "print">(null);
   const [coordSystem, setCoordSystemState] = useState<CoordSystem>(() => {
     try {
@@ -347,6 +353,9 @@ export default function App() {
 
   const commitLayer = async (layer: VectorLayerNode) => {
     if (!ontology) {return;}
+    const pendingIds = layer.pending ? [...layer.pending.created, ...layer.pending.modified] : [];
+    const bad = invalidFeatures(layer, pendingIds);
+    if (bad && !confirm(`${bad} of the features to commit break the layer's field rules (required or allowed values). Commit anyway?`)) {return;}
     setStatus(layer.id, "Committing…", { busy: true });
     const result = await commitEdits(layer, ontology, (done, total) => setStatus(layer.id, `Committing ${done}/${total}…`, { busy: true }));
     dispatch({ type: "markCommitted", layerId: layer.id, keep: result.failed.map((f) => f.id) });
@@ -487,6 +496,61 @@ export default function App() {
       else if (tool === "polygon" && coords.length >= 3) {addFeature({ type: "Polygon", coordinates: [[...coords, coords[0]]] });}
       else if (tool === "measure-line" && coords.length >= 2) {setMeasured({ kind: "distance", coords });}
       else if (tool === "measure-area" && coords.length >= 3) {setMeasured({ kind: "area", coords });}
+      else if (tool === "route" && coords.length >= 2) {
+        if (!foundry) {
+          say("Routing reads the pathfinding graphs from Foundry, which is not configured.", "error");
+          return;
+        }
+        const { profile, dataset } = routeSettings;
+        const fc = foundry;
+        setAnalysisBusy(`Finding a ${profile} route…`);
+        void import("./foundry/routing")
+          .then(({ routeBetween }) => routeBetween(fc, dataset, profile, coords[0] as [number, number], coords[1] as [number, number]))
+          .then((r) => {
+            if (r.waypoints.length < 2) {
+              say("No route found between those points.", "error");
+              return;
+            }
+            const props = { profile, distance_km: +(r.distanceM / 1000).toFixed(2), eta_min: r.etaS === null ? null : Math.round(r.etaS / 60), truncated: r.truncated };
+            const layer: VectorLayerNode = {
+              kind: "vector", id: newId("vec"), title: `Route (${profile})`, visible: true, opacity: 1,
+              style: { ...defaultVectorStyle(4), color: "#7b2ff7", strokeWidth: 4 },
+              data: { type: "FeatureCollection", features: [{ type: "Feature", id: newId("f"), geometry: { type: "LineString", coordinates: r.waypoints.map(([lat, lon]) => [lon, lat]) }, properties: props }] },
+              fields: Object.keys(props),
+            };
+            dispatch({ type: "addLayer", layer });
+            say(`Route: ${props.distance_km} km${props.eta_min !== null ? `, about ${props.eta_min} min` : ""} for ${profile} vehicles${r.truncated ? " (search budget reached: may not be the best route)" : ""}.`);
+          })
+          .catch((e: unknown) => say(`Routing failed: ${e instanceof Error ? e.message : String(e)}`, "error"))
+          .finally(() => setAnalysisBusy(null));
+      }
+      else if (tool === "split" && coords.length >= 2) {
+        const layer = activeVector;
+        if (!layer || !isEditable(layer)) {
+          say("Make an editable vector layer active to split its features.", "error");
+          return;
+        }
+        const cutter = { type: "LineString" as const, coordinates: coords };
+        // Selected features the line crosses, or else every feature it crosses.
+        const scope = selection?.layerId === layer.id && selection.featureIds.length ? new Set(selection.featureIds) : null;
+        let hit = new Set(selectByLocation(layer.data.features.filter((f) => !scope || scope.has(f.id)), [cutter], "intersects"));
+        if (scope && hit.size === 0) {hit = new Set(selectByLocation(layer.data.features, [cutter], "intersects"));}
+        let made = 0;
+        const next = layer.data.features.flatMap((f) => {
+          if (!hit.has(f.id) || f.geometry.type.endsWith("Point")) {return [f];}
+          const parts = splitByLine(f, cutter).features;
+          if (parts.length < 2) {return [f];}
+          made += parts.length;
+          // The first piece keeps the feature's id; the rest are new features.
+          return parts.map((p, i) => (i === 0 ? { ...p, id: f.id } : p));
+        });
+        if (!made) {
+          say("The line did not cut any feature into pieces.", "error");
+          return;
+        }
+        dispatch({ type: "replaceFeatures", layerId: layer.id, features: next });
+        say(`Split into ${made} pieces.`);
+      }
       else if (tool === "los" && coords.length >= 2) {
         const src = needHeights();
         if (!src) {return;}
@@ -712,6 +776,45 @@ export default function App() {
     if (needsCrs.length && !crs) {setCrsRequest({ files, names: needsCrs });}
   };
 
+  // ── Editing commands ────────────────────────────────────────────────────
+  const selectedFeatures = (): StudioFeature[] => {
+    const layer = selection && project.layers.find((l) => l.id === selection.layerId);
+    if (!layer || layer.kind !== "vector") {return [];}
+    const ids = new Set(selection!.featureIds);
+    return layer.data.features.filter((f) => ids.has(f.id));
+  };
+  const copySelected = () => {
+    const features = selectedFeatures();
+    clipboard.current = features;
+    if (features.length) {
+      void navigator.clipboard?.writeText(JSON.stringify({ type: "FeatureCollection", features })).catch(() => undefined);
+      say(`Copied ${features.length} feature(s).`);
+    } else {say("Select features to copy.", "error");}
+  };
+  const paste = () => {
+    if (!clipboard.current.length) {return say("Nothing copied yet.", "error");}
+    const layerId = ensureVectorLayer();
+    const copies = clipboard.current.map((f) => ({ ...f, id: newId("f"), properties: { ...f.properties } }));
+    const layer = project.layers.find((l) => l.id === layerId);
+    const existing = layer?.kind === "vector" ? layer.data.features : [];
+    dispatch({ type: "replaceFeatures", layerId, features: [...existing, ...copies] });
+    setSelection({ layerId, featureIds: copies.map((f) => f.id) });
+    say(`Pasted ${copies.length} feature(s).`);
+  };
+  const mergeSelected = () => {
+    const layer = selection && project.layers.find((l) => l.id === selection.layerId);
+    const features = selectedFeatures();
+    if (!layer || layer.kind !== "vector" || features.length < 2) {return say("Select two or more features in one layer to merge.", "error");}
+    if (!isEditable(layer)) {return say(`“${layer.title}” is read-only.`, "error");}
+    const merged = mergeFeatures(features).features[0];
+    if (!merged) {return say("Those features could not be merged.", "error");}
+    const keep = { ...merged, id: features[0].id };
+    const gone = new Set(features.map((f) => f.id));
+    dispatch({ type: "replaceFeatures", layerId: layer.id, features: [...layer.data.features.filter((f) => !gone.has(f.id)), keep] });
+    setSelection({ layerId: layer.id, featureIds: [keep.id] });
+    say(`Merged ${features.length} features.`);
+  };
+
   const saveProject = () => download(`${safeName(project.title)}.decho.json`, serializeProject(project), "application/json");
 
   const replaceProject = (p: typeof project) => {
@@ -818,6 +921,12 @@ export default function App() {
       } else if (e.key.toLowerCase() === "y") {
         e.preventDefault();
         dispatch({ type: "redo" });
+      } else if (e.key.toLowerCase() === "c" && selection?.featureIds.length) {
+        e.preventDefault();
+        copySelected();
+      } else if (e.key.toLowerCase() === "v" && clipboard.current.length) {
+        e.preventDefault();
+        paste();
       } else if (e.key.toLowerCase() === "s") {
         e.preventDefault();
         void saveToFoundry();
@@ -861,8 +970,10 @@ export default function App() {
         onExportLayer={(f) => void exportLayer(f)}
         onAnalysis={(tab) => { setAnalysisTab(tab); setDialog("analysis"); }}
         onPrint={() => setDialog("print")}
-        grid={project.grid ?? "none"}
-        onGrid={(g) => dispatch({ type: "setGrid", grid: g })}
+        onCopy={copySelected}
+        onPaste={paste}
+        onMerge={mergeSelected}
+        onDelete={() => toolCtx.current?.deleteSelected()}
         onGoto={(text) => {
           const p = parseCoord(text);
           if (!p) {
@@ -946,6 +1057,8 @@ export default function App() {
           los={los}
           busy={analysisBusy}
           viewshedSettings={viewshedSettings}
+          routeSettings={routeSettings}
+          onRouteSettings={setRouteSettings}
           onViewshedSettings={setViewshedSettings}
           identify={identify}
           measurement={liveMeasurement}
@@ -960,6 +1073,7 @@ export default function App() {
           }}
         />
         <PropertiesPanel
+          selectedFeature={activeVector && selection?.layerId === activeVector.id && selection.featureIds.length === 1 ? activeVector.data.features.find((f) => f.id === selection.featureIds[0]) ?? null : null}
           node={activeNode} entry={activeEntry} manifest={activeManifest} glyphs={glyphs} dispatch={typedDispatch}
           foundry={{
             ready: !!ontology,
@@ -1073,6 +1187,8 @@ export default function App() {
         onDismiss={() => setMessage(null)}
         coordSystem={coordSystem}
         onCoordSystem={setCoordSystem}
+        grid={project.grid ?? "none"}
+        onGrid={(g) => dispatch({ type: "setGrid", grid: g })}
       />
     </div>
   );

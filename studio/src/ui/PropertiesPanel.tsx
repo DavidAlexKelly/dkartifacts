@@ -5,10 +5,11 @@ import { catalogKind } from "../map/style";
 import { buildCategories, buildGraduated, legendFor, modeOf, type StyleMode } from "../map/symbology";
 import { RAMP_NAMES, type RampName } from "../analysis/classify";
 import { tryCompile } from "../analysis/expression";
+import { FeatureForm, FieldRules } from "./FeatureForm";
 import { download } from "../formats/vector";
 import { ASPECT_LEGEND, SLOPE_CLASSES } from "../analysis/derivedtiles";
 import { fieldsOf, type Action } from "../project/reducer";
-import { PALETTE, type BasemapFlavor, type CatalogLayerNode, type LayerNode, type VectorLayerNode, type VectorStyle } from "../project/types";
+import { PALETTE, type BasemapFlavor, type CatalogLayerNode, type LayerNode, type VectorLayerNode, type VectorStyle, isEditable, type StudioFeature } from "../project/types";
 
 export interface FoundryLayerActions {
   ready: boolean;
@@ -19,6 +20,7 @@ export interface FoundryLayerActions {
 }
 
 interface Props {
+  selectedFeature?: StudioFeature | null;
   foundry: FoundryLayerActions;
   node: LayerNode | null;
   entry?: CatalogEntry;
@@ -312,7 +314,7 @@ function FoundrySource({ node, foundry }: { node: VectorLayerNode; foundry: Foun
   );
 }
 
-export function PropertiesPanel({ node, entry, manifest, glyphs, dispatch, foundry }: Props) {
+export function PropertiesPanel({ node, entry, manifest, glyphs, dispatch, foundry, selectedFeature }: Props) {
   if (!node) {
     return (
       <section className="panel" aria-label="Layer properties">
@@ -327,7 +329,9 @@ export function PropertiesPanel({ node, entry, manifest, glyphs, dispatch, found
       <div className="props">
         <Row label="Name"><input value={node.title} onChange={(e) => dispatch({ type: "updateLayer", id: node.id, patch: { title: e.target.value } })} /></Row>
         <Row label={`Opacity ${Math.round(node.opacity * 100)}%`}><input type="range" min={0} max={1} step={0.05} value={node.opacity} onChange={(e) => dispatch({ type: "updateLayer", id: node.id, patch: { opacity: Number(e.target.value) } })} /></Row>
+        {node.kind === "vector" && selectedFeature && <FeatureForm layer={node} feature={selectedFeature} dispatch={dispatch} />}
         {node.kind === "vector" && <FoundrySource node={node} foundry={foundry} />}
+        {node.kind === "vector" && isEditable(node) && <FieldRules layer={node} dispatch={dispatch} />}
         {node.kind === "vector" ? <VectorStyleEditor node={node} glyphs={glyphs} dispatch={dispatch} /> : <CatalogOptions node={node} entry={entry} manifest={manifest} glyphs={glyphs} dispatch={dispatch} />}
       </div>
     </section>

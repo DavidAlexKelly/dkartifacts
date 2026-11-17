@@ -269,6 +269,12 @@ export function fakeFoundry(opts: FakeFoundryOptions): Plugin {
       const { handle, rids } = createFakeFoundry(opts);
       const dataRoot = opts.dataDir ? resolve(opts.dataDir) : null;
       server.middlewares.use("/fake-foundry", handle);
+      // @acc/decho-foundry-bytes builds URLs from the origin alone
+      // (/api/v2/…), so the fake answers there too.
+      server.middlewares.use("/api", (req, res) => {
+        req.url = `/api${req.url ?? ""}`;
+        handle(req, res);
+      });
       server.config.logger.info(`  fake Foundry at /fake-foundry (${rids.size} datasets from ${dataRoot ?? "no folder"}; token "fake")`);
       for (const [rid, name] of rids) {server.config.logger.info(`    ${name}: ${rid}`);}
     },

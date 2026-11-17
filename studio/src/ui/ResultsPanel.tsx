@@ -35,6 +35,8 @@ interface Props {
   busy: string | null;
   viewshedSettings: ViewshedSettings;
   onViewshedSettings(s: ViewshedSettings): void;
+  routeSettings: { profile: "tracked" | "wheeled" | "foot"; dataset: string };
+  onRouteSettings(s: { profile: "tracked" | "wheeled" | "foot"; dataset: string }): void;
   identify: IdentifyResult | null;
   measurement: Measurement | null;
   profile: ProfilePoint[] | null;
@@ -101,9 +103,9 @@ function SightChart({ r }: { r: LineOfSightResult }) {
   );
 }
 
-export function ResultsPanel({ tool, los, busy, viewshedSettings, onViewshedSettings, identify, measurement, profile, profileBusy, onClose }: Props) {
+export function ResultsPanel({ tool, los, busy, viewshedSettings, onViewshedSettings, routeSettings, onRouteSettings, identify, measurement, profile, profileBusy, onClose }: Props) {
   const showSettings = tool === "viewshed" || tool === "los";
-  if (!identify && !measurement && !profile && !profileBusy && !los && !busy && !showSettings) {return null;}
+  if (!identify && !measurement && !profile && !profileBusy && !los && !busy && !showSettings && tool !== "route") {return null;}
   const v = viewshedSettings;
   const num = (key: keyof ViewshedSettings, label: string, min: number, max: number, step: number) => (
     <label className="row">
@@ -114,7 +116,7 @@ export function ResultsPanel({ tool, los, busy, viewshedSettings, onViewshedSett
   return (
     <section className="panel results" aria-label="Results">
       <div className="panel-head">
-        <h2>{los || tool === "los" ? "Line of sight" : tool === "viewshed" ? "Viewshed" : profile || profileBusy ? "Elevation profile" : measurement ? "Measurement" : "Identify"}</h2>
+        <h2>{tool === "route" ? "Route" : los || tool === "los" ? "Line of sight" : tool === "viewshed" ? "Viewshed" : profile || profileBusy ? "Elevation profile" : measurement ? "Measurement" : "Identify"}</h2>
         <button type="button" className="small" onClick={onClose}>Close</button>
       </div>
       {showSettings && (
@@ -123,6 +125,23 @@ export function ResultsPanel({ tool, los, busy, viewshedSettings, onViewshedSett
           {num("observerM", "Observer height (m)", 0, 500, 1)}
           {num("targetM", "Target height (m)", 0, 500, 1)}
           <p className="hint">Heights above the ground. Earth curvature and refraction are included.</p>
+        </div>
+      )}
+      {tool === "route" && (
+        <div className="props">
+          <label className="row">
+            <span>Vehicle</span>
+            <select value={routeSettings.profile} onChange={(e) => onRouteSettings({ ...routeSettings, profile: e.target.value as "tracked" | "wheeled" | "foot" })}>
+              <option value="tracked">tracked</option>
+              <option value="wheeled">wheeled</option>
+              <option value="foot">on foot</option>
+            </select>
+          </label>
+          <label className="row">
+            <span>Graph dataset</span>
+            <input value={routeSettings.dataset} onChange={(e) => onRouteSettings({ ...routeSettings, dataset: e.target.value.trim() })} aria-label="Pathfinding graph dataset" />
+          </label>
+          <p className="hint">Routes follow the terrain graphs: slope, water and built-up areas count. The result is added as a layer.</p>
         </div>
       )}
       {busy && <p className="empty">{busy}</p>}
