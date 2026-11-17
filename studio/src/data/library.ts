@@ -23,7 +23,7 @@
 import { PMTiles, type Source } from "pmtiles";
 import type { FoundryConfig } from "../foundry/auth";
 import { readFile, readJson } from "./cache";
-import { parseManifest, pyramidResolver, type LayerManifest, type PyramidResolver } from "./manifest";
+import { ASSETS_PROBE, assetsBundleManifest, parseManifest, pyramidResolver, type LayerManifest, type PyramidResolver } from "./manifest";
 import { FoundryDatasetStore, HttpStore, type FileStore } from "./stores";
 
 export type Connection = { kind: "http"; baseUrl: string } | { kind: "foundry"; catalogRid: string };
@@ -201,9 +201,17 @@ export class Library {
         const why = this.unavailable(entry);
         if (why) {throw new Error(why);}
         const path = entry.manifestPath ?? "manifest.json";
-        const raw = await readJson<unknown>(this.storeFor(entry), path, entry.manifestSha256);
-        if (!raw) {throw new Error(`${id}: ${path} not found`);}
-        const m = parseManifest(raw, id);
+        const store = this.storeFor(entry);
+        const raw = await readJson<unknown>(store, path, entry.manifestSha256);
+        let m: LayerManifest;
+        if (raw) {
+          m = parseManifest(raw, id);
+        } else if (await store.read(ASSETS_PROBE)) {
+          // A Protomaps glyph/sprite bundle uploaded as downloaded, with no manifest.
+          m = assetsBundleManifest(id);
+        } else {
+          throw new Error(`${id}: ${path} not found`);
+        }
         if (m.layers) {this.resolvers.set(id, pyramidResolver(m));}
         return m;
       })();

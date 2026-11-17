@@ -16,6 +16,8 @@ export interface CatalogLayerOptions {
   labels?: boolean;
   // raster-dem
   hillshade?: boolean;
+  /** Colour by height. On unless set to false. */
+  relief?: boolean;
   terrain3d?: boolean;
   exaggeration?: number;
   // contours / generic vector tiles

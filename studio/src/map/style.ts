@@ -29,6 +29,24 @@ export interface StyleContext {
   background: string;
 }
 
+/**
+ * Heights to colours: sea, green lowland, through dry upland and brown rock,
+ * to snow. Voids are sea level in Terrarium, so 0 m reads as water.
+ */
+export const RELIEF_RAMP: ExpressionSpecification = [
+  "interpolate", ["linear"], ["elevation"],
+  -500, "#6f9fc6",
+  0, "#a9cbe4",
+  1, "#a7c98f",
+  200, "#c4d89a",
+  600, "#e2dca5",
+  1000, "#d9c08f",
+  1500, "#bf9f7c",
+  2000, "#a7927f",
+  2400, "#d8d3ce",
+  3200, "#ffffff",
+];
+
 export function layerIdOf(styleLayerId: string): string | null {
   const i = styleLayerId.indexOf("::");
   return i < 0 ? null : styleLayerId.slice(0, i);
@@ -118,18 +136,26 @@ function catalogLayers(node: CatalogLayerNode, ctx: StyleContext, sources: Recor
       const elev = enc.elevationProperty ?? "ELEV";
       const isIndex: ExpressionSpecification = ["==", ["get", enc.indexProperty ?? "index"], true];
       const color = o.color ?? "#8a5a2b";
+      // Index lines at every zoom; the rest only from z11, where there is
+      // room for them. Below that, 20 m contours in steep terrain are a
+      // solid brown fill rather than lines.
       out.push({
-        id: id("lines"), type: "line", source: id("src"), "source-layer": sl,
+        id: id("lines"), type: "line", source: id("src"), "source-layer": sl, filter: ["!", isIndex], minzoom: 11,
+        layout: { visibility: vis, "line-join": "round" },
+        paint: { "line-color": color, "line-opacity": 0.5 * node.opacity, "line-width": (o.width ?? 1) * 0.7 },
+      });
+      out.push({
+        id: id("index"), type: "line", source: id("src"), "source-layer": sl, filter: isIndex,
         layout: { visibility: vis, "line-join": "round" },
         paint: {
           "line-color": color,
-          "line-opacity": ["case", isIndex, 0.9 * node.opacity, 0.55 * node.opacity],
-          "line-width": ["case", isIndex, (o.width ?? 1) * 1.6, (o.width ?? 1) * 0.7],
+          "line-opacity": 0.85 * node.opacity,
+          "line-width": ["interpolate", ["linear"], ["zoom"], 8, (o.width ?? 1) * 0.6, 12, (o.width ?? 1) * 1.6],
         },
       });
       if (ctx.glyphs && o.labels !== false) {
         out.push({
-          id: id("labels"), type: "symbol", source: id("src"), "source-layer": sl, filter: isIndex, minzoom: 11,
+          id: id("labels"), type: "symbol", source: id("src"), "source-layer": sl, filter: isIndex, minzoom: 10,
           layout: {
             visibility: vis, "symbol-placement": "line", "text-field": ["concat", ["to-string", ["get", elev]], " m"],
             "text-font": ["Noto Sans Regular"], "text-size": 10,
@@ -146,8 +172,18 @@ function catalogLayers(node: CatalogLayerNode, ctx: StyleContext, sources: Recor
       return;
     }
     case "raster-dem": {
+      if (o.hillshade !== false || o.relief !== false) {sources[id("hs")] = tileSource(node, m, "raster-dem");}
+      if (o.relief !== false) {
+        // Colour by height (hypsometric tint), under the shading.
+        out.push({
+          id: id("relief"), type: "color-relief", source: id("hs"), layout: { visibility: vis },
+          paint: {
+            "color-relief-color": RELIEF_RAMP,
+            "color-relief-opacity": 0.85 * node.opacity,
+          },
+        } as LayerSpecification);
+      }
       if (o.hillshade !== false) {
-        sources[id("hs")] = tileSource(node, m, "raster-dem");
         out.push({
           id: id("hillshade"), type: "hillshade", source: id("hs"), layout: { visibility: vis },
           paint: {

@@ -185,6 +185,7 @@ describe("style builder", () => {
     const ids = style.layers.map((l) => l.id);
     expect(ids).toContain("t::hillshade");
     expect(ids).toContain("c::lines");
+    expect(ids).toContain("c::index");
     expect(ids).not.toContain("c::labels"); // no glyphs, no labels
     expect(ids).toContain("v::sel-point");
     expect(ids.indexOf("v::point")).toBeGreaterThan(ids.indexOf("c::lines"));
@@ -235,5 +236,31 @@ describe("adding a dataset on its own", () => {
     expect(parseSource("/data/terrain")).toEqual({ baseUrl: "/data/terrain" });
     // One identity per folder, with or without the trailing slash.
     expect(sourceId({ baseUrl: "/data/terrain" })).toBe(sourceId({ baseUrl: "/data/terrain/" }));
+  });
+});
+
+describe("datasets made before decho-layer/1", () => {
+  it("reads decho-basemap's chunked-basemap manifest as a Protomaps basemap", () => {
+    const m = parseManifest({ version: 1, gridOrigin: { lon: -180, lat: 85 }, layers: [{ id: "low", minZoom: 0, maxZoom: 7, type: "single", path: "z0-7.pmtiles" }, { id: "z12", minZoom: 8, maxZoom: 12, type: "grid", cellDeg: 2, pathTemplate: "z12/c{col}_r{row}.pmtiles", cells: [[90, 18]] }] }, "ri.foundry.main.dataset.x");
+    expect(m.kind).toBe("vector-tiles");
+    expect(m.encoding).toEqual({ schema: "protomaps" });
+    expect(pyramidResolver(m).pathForTile(3, 4, 2)?.path).toBe("z0-7.pmtiles");
+  });
+
+  it("explains what to do with the old DEM-cell format", () => {
+    expect(() => parseManifest({ gridOrigin: { lon: -180, lat: 85 }, cellDeg: 2, cells: [] }, "dem")).toThrow(/terrain pyramid/);
+  });
+});
+
+describe("terrain colours", () => {
+  it("colours terrain by height under the hillshade, unless turned off", () => {
+    const p = newProject();
+    p.layers = [{ kind: "catalog", id: "t", catalogId: "terrain", title: "T", visible: true, opacity: 1, options: {} }];
+    const ctx = { entries: new Map(), manifests: new Map([["terrain", terrainManifest as unknown as LayerManifest]]), glyphs: false, overlay: { type: "FeatureCollection" as const, features: [] }, selection: null, background: "#eee" };
+    const ids = buildStyle(p, ctx).layers.map((l) => l.id);
+    expect(ids.indexOf("t::relief")).toBeGreaterThan(-1);
+    expect(ids.indexOf("t::relief")).toBeLessThan(ids.indexOf("t::hillshade"));
+    p.layers = [{ ...p.layers[0], options: { relief: false } } as typeof p.layers[0]];
+    expect(buildStyle(p, ctx).layers.map((l) => l.id)).not.toContain("t::relief");
   });
 });

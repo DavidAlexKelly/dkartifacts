@@ -78,6 +78,8 @@ export class ManifestError extends Error {
 
 export function parseManifest(raw: unknown, where: string): LayerManifest {
   if (typeof raw !== "object" || raw === null) {throw new ManifestError(`${where}: manifest is not a JSON object`);}
+  const legacy = fromLegacy(raw as Record<string, unknown>, where);
+  if (legacy) {return legacy;}
   const m = raw as LayerManifest;
   if (m.schema !== SCHEMA) {
     throw new ManifestError(`${where}: schema is ${String(m.schema)}, expected ${SCHEMA}. Rebuild it with terrain-gen.`);
@@ -90,6 +92,45 @@ export function parseManifest(raw: unknown, where: string): LayerManifest {
   }
   return m;
 }
+
+/**
+ * Datasets made before decho-layer/1, so ones already in Foundry work as-is.
+ *
+ *   chunked basemap   decho-basemap's GlobeManifest: { version, gridOrigin,
+ *                     layers } and no schema. Read as a Protomaps basemap.
+ *   DEM cells         decho-elevation's optional DemManifest. Not readable
+ *                     here: the studio draws terrain from a pyramid, so say
+ *                     what to build instead.
+ */
+function fromLegacy(raw: Record<string, unknown>, where: string): LayerManifest | null {
+  if (raw.schema !== undefined) {return null;}
+  if (raw.gridOrigin && Array.isArray(raw.layers) && raw.layers.length > 0) {
+    return {
+      ...(raw as unknown as LayerManifest),
+      schema: SCHEMA,
+      id: where,
+      kind: "vector-tiles",
+      title: "Basemap",
+      encoding: { schema: "protomaps" },
+      attribution: "© OpenStreetMap contributors, Protomaps",
+    };
+  }
+  if (Array.isArray(raw.cells) || raw.cellDeg !== undefined) {
+    throw new ManifestError(
+      `${where}: this is the older DEM-cell format. The studio draws terrain from a terrain pyramid: ` +
+        "build one with terrain-gen (dem-cells, then terrain) and add that dataset.",
+    );
+  }
+  return null;
+}
+
+/** A manifest for a Protomaps glyphs-and-sprites bundle uploaded without one. */
+export function assetsBundleManifest(id: string): LayerManifest {
+  return { schema: SCHEMA, id, kind: "assets", title: "Glyphs and sprites", attribution: "Protomaps, Noto fonts (OFL)", fontsPrefix: "fonts" };
+}
+
+/** A file every Protomaps glyph bundle has; its presence identifies one. */
+export const ASSETS_PROBE = "fonts/Noto Sans Regular/0-255.pbf";
 
 export function pad3(n: number): string {
   return String(n).padStart(3, "0");
