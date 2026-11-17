@@ -4,7 +4,10 @@ import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "r
 import { elevationAt, profile as sampleProfile, type ProfilePoint } from "./data/elevation";
 import { Library, parseSource, sourceId, type CatalogEntry, type Connection, type DatasetSource } from "./data/library";
 import type { LayerManifest } from "./data/manifest";
-import { hasAssets, registerProtocols, setAssetsDataset, setProtocolLibrary } from "./data/protocols";
+import { getProtocolLibrary, hasAssets, registerProtocols, setAssetsDataset, setProtocolLibrary } from "./data/protocols";
+import { registerDerivedProtocols } from "./data/derived";
+import { createHeightSource, type HeightSource } from "./analysis/heightgrid";
+import { lineOfSight, viewshed, type LineOfSightResult } from "./analysis/terrain";
 import { configuredCatalogRid, foundry } from "./foundry/auth";
 import { commitEdits, deleteProject as deleteFoundryProject, loadBacked, openProject as openFoundryProject, publishLayer, saveProject as saveFoundryProject } from "./foundry/layers";
 import { OntologyClient, type ObjectTypeDef } from "./foundry/ontology";
@@ -33,11 +36,12 @@ import { AttributeTable } from "./ui/AttributeTable";
 import { BrowserPanel } from "./ui/BrowserPanel";
 import { LayersPanel } from "./ui/LayersPanel";
 import { PropertiesPanel } from "./ui/PropertiesPanel";
-import { ResultsPanel, type IdentifyResult, type Measurement } from "./ui/ResultsPanel";
+import { ResultsPanel, type IdentifyResult, type Measurement, type ViewshedSettings } from "./ui/ResultsPanel";
 import { StatusBar } from "./ui/StatusBar";
 import { Toolbar } from "./ui/Toolbar";
 
 registerProtocols();
+registerDerivedProtocols(getProtocolLibrary);
 
 /**
  * An optional catalog to open at start: from the URL, then the build config,
@@ -115,6 +119,9 @@ export default function App() {
   const [zoom, setZoom] = useState(project.view.zoom);
   const initialView = useRef(project.view);
   const ontology = useMemo(() => (foundry ? new OntologyClient(foundry) : null), []);
+  const [los, setLos] = useState<(LineOfSightResult & { from: Position; to: Position }) | null>(null);
+  const [viewshedSettings, setViewshedSettings] = useState<ViewshedSettings>({ radiusKm: 5, observerM: 2, targetM: 0 });
+  const [analysisBusy, setAnalysisBusy] = useState<string | null>(null);
   const [dialog, setDialog] = useState<null | "projects" | "ontology">(null);
   // Per-layer load state for Foundry-backed layers: a message, or an error.
   const [layerStatus, setLayerStatus] = useState<Map<string, { text: string; error?: boolean; busy?: boolean }>>(new Map());
@@ -207,6 +214,24 @@ export default function App() {
     if (onMap && onMap.kind === "catalog") {return onMap.catalogId;}
     return library.entries().find((e) => e.kind === "raster-dem" && !library.unavailable(e))?.id ?? null;
   }, [library, entries, project.layers]);
+
+  // Heights for analysis (line of sight, viewshed, zonal statistics).
+  const [heights, setHeights] = useState<HeightSource | null>(null);
+  useEffect(() => {
+    setHeights(null);
+    if (!terrainId) {return;}
+    let cancelled = false;
+    createHeightSource(library, terrainId)
+      .then((h) => !cancelled && setHeights(h))
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [library, terrainId, libraryVersion]);
+  const needHeights = (): HeightSource | null => {
+    if (!heights) {say("This needs a terrain layer (raster-dem): add one first.", "error");}
+    return heights;
+  };
 
   // Labels: the project's own glyphs dataset, else one the catalog lists.
   const assetsId = project.assets ? sourceId(project.assets) : (library.entries().find((e) => e.kind === "assets")?.id ?? null);
@@ -350,6 +375,7 @@ export default function App() {
     setMeasured(null);
     setProfilePoints(null);
     setIdentify(null);
+    setLos(null);
     if (map) {
       if (SKETCH_TOOLS.has(t)) {map.doubleClickZoom.disable();}
       else {map.doubleClickZoom.enable();}
@@ -403,12 +429,46 @@ export default function App() {
       if (sel && sel.layerId !== activeId) {setActiveId(sel.layerId);}
     },
     addPoint: (at) => addFeature({ type: "Point", coordinates: at }),
+    clickAt: (at) => {
+      if (tool !== "viewshed") {return;}
+      const src = needHeights();
+      if (!src) {return;}
+      const { radiusKm, observerM, targetM } = viewshedSettings;
+      setAnalysisBusy(`Computing the viewshed (${radiusKm} km)…`);
+      viewshed(src, at as [number, number], { radiusM: radiusKm * 1000, observerHeightM: observerM, targetHeightM: targetM })
+        .then((res) => {
+          const pct = res.stats.totalAreaM2 ? (100 * res.stats.visibleAreaM2) / res.stats.totalAreaM2 : 0;
+          const features: StudioFeature[] = res.features.map((f) => ({
+            type: "Feature", id: newId("f"), geometry: f.geometry,
+            properties: { observer: `${at[1].toFixed(5)}, ${at[0].toFixed(5)}`, radius_km: radiusKm, observer_m: observerM, target_m: targetM, visible_km2: +(res.stats.visibleAreaM2 / 1e6).toFixed(2), visible_pct: +pct.toFixed(1) },
+          }));
+          features.push({ type: "Feature", id: newId("f"), geometry: { type: "Point", coordinates: at }, properties: { observer: "observer", radius_km: radiusKm, observer_m: observerM } });
+          const layer: VectorLayerNode = {
+            kind: "vector", id: newId("vec"), title: `Viewshed ${radiusKm} km`, visible: true, opacity: 1,
+            style: { ...defaultVectorStyle(2), color: "#1aa64b", strokeColor: "#0d6b2f", fillOpacity: 0.35, strokeWidth: 1 },
+            data: { type: "FeatureCollection", features }, fields: ["observer", "radius_km", "observer_m", "target_m", "visible_km2", "visible_pct"],
+          };
+          dispatch({ type: "addLayer", layer });
+          say(`Viewshed: ${pct.toFixed(0)}% of the ${radiusKm} km circle is visible (${(res.stats.visibleAreaM2 / 1e6).toFixed(1)} km²). Added as a layer.`);
+        })
+        .catch((e: unknown) => say(`Viewshed failed: ${String(e)}`, "error"))
+        .finally(() => setAnalysisBusy(null));
+    },
     finishSketch: (coords) => {
       setSketch([]);
       if (tool === "line" && coords.length >= 2) {addFeature({ type: "LineString", coordinates: coords });}
       else if (tool === "polygon" && coords.length >= 3) {addFeature({ type: "Polygon", coordinates: [[...coords, coords[0]]] });}
       else if (tool === "measure-line" && coords.length >= 2) {setMeasured({ kind: "distance", coords });}
       else if (tool === "measure-area" && coords.length >= 3) {setMeasured({ kind: "area", coords });}
+      else if (tool === "los" && coords.length >= 2) {
+        const src = needHeights();
+        if (!src) {return;}
+        setAnalysisBusy("Checking line of sight…");
+        lineOfSight(src, coords[0] as [number, number], coords[1] as [number, number], { observerHeightM: viewshedSettings.observerM, targetHeightM: viewshedSettings.targetM })
+          .then((r) => setLos({ ...r, from: coords[0], to: coords[1] }))
+          .catch((e: unknown) => say(`Line of sight failed: ${String(e)}`, "error"))
+          .finally(() => setAnalysisBusy(null));
+      }
       else if (tool === "profile" && coords.length >= 2) {
         if (!library || !terrainId) {
           say("An elevation profile needs a terrain layer (raster-dem) in the catalog.", "error");
@@ -515,9 +575,22 @@ export default function App() {
       }
     }
     if (identify) {out.push(pt(identify.at, "vertex"));}
+    if (los) {
+      // The sight line, green where the target-height line is in view and red where it is not.
+      const total = los.profile[los.profile.length - 1]?.distanceM ?? 0;
+      const along = (d: number): Position => [los.from[0] + (los.to[0] - los.from[0]) * (d / total), los.from[1] + (los.to[1] - los.from[1]) * (d / total)];
+      let cursorM = 0;
+      for (const [a, b] of los.visibleSegments) {
+        if (a > cursorM) {out.push({ type: "Feature", properties: { role: "los-hidden" }, geometry: { type: "LineString", coordinates: [along(cursorM), along(a)] } });}
+        out.push({ type: "Feature", properties: { role: "los-visible" }, geometry: { type: "LineString", coordinates: [along(a), along(b)] } });
+        cursorM = b;
+      }
+      if (total > cursorM) {out.push({ type: "Feature", properties: { role: "los-hidden" }, geometry: { type: "LineString", coordinates: [along(cursorM), along(total)] } });}
+      out.push(pt(los.from, "vertex"), pt(los.to, "vertex"));
+    }
     if (cursor?.snapped) {out.push(pt(cursor.lngLat, "snap"));}
     return { type: "FeatureCollection", features: out };
-  }, [tool, sketch, cursor, measured, activeVector, selection, draft, identify]);
+  }, [tool, sketch, cursor, measured, activeVector, selection, draft, identify, los]);
 
   // The overlay changes on every mouse move, so it bypasses the style diff
   // and is pushed straight into its source.
@@ -794,6 +867,11 @@ export default function App() {
       </main>
       <aside className="right">
         <ResultsPanel
+          tool={tool}
+          los={los}
+          busy={analysisBusy}
+          viewshedSettings={viewshedSettings}
+          onViewshedSettings={setViewshedSettings}
           identify={identify}
           measurement={liveMeasurement}
           profile={profilePoints}
@@ -803,6 +881,7 @@ export default function App() {
             setMeasured(null);
             setProfilePoints(null);
             setSketch([]);
+            setLos(null);
           }}
         />
         <PropertiesPanel

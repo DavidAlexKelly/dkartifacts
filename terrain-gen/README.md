@@ -21,6 +21,7 @@ use external tools:
 | Step | Needs | Get it |
 |---|---|---|
 | `contours` | `tippecanoe` | `brew install tippecanoe`, `apt install tippecanoe`, or [build it](https://github.com/felt/tippecanoe) |
+| `vector` | `tippecanoe` | as above |
 | `basemap` | `pmtiles` | a binary from [go-pmtiles releases](https://github.com/protomaps/go-pmtiles/releases) |
 
 ## Run
@@ -69,6 +70,57 @@ into an existing manifest, so you can grow a dataset one region at a time.
 
 `python -m terrain_gen <step> --help` lists the rest.
 
+## Your own imagery and vector data
+
+Two products take your data instead of the DEM. Neither is part of `all`
+unless you pass its inputs (`all --products imagery,vector --imagery-dir … --vector-files …`).
+
+**`imagery`**: a raster pyramid (`kind: "raster"`) from GeoTIFF/COG files in any
+CRS, warped to web mercator (bilinear), or from an XYZ tile service:
+
+```bash
+python -m terrain_gen imagery --source-dir ~/orthophotos --attribution "© Kartverket"   # → out/imagery/
+python -m terrain_gen imagery --files a.tif b.tif --max-zoom 16 --format jpg --id ortho
+python -m terrain_gen imagery --xyz "https://tiles.example.com/{z}/{x}/{y}.jpg" --bbox 10,59,11,60 --max-zoom 14
+```
+
+> **XYZ: only fetch tiles you have the right to download and redistribute.**
+> Most public tile services, the OpenStreetMap tile servers among them,
+> forbid bulk downloading. There is no default URL. Requests are polite
+> (4 connections, retries with backoff, `Retry-After` honoured, User-Agent
+> `terrain-gen/…`), cached under `work/xyz-cache/`, and capped at
+> `--xyz-max-tiles` (50 000).
+
+The deepest zoom defaults to the one matching the finest source resolution;
+shallower zooms are 2×2 averages (`--xyz-all-zooms` fetches them from the
+server instead, better for tiles with labels). WebP quality 80 by default, with
+alpha only where a tile is partly empty; empty tiles are skipped. `jpg` has no
+alpha, so no-data edges are black. Non-8-bit rasters are stretched from their
+2nd–98th percentile, or `--scale MIN,MAX`.
+
+**`vector`**: any vector data as one vector-tile layer (`kind: "vector-tiles"`,
+needs `tippecanoe`):
+
+```bash
+python -m terrain_gen vector roads.gpkg --layer-name roads           # → out/roads/
+python -m terrain_gen vector sites.csv more-sites.geojson --max-zoom 12 --id sites
+python -m terrain_gen vector parcels.shp --crs EPSG:25832            # when the file has no/wrong CRS
+```
+
+GeoJSON, line-delimited GeoJSON and CSV (lat/lon columns, or a WKT column) are
+read in pure Python. GeoPackage, Shapefile, FlatGeobuf and other GDAL formats
+are read with `pyogrio` (in requirements.txt; GDAL ships in its wheel), or with
+the `ogr2ogr` command when pyogrio isn't installed. Everything is reprojected to
+WGS84. The max zoom is tippecanoe's guess (`-zg`, at least 10) unless given;
+low-zoom tiles over 500 KB are thinned (`--drop-densest-as-needed`, mostly
+points), and zooms are added if needed so every feature is in the deepest zoom.
+`--keep-all` turns thinning off.
+
+The manifest's `encoding` lists what the studio needs to style the layer
+without reading tiles: `sourceLayer`, `geometryTypes` (`Point`, `LineString`,
+`Polygon`), `fields` (`{name: "string" | "number" | "boolean" | "mixed"}`) and
+`featureCount`.
+
 ## Upload
 
 Each folder in `out/` is one Foundry dataset. Upload its contents as they are,
@@ -106,8 +158,10 @@ python -m pytest tests
 ```
 
 Offline: a synthetic DEM, the Terrarium encoding against the TypeScript's
-arithmetic, and every chunked tile against a Python port of
-`manifestResolver.pathForTile`.
+arithmetic, every chunked tile against a Python port of
+`manifestResolver.pathForTile`, imagery from a synthetic UTM GeoTIFF and from a
+local XYZ server, and vector tiles from GeoJSON, CSV and GeoPackage. The vector
+tests are skipped without `tippecanoe`.
 
 ## Data licences
 

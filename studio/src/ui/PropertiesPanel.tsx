@@ -2,6 +2,7 @@ import type { Dispatch } from "react";
 import type { CatalogEntry } from "../data/library";
 import type { LayerManifest } from "../data/manifest";
 import { catalogKind } from "../map/style";
+import { ASPECT_LEGEND, SLOPE_CLASSES } from "../analysis/derivedtiles";
 import { fieldsOf, type Action } from "../project/reducer";
 import { PALETTE, type BasemapFlavor, type CatalogLayerNode, type LayerNode, type VectorLayerNode, type VectorStyle } from "../project/types";
 
@@ -98,6 +99,10 @@ function CatalogOptions({ node, entry, manifest, glyphs, dispatch }: { node: Cat
         <>
           <h3>Terrain</h3>
           <Row label="Colour by height"><input type="checkbox" checked={o.relief !== false} onChange={(e) => set({ relief: e.target.checked })} /></Row>
+          <Row label="Slope classes"><input type="checkbox" checked={!!o.slope} onChange={(e) => set({ slope: e.target.checked })} /></Row>
+          {o.slope && <ul className="legend">{SLOPE_CLASSES.map((c) => <li key={c.label}><span style={{ background: c.css }} />{c.label}</li>)}</ul>}
+          <Row label="Aspect"><input type="checkbox" checked={!!o.aspect} onChange={(e) => set({ aspect: e.target.checked })} /></Row>
+          {o.aspect && <ul className="legend">{ASPECT_LEGEND.map((c) => <li key={c.label}><span style={{ background: c.css }} />{c.label}</li>)}</ul>}
           <Row label="Hillshade"><input type="checkbox" checked={o.hillshade !== false} onChange={(e) => set({ hillshade: e.target.checked })} /></Row>
           <Row label="3D terrain"><input type="checkbox" checked={!!o.terrain3d} onChange={(e) => set({ terrain3d: e.target.checked })} /></Row>
           <Row label={`Exaggeration ${(o.exaggeration ?? 1.5).toFixed(1)}×`}><input type="range" min={0.5} max={5} step={0.1} value={o.exaggeration ?? 1.5} disabled={!o.terrain3d} onChange={(e) => set({ exaggeration: Number(e.target.value) })} /></Row>

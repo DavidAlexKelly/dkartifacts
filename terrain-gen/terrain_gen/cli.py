@@ -5,6 +5,7 @@ one at a time, resumed, or all at once:
     download-dem  →  dem-cells  →  terrain  →  hillshade
                                 └→ contours
     basemap, assets            (independent)
+    imagery, vector            (independent: your own rasters / XYZ tiles / vector files)
     catalog                    (last: indexes whatever is in --out)
 
     python -m terrain_gen all --bbox 4,57,32,72
@@ -28,7 +29,10 @@ from .manifest import header, write_manifest
 
 log = logging.getLogger("terrain_gen")
 
-PRODUCTS = ["dem", "terrain", "hillshade", "contours", "basemap", "assets"]
+PRODUCTS = ["dem", "terrain", "hillshade", "contours", "basemap", "assets", "imagery", "vector"]
+
+XYZ_RIGHTS = ("Only fetch tiles you have the right to download AND redistribute: most public tile "
+              "services (the OpenStreetMap tile servers among them) forbid bulk downloads.")
 # The zoom whose pixels are about the DEM's own posting at mid-latitudes. One
 # deeper quadruples the tiles for detail the source does not have; MapLibre
 # overzooms terrain smoothly.
@@ -221,6 +225,95 @@ def cmd_assets(args):
     })
 
 
+def _raster_paths(args) -> list[Path]:
+    paths = [Path(p) for p in (args.files or [])]
+    if args.source_dir:
+        d = Path(args.source_dir)
+        paths += sorted(p for p in d.rglob("*") if p.suffix.lower() in (".tif", ".tiff", ".vrt", ".jp2"))
+    return paths
+
+
+def cmd_imagery(args):
+    from .imagery import build_imagery_from_rasters, build_imagery_from_xyz
+
+    paths = _raster_paths(args)
+    if bool(paths) == bool(args.xyz):
+        sys.exit("imagery needs exactly one input: --source-dir/--files (GeoTIFFs), or --xyz URL")
+    work = Path(args.work)
+    store_path = work / f"{args.id}.tiles.sqlite"
+    scale = tuple(float(v) for v in args.scale.split(",")) if args.scale else None
+    if paths:
+        missing = [str(p) for p in paths if not p.exists()]
+        if missing:
+            sys.exit(f"not found: {', '.join(missing)}")
+        bbox = Bounds.parse(args.bbox) if args.bbox else None
+        store, specs, max_zoom = build_imagery_from_rasters(
+            paths, store_path, min_zoom=args.min_zoom, max_zoom=args.max_zoom, size=args.tile_size,
+            fmt=args.format, quality=args.quality, workers=args.workers, bbox=bbox, scale=scale,
+        )
+        b = [min(s.bounds_4326[0] for s in specs), min(s.bounds_4326[1] for s in specs),
+             max(s.bounds_4326[2] for s in specs), max(s.bounds_4326[3] for s in specs)]
+        if bbox:
+            b = [max(b[0], bbox.west), max(b[1], bbox.south), min(b[2], bbox.east), min(b[3], bbox.north)]
+        src_name = ", ".join(p.name for p in paths[:5]) + (f" (+{len(paths) - 5} more)" if len(paths) > 5 else "")
+    else:
+        if not args.bbox:
+            sys.exit("--xyz needs --bbox: tiles are fetched for that area only")
+        if args.max_zoom is None:
+            sys.exit("--xyz needs --max-zoom: the deepest zoom to fetch")
+        log.warning("imagery: %s", XYZ_RIGHTS)
+        bbox = Bounds.parse(args.bbox)
+        store = build_imagery_from_xyz(
+            args.xyz, bbox, store_path, work / "xyz-cache", min_zoom=args.min_zoom, max_zoom=args.max_zoom,
+            size=args.tile_size, fmt=args.format, quality=args.quality, workers=args.workers,
+            concurrency=args.xyz_concurrency, all_zooms=args.xyz_all_zooms, max_tiles=args.xyz_max_tiles,
+        )
+        max_zoom, b, src_name = args.max_zoom, bbox.as_list(), args.xyz
+    _write_pyramid(
+        args, store, id=args.id, kind="raster", title=args.title or "Imagery",
+        attribution=args.attribution or "", src_name=src_name,
+        encoding={"tileSize": args.tile_size},
+        parameters={"minZoom": args.min_zoom, "maxZoom": max_zoom, "format": args.format, "quality": args.quality,
+                    **({"xyz": args.xyz, "xyzAllZooms": args.xyz_all_zooms} if args.xyz else {}),
+                    **({"scale": list(scale)} if scale else {})},
+        metadata={"name": args.id, "type": "overlay", "format": args.format, "attribution": args.attribution or ""},
+        bounds=b,
+    )
+    store.close()
+
+
+def cmd_vector(args):
+    from .tiles import MBTilesSource
+    from .vector import layer_name_for, tile_vector, write_ndjson
+
+    files = [Path(p) for p in args.files]
+    missing = [str(p) for p in files if not p.exists()]
+    if missing:
+        sys.exit(f"not found: {', '.join(missing)}")
+    layer = args.layer_name or layer_name_for(files[0])
+    id = args.id or layer
+    work = Path(args.work)
+    ndjson = work / f"{id}.ndjson"
+    schema = write_ndjson(files, ndjson, crs=args.crs, layer=args.input_layer,
+                          lat_field=args.lat_field, lon_field=args.lon_field, wkt_field=args.wkt_field)
+    log.info("vector: %d features, %s, %d fields", schema.count, "/".join(sorted(schema.geometry_types)), len(schema.fields))
+    max_zoom = None if args.max_zoom in (None, "g") else int(args.max_zoom)
+    mbtiles = tile_vector(ndjson, work / f"{id}.mbtiles", layer_name=layer, min_zoom=args.min_zoom,
+                          max_zoom=max_zoom, keep_all=args.keep_all, attribution=args.attribution or "", name=id)
+    src = MBTilesSource(mbtiles)
+    zooms = sorted({z for z, *_ in src.index()})
+    _write_pyramid(
+        args, src, id=id, kind="vector-tiles", title=args.title or layer,
+        attribution=args.attribution or "", src_name=", ".join(p.name for p in files),
+        encoding=schema.encoding(layer),
+        parameters={"minZoom": zooms[0], "maxZoom": zooms[-1], "requestedMaxZoom": args.max_zoom or "g",
+                    "keepAll": args.keep_all, "crs": args.crs},
+        metadata=src.metadata(),
+        bounds=schema.bounds(),
+    )
+    src.close()
+
+
 def cmd_catalog(args):
     from .catalog import build_catalog
 
@@ -233,20 +326,35 @@ def cmd_all(args):
     unknown = set(products) - set(PRODUCTS)
     if unknown:
         sys.exit(f"unknown products: {', '.join(sorted(unknown))}")
+    # Inputs first: imagery and vector have no default source.
+    if "imagery" in products and not (args.imagery_dir or args.imagery_files or args.xyz):
+        sys.exit("imagery in --products needs --imagery-dir, --imagery-files or --xyz")
+    if "imagery" in products and args.xyz and (not args.bbox or args.imagery_max_zoom is None):
+        sys.exit("--xyz needs --bbox and --imagery-max-zoom")
+    if "vector" in products and not args.vector_files:
+        sys.exit("vector in --products needs --vector-files")
     # Check external tools before the slow steps, not after them.
     import shutil
 
-    needed = {"contours": ("tippecanoe", "brew install tippecanoe / apt install tippecanoe"),
+    tippecanoe = ("tippecanoe", "brew install tippecanoe / apt install tippecanoe")
+    needed = {"contours": tippecanoe, "vector": tippecanoe,
               "basemap": ("pmtiles", "https://github.com/protomaps/go-pmtiles/releases")}
     missing = [f"  {tool} (for {p}): {how}" for p, (tool, how) in needed.items() if p in products and not shutil.which(tool)]
+    if "vector" in products:
+        from .vector import gdal_reader, needs_gdal
+
+        if any(needs_gdal(Path(f)) for f in args.vector_files) and not gdal_reader():
+            missing.append("  pyogrio or ogr2ogr (for vector GeoPackage/Shapefile/FlatGeobuf input): pip install pyogrio")
     if missing:
         sys.exit("Missing tools — install them, or leave those products out with --products:\n" + "\n".join(missing))
     if "basemap" in products and not args.source:
         sys.exit("--source is required for the basemap: https://build.protomaps.com/YYYYMMDD.pmtiles or a local .pmtiles")
     # Each step's own zoom defaults apply; `all` does not share one --max-zoom.
-    defaults = vars(build_parser().parse_args(["terrain"]))
-    def step(name, fn, **over):
-        ns = argparse.Namespace(**{**defaults, **vars(args), **over})
+    parser = build_parser()
+    defaults = vars(parser.parse_args(["terrain"]))
+    def step(name, fn, defaults_argv=None, **over):
+        base = vars(parser.parse_args(defaults_argv)) if defaults_argv else defaults
+        ns = argparse.Namespace(**{**base, **vars(args), **over})
         log.info("── %s ──", name)
         fn(ns)
     if "dem" in products:
@@ -263,6 +371,12 @@ def cmd_all(args):
         step("basemap", cmd_basemap, max_zoom=None)
     if "assets" in products:
         step("assets", cmd_assets)
+    if "imagery" in products:
+        step("imagery", cmd_imagery, ["imagery"], source_dir=args.imagery_dir, files=args.imagery_files,
+             min_zoom=0, max_zoom=args.imagery_max_zoom, attribution=args.imagery_attribution, id="imagery", title=None)
+    if "vector" in products:
+        step("vector", cmd_vector, ["vector", "x"], files=args.vector_files, layer_name=args.vector_layer_name,
+             min_zoom=0, max_zoom=None, attribution=args.vector_attribution, id=None, title=None)
     step("catalog", cmd_catalog)
 
 
@@ -326,13 +440,68 @@ def build_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("assets", parents=[common], help="Protomaps glyphs and sprites")
     s.set_defaults(fn=cmd_assets)
 
+    s = sub.add_parser(
+        "imagery", parents=[common], formatter_class=argparse.RawDescriptionHelpFormatter,
+        help="raster imagery pyramid from GeoTIFFs (any CRS) or an XYZ tile URL",
+        description="Raster imagery → web-mercator raster pyramid (kind 'raster'), chunked.\n\n"
+                    "Inputs: --source-dir / --files (GeoTIFF/COG in any CRS, warped bilinear to EPSG:3857), or\n"
+                    "--xyz URL with --bbox and --max-zoom.\n\n"
+                    "!! XYZ: " + XYZ_RIGHTS + " There is no default URL.",
+    )
+    s.add_argument("--source-dir", help="folder of GeoTIFF/COG files (searched recursively)")
+    s.add_argument("--files", nargs="+", help="GeoTIFF/COG files; later files are drawn over earlier ones")
+    s.add_argument("--xyz", metavar="URL", help="tile URL template with {z} {x} {y} (or {-y} for TMS, {s} for a/b/c). "
+                                                "You must have the right to download and redistribute these tiles.")
+    s.add_argument("--xyz-concurrency", type=int, default=4, help="parallel requests to the tile server (default 4)")
+    s.add_argument("--xyz-max-tiles", type=int, default=50_000, help="refuse to fetch more tiles than this (default 50000)")
+    s.add_argument("--xyz-all-zooms", action="store_true",
+                   help="fetch every zoom from the server instead of averaging overviews from the deepest "
+                        "(better for cartographic tiles with labels; about a third more requests)")
+    s.add_argument("--min-zoom", type=int, default=0)
+    s.add_argument("--max-zoom", type=int, help="default: from the finest source resolution (required with --xyz)")
+    s.add_argument("--format", choices=["webp", "jpg"], default="webp",
+                   help="webp (default; alpha where partly transparent) or jpg (no alpha: no-data is black)")
+    s.add_argument("--quality", type=int, default=80, help="lossy quality (default 80)")
+    s.add_argument("--tile-size", type=int, default=256, choices=[256, 512])
+    s.add_argument("--scale", metavar="MIN,MAX", help="for non-8-bit rasters: values mapped to 0..255 "
+                                                       "(default: each file's 2nd..98th percentile)")
+    s.add_argument("--attribution", help="attribution text written into the manifest (default none)")
+    s.add_argument("--id", default="imagery", help="output folder and layer id (default imagery)")
+    s.add_argument("--title", help="layer title (default Imagery)")
+    s.set_defaults(fn=cmd_imagery)
+
+    s = sub.add_parser(
+        "vector", parents=[common], formatter_class=argparse.RawDescriptionHelpFormatter,
+        help="any vector data → one vector-tile pyramid (needs tippecanoe)",
+        description="GeoJSON, NDJSON, CSV (lat/lon or WKT) and — through pyogrio or ogr2ogr — GeoPackage,\n"
+                    "Shapefile, FlatGeobuf and other GDAL formats → one source layer of vector tiles, chunked.\n"
+                    "Low-zoom tiles over 500 KB are thinned (--drop-densest-as-needed, mostly points); zooms are\n"
+                    "added past --max-zoom if needed so every feature is in the deepest zoom. --keep-all disables\n"
+                    "all thinning.",
+    )
+    s.add_argument("files", nargs="+", help="input files, all into one layer")
+    s.add_argument("--layer-name", help="source-layer name (default: from the first file name)")
+    s.add_argument("--input-layer", help="layer inside a multi-layer file such as a GeoPackage (default: the first)")
+    s.add_argument("--crs", help="CRS of the input coordinates when the file doesn't say (or says wrong), e.g. EPSG:25832")
+    s.add_argument("--lat-field", help="CSV latitude column (default: lat, latitude or y)")
+    s.add_argument("--lon-field", help="CSV longitude column (default: lon, lng, long, longitude or x)")
+    s.add_argument("--wkt-field", help="CSV WKT geometry column (default: wkt, geometry, geom or the_geom)")
+    s.add_argument("--min-zoom", type=int, default=0)
+    s.add_argument("--max-zoom", help="deepest zoom, or g to let tippecanoe guess from feature spacing, at least 10 (default g)")
+    s.add_argument("--keep-all", action="store_true", help="no size limits and no thinning at any zoom (big tiles)")
+    s.add_argument("--attribution", help="attribution text (default none)")
+    s.add_argument("--id", help="output folder and layer id (default: the layer name)")
+    s.add_argument("--title", help="layer title (default: the layer name)")
+    s.set_defaults(fn=cmd_vector)
+
     s = sub.add_parser("catalog", parents=[common], help="index every product in --out into catalog/catalog.json")
     s.add_argument("--rids", help="JSON file mapping layer id -> dataset RID, once uploaded")
     s.set_defaults(fn=cmd_catalog)
 
     s = sub.add_parser("all", parents=[common], help="every step, in order")
     s.add_argument("--products", help=f"comma-separated subset of {','.join(PRODUCTS)} "
-                                      "(default: dem,terrain,hillshade,contours,assets)")
+                                      "(default: dem,terrain,hillshade,contours,assets; "
+                                      "imagery and vector only with their inputs)")
     s.add_argument("--source-dir", help="as for dem-cells")
     s.add_argument("--attribution")
     s.add_argument("--dem-dtype", choices=["float32", "int16"], default="float32")
@@ -341,6 +510,15 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--rids")
     s.add_argument("--download-workers", type=int, default=8)
     s.add_argument("--tile-size", type=int, default=256, choices=[256, 512])
+    s.add_argument("--imagery-dir", help="imagery: folder of GeoTIFFs")
+    s.add_argument("--imagery-files", nargs="+", help="imagery: GeoTIFF files")
+    s.add_argument("--xyz", help="imagery: XYZ tile URL (needs --bbox, --imagery-max-zoom). " + XYZ_RIGHTS)
+    s.add_argument("--xyz-concurrency", type=int, default=4)
+    s.add_argument("--imagery-max-zoom", type=int, help="imagery: deepest zoom (default from source resolution)")
+    s.add_argument("--imagery-attribution")
+    s.add_argument("--vector-files", nargs="+", help="vector: input files")
+    s.add_argument("--vector-layer-name")
+    s.add_argument("--vector-attribution")
     s.set_defaults(fn=cmd_all)
     return p
 

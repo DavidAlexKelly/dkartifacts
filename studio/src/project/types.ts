@@ -18,6 +18,9 @@ export interface CatalogLayerOptions {
   hillshade?: boolean;
   /** Colour by height. On unless set to false. */
   relief?: boolean;
+  /** Slope classes / aspect overlays computed from the terrain in the browser. */
+  slope?: boolean;
+  aspect?: boolean;
   terrain3d?: boolean;
   exaggeration?: number;
   // contours / generic vector tiles

@@ -12,6 +12,8 @@ const TOOLS: Array<{ tool: Tool; label: string; hint: string }> = [
   { tool: "measure-line", label: "Distance", hint: "Measure a distance along a path" },
   { tool: "measure-area", label: "Area", hint: "Measure an area" },
   { tool: "profile", label: "Profile", hint: "Draw a line to see the terrain along it" },
+  { tool: "los", label: "Sight", hint: "Line of sight: click the observer, then the target" },
+  { tool: "viewshed", label: "Viewshed", hint: "Click a point to see what can be seen from it (settings in the panel on the right)" },
 ];
 
 interface Props {

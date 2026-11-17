@@ -20,6 +20,10 @@ export function setProtocolLibrary(lib: Library | null): void {
   library = lib;
 }
 
+export function getProtocolLibrary(): Library | null {
+  return library;
+}
+
 /** The dataset glyphs and sprites are read from — an "assets" dataset — or null for no labels. */
 export function setAssetsDataset(id: string | null): void {
   assetsId = id;

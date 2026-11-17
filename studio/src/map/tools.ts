@@ -21,9 +21,11 @@ export type Tool =
   | "edit"
   | "measure-line"
   | "measure-area"
-  | "profile";
+  | "profile"
+  | "los"
+  | "viewshed";
 
-export const SKETCH_TOOLS = new Set<Tool>(["line", "polygon", "measure-line", "measure-area", "profile"]);
+export const SKETCH_TOOLS = new Set<Tool>(["line", "polygon", "measure-line", "measure-area", "profile", "los"]);
 
 export interface Draft {
   layerId: string;
@@ -41,6 +43,8 @@ export interface ToolContext {
   setCursor(c: { lngLat: Position; snapped: boolean } | null): void;
   finishSketch(coords: Position[]): void;
   addPoint(at: Position): void;
+  /** A single-click tool (viewshed) was used at this point. */
+  clickAt(at: Position): void;
   select(sel: { layerId: string; featureIds: string[] } | null): void;
   setDraft(d: Draft | null): void;
   commitGeometry(d: Draft): void;
@@ -127,6 +131,16 @@ export function attachTools(map: MlMap, get: () => ToolContext): () => void {
       case "point":
         ctx.addPoint(snapTarget(map, ctx, e).at);
         return;
+      case "viewshed":
+        ctx.clickAt(at);
+        return;
+      case "los": {
+        // Two clicks: observer, then target.
+        const next = [...ctx.sketch, snapTarget(map, ctx, e).at];
+        if (next.length >= 2) {ctx.finishSketch(next.slice(0, 2));}
+        else {ctx.setSketch(next);}
+        return;
+      }
       default:
         if (SKETCH_TOOLS.has(ctx.tool)) {ctx.setSketch([...ctx.sketch, snapTarget(map, ctx, e).at]);}
     }

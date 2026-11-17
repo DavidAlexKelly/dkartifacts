@@ -21,6 +21,8 @@ const TOOL_HINT: Partial<Record<Tool, string>> = {
   "measure-area": "Click to measure · double-click to finish",
   profile: "Draw a line · double-click to see the terrain along it",
   identify: "Click to identify",
+  los: "Click the observer, then the target",
+  viewshed: "Click where the observer stands",
 };
 
 function dms(v: number, pos: string, neg: string): string {

@@ -17,6 +17,7 @@ import type {
 import type { CatalogEntry } from "../data/library";
 import type { LayerManifest } from "../data/manifest";
 import type { CatalogLayerNode, Project, VectorLayerNode } from "../project/types";
+import { aspectSource, slopeSource } from "../analysis/derivedtiles";
 
 export const OVERLAY = "__overlay";
 
@@ -194,6 +195,15 @@ function catalogLayers(node: CatalogLayerNode, ctx: StyleContext, sources: Recor
           },
         });
       }
+      const { maxzoom } = zoomRange(m);
+      if (o.slope) {
+        sources[id("slope")] = slopeSource(node.catalogId, maxzoom);
+        out.push({ id: id("slope"), type: "raster", source: id("slope"), minzoom: 8, layout: { visibility: vis }, paint: { "raster-opacity": 0.75 * node.opacity, "raster-resampling": "nearest" } });
+      }
+      if (o.aspect) {
+        sources[id("aspect")] = aspectSource(node.catalogId, maxzoom);
+        out.push({ id: id("aspect"), type: "raster", source: id("aspect"), minzoom: 8, layout: { visibility: vis }, paint: { "raster-opacity": 0.6 * node.opacity } });
+      }
       if (o.terrain3d && node.visible) {
         sources[id("dem")] = tileSource(node, m, "raster-dem");
         style.terrain = { source: id("dem"), exaggeration: o.exaggeration ?? 1.5 };
@@ -281,7 +291,8 @@ function overlayLayers(ctx: StyleContext, sources: Record<string, SourceSpecific
   const role = (r: string): ExpressionSpecification => ["==", ["get", "role"], r];
   out.push(
     { id: `${OVERLAY}::fill`, type: "fill", source: OVERLAY, filter: ["all", isPolygon, ["!=", ["get", "role"], "handle"]], paint: { "fill-color": "#ff5a00", "fill-opacity": 0.15 } },
-    { id: `${OVERLAY}::line`, type: "line", source: OVERLAY, filter: ["!", isPoint], paint: { "line-color": "#ff5a00", "line-width": 2.5, "line-dasharray": [2, 1] } },
+    { id: `${OVERLAY}::line`, type: "line", source: OVERLAY, filter: ["all", ["!", isPoint], ["!", ["in", ["get", "role"], ["literal", ["los-visible", "los-hidden"]]]]], paint: { "line-color": "#ff5a00", "line-width": 2.5, "line-dasharray": [2, 1] } },
+    { id: `${OVERLAY}::los`, type: "line", source: OVERLAY, filter: ["in", ["get", "role"], ["literal", ["los-visible", "los-hidden"]]], layout: { "line-cap": "round" }, paint: { "line-color": ["match", ["get", "role"], "los-visible", "#1aa64b", "#d7263d"], "line-width": 5 } },
     { id: `${OVERLAY}::vertex`, type: "circle", source: OVERLAY, filter: role("vertex"), paint: { "circle-color": "#ff5a00", "circle-radius": 4, "circle-stroke-color": "#fff", "circle-stroke-width": 1.5 } },
     { id: `${OVERLAY}::mid`, type: "circle", source: OVERLAY, filter: role("mid"), paint: { "circle-color": "#ffffff", "circle-radius": 3.5, "circle-stroke-color": "#ff5a00", "circle-stroke-width": 1.5 } },
     { id: `${OVERLAY}::handle`, type: "circle", source: OVERLAY, filter: role("handle"), paint: { "circle-color": "#ffffff", "circle-radius": 5.5, "circle-stroke-color": "#ff5a00", "circle-stroke-width": 2 } },

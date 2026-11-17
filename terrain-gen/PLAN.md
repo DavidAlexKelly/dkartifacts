@@ -160,10 +160,18 @@ out/
   contours/    manifest.json  z8.pmtiles  z9/…  z12/…    ← vector, layer "contours", ELEV + index
   basemap/     manifest.json  …                          ← Protomaps extract, re-chunked
   assets/      manifest.json  fonts/…  sprites/…         ← glyphs + sprites
+  imagery/     manifest.json  z0-z9.pmtiles  z10/…       ← your GeoTIFFs or XYZ tiles, raster
+  <layer>/     manifest.json  z0-z8.pmtiles  z9/…        ← your vector files, one source layer
   catalog/     catalog.json  manifest.json
 ```
 
 Each folder is one Foundry dataset: upload its contents as-is.
+
+`imagery` and `vector` are generic: they bring a user's own data into the same
+pyramid-and-manifest shape. Imagery is `kind: "raster"` like hillshade. Vector
+is `kind: "vector-tiles"`, and its `encoding` carries `sourceLayer`,
+`geometryTypes`, `fields` (name → type) and `featureCount`, so the studio can
+build a default style and an attribute picker from the manifest alone.
 
 ### Measured on a real region
 
