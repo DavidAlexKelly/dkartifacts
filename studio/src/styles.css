@@ -226,3 +226,21 @@ button.primary:hover:not(:disabled) { background: var(--accent); filter: brightn
 .legend li { display: flex; align-items: center; gap: 4px; }
 .legend span { width: 12px; height: 10px; border-radius: 2px; border: 1px solid rgba(0,0,0,0.15); }
 .results .props input[type="number"] { width: 90px; padding: 2px 6px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel-2); }
+
+/* Analysis dialog */
+.tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--line); margin-bottom: 10px; }
+.tab { border: none; border-bottom: 2px solid transparent; border-radius: 0; background: none; padding: 6px 12px; }
+.tab.on { border-bottom-color: var(--accent); color: var(--accent); }
+.analysis-grid { display: grid; grid-template-columns: 210px 1fr; gap: 14px; }
+@media (max-width: 700px) { .analysis-grid { grid-template-columns: 1fr; } }
+.tool-list { list-style: none; margin: 0; padding: 0; max-height: 52vh; overflow: auto; }
+.tool-list button { width: 100%; justify-content: flex-start; border: none; background: none; padding: 5px 8px; }
+.tool-list button.on { background: var(--accent-soft); color: var(--accent); }
+.expr { width: 100%; font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; padding: 6px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel-2); color: var(--text); }
+.chips { display: flex; flex-wrap: wrap; gap: 4px; margin: 6px 0; }
+.chip { font-size: 11px; padding: 1px 7px; border-radius: 10px; }
+.chip.var { color: var(--muted); }
+.history { list-style: none; margin: 0; padding: 0; font-size: 12px; }
+.history li { display: flex; gap: 6px; align-items: baseline; padding: 2px 0; }
+.crs-list { width: 100%; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel-2); margin-bottom: 8px; }
+.props textarea { box-sizing: border-box; }

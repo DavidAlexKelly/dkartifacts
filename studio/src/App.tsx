@@ -12,7 +12,10 @@ import { configuredCatalogRid, foundry } from "./foundry/auth";
 import { commitEdits, deleteProject as deleteFoundryProject, loadBacked, openProject as openFoundryProject, publishLayer, saveProject as saveFoundryProject } from "./foundry/layers";
 import { OntologyClient, type ObjectTypeDef } from "./foundry/ontology";
 import { OntologyDialog, ProjectsDialog } from "./ui/FoundryDialogs";
-import { download, importFile, safeName, toCsv, toGeoJson, toKml } from "./formats/vector";
+import { AnalysisDialog, type AnalysisTab, type ProcessingRun } from "./ui/AnalysisDialog";
+import { CrsDialog } from "./ui/CrsDialog";
+import { download, safeName } from "./formats/vector";
+import type { ExportFormat } from "./formats/import";
 import { renderLayout } from "./formats/print";
 import { bbox, lengthM, midpoints, polygonAreaM2, vertices } from "./map/geometry";
 import { MapView } from "./map/MapView";
@@ -122,7 +125,9 @@ export default function App() {
   const [los, setLos] = useState<(LineOfSightResult & { from: Position; to: Position }) | null>(null);
   const [viewshedSettings, setViewshedSettings] = useState<ViewshedSettings>({ radiusKm: 5, observerM: 2, targetM: 0 });
   const [analysisBusy, setAnalysisBusy] = useState<string | null>(null);
-  const [dialog, setDialog] = useState<null | "projects" | "ontology">(null);
+  const [dialog, setDialog] = useState<null | "projects" | "ontology" | "analysis">(null);
+  const [analysisTab, setAnalysisTab] = useState<AnalysisTab>("processing");
+  const [processingHistory, setProcessingHistory] = useState<ProcessingRun[]>([]);
   // Per-layer load state for Foundry-backed layers: a message, or an error.
   const [layerStatus, setLayerStatus] = useState<Map<string, { text: string; error?: boolean; busy?: boolean }>>(new Map());
   const loadedLayers = useRef(new Set<string>());
@@ -634,28 +639,34 @@ export default function App() {
     setActiveId(node.id);
   };
 
-  const importFiles = async (files: FileList | File[]) => {
-    for (const file of Array.from(files)) {
-      try {
-        const imported = importFile(file.name, await file.text());
-        const layer: VectorLayerNode = {
-          kind: "vector",
-          id: newId("vec"),
-          title: imported.title,
-          visible: true,
-          opacity: 1,
-          style: defaultVectorStyle(project.layers.filter((l) => l.kind === "vector").length),
-          data: { type: "FeatureCollection", features: imported.features },
-          fields: imported.fields,
-        };
-        dispatch({ type: "addLayer", layer });
-        setActiveId(layer.id);
-        zoomToBounds(bbox(imported.features.map((f) => f.geometry)));
-        say(`Imported ${imported.features.length} features from ${file.name}${imported.skipped ? ` (${imported.skipped} without a location skipped)` : ""}.`);
-      } catch (e) {
-        say(`Could not import ${file.name}: ${e instanceof Error ? e.message : String(e)}`, "error");
-      }
+  // Formats load on demand: GeoPackage pulls in SQLite (WebAssembly), CRS support proj4.
+  const [crsRequest, setCrsRequest] = useState<{ files: File[]; names: string[] } | null>(null);
+  const importFiles = async (list: FileList | File[], crs?: string) => {
+    const files = Array.from(list);
+    const { importFiles: importAny } = await import("./formats/import");
+    const { layers, errors, needsCrs } = await importAny(files, crs ? { crs } : undefined);
+    let firstBounds: [number, number, number, number] | null = null;
+    for (const imported of layers) {
+      const layer: VectorLayerNode = {
+        kind: "vector",
+        id: newId("vec"),
+        title: imported.title,
+        visible: true,
+        opacity: 1,
+        style: defaultVectorStyle(project.layers.filter((l) => l.kind === "vector").length + layers.indexOf(imported)),
+        data: { type: "FeatureCollection", features: imported.features },
+        fields: imported.fields,
+      };
+      dispatch({ type: "addLayer", layer });
+      setActiveId(layer.id);
+      firstBounds ??= bbox(imported.features.map((f) => f.geometry));
     }
+    if (firstBounds) {zoomToBounds(firstBounds);}
+    const n = layers.reduce((a, l) => a + l.features.length, 0);
+    const skipped = layers.reduce((a, l) => a + l.skipped, 0);
+    if (errors.length) {say(`${layers.length ? `Imported ${layers.length} layer(s). ` : ""}${errors.join(" ")}`, "error");}
+    else if (layers.length) {say(`Imported ${n} features in ${layers.length} layer(s)${skipped ? ` (${skipped} without a location skipped)` : ""}.`);}
+    if (needsCrs.length && !crs) {setCrsRequest({ files, names: needsCrs });}
   };
 
   const saveProject = () => download(`${safeName(project.title)}.decho.json`, serializeProject(project), "application/json");
@@ -723,14 +734,16 @@ export default function App() {
     setSelection(null);
   };
 
-  const exportLayer = (format: "geojson" | "csv" | "kml") => {
+  const exportLayer = async (format: ExportFormat) => {
     const layer = activeVector;
     if (!layer) {return;}
-    const fields = fieldsOf(layer);
-    const name = safeName(layer.title);
-    if (format === "geojson") {download(`${name}.geojson`, toGeoJson(layer.data.features), "application/geo+json");}
-    if (format === "csv") {download(`${name}.csv`, toCsv(layer.data.features, fields), "text/csv");}
-    if (format === "kml") {download(`${name}.kml`, toKml(layer.title, layer.data.features, fields, layer.style.labelField), "application/vnd.google-earth.kml+xml");}
+    try {
+      const { exportLayer: write } = await import("./formats/import");
+      const { blob, filename } = await write(format, layer.title, layer.data.features, fieldsOf(layer), layer.style.labelField);
+      download(filename, blob, blob.type || "application/octet-stream");
+    } catch (e) {
+      say(`Export failed: ${e instanceof Error ? e.message : String(e)}`, "error");
+    }
   };
 
   const exportPng = async () => {
@@ -802,7 +815,8 @@ export default function App() {
         onOntology={() => setDialog("ontology")}
         onImport={(f) => void importFiles(f)}
         onExportPng={() => void exportPng()}
-        onExportLayer={exportLayer}
+        onExportLayer={(f) => void exportLayer(f)}
+        onAnalysis={(tab) => { setAnalysisTab(tab); setDialog("analysis"); }}
       />
       <aside className="left">
         <LayersPanel
@@ -919,6 +933,56 @@ export default function App() {
             }
           }}
           onClose={() => setDialog(null)}
+        />
+      )}
+      {dialog === "analysis" && (
+        <AnalysisDialog
+          tab={analysisTab}
+          onTab={setAnalysisTab}
+          layers={project.layers.filter((l): l is VectorLayerNode => l.kind === "vector")}
+          activeId={activeId}
+          selection={selection}
+          history={processingHistory}
+          onResult={(tool, params, result, inputTitle) => {
+            const layer: VectorLayerNode = {
+              kind: "vector", id: newId("vec"), title: `${tool.title}${inputTitle ? ` · ${inputTitle}` : ""}`, visible: true, opacity: 1,
+              style: defaultVectorStyle(project.layers.filter((l) => l.kind === "vector").length),
+              data: { type: "FeatureCollection", features: result.features }, fields: result.fields,
+            };
+            if (result.features.length) {
+              dispatch({ type: "addLayer", layer });
+              setActiveId(layer.id);
+            }
+            setProcessingHistory((h) => [...h, { tool: tool.id, title: tool.title, params, at: new Date().toISOString(), output: result.features.length ? layer.title : undefined }]);
+            say(result.message ?? (result.features.length ? `${tool.title}: ${result.features.length} features in a new layer.` : `${tool.title}: no features in the result.`), result.features.length ? "info" : "error");
+          }}
+          onSelect={(layerId, ids) => {
+            setActiveId(layerId);
+            setSelection(ids.length ? { layerId, featureIds: ids } : null);
+            say(`${ids.length} feature(s) selected.`);
+          }}
+          onCalculate={(layerId, field, values) => {
+            const layer = project.layers.find((l) => l.id === layerId);
+            if (layer?.kind !== "vector") {return;}
+            if (!fieldsOf(layer).includes(field)) {dispatch({ type: "addField", layerId, field });}
+            dispatch({
+              type: "replaceFeatures", layerId,
+              features: layer.data.features.map((f) => (values.has(f.id) ? { ...f, properties: { ...f.properties, [field]: values.get(f.id) } } : f)),
+            });
+            say(`Calculated “${field}” for ${values.size} feature(s).`);
+          }}
+          onClose={() => setDialog(null)}
+        />
+      )}
+      {crsRequest && (
+        <CrsDialog
+          names={crsRequest.names}
+          onChoose={(crs) => {
+            const files = crsRequest.files;
+            setCrsRequest(null);
+            void importFiles(files, crs);
+          }}
+          onClose={() => setCrsRequest(null)}
         />
       )}
       {dialog === "ontology" && ontology && (
