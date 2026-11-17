@@ -53,6 +53,38 @@ export type StudioFeature = Omit<Feature<Geometry, Record<string, unknown>>, "id
   properties: Record<string, unknown>;
 };
 
+/**
+ * Where a vector layer's features live, when not only in the project.
+ *
+ *   ontology-features  a collection of MapFeature objects: editable, and
+ *                      edits are committed through Actions
+ *   ontology           any object type with a geopoint/geoshape: read-only
+ *   dataset            a tabular dataset with lat/lon or WKT columns: read-only
+ *
+ * Backed layers' features are loaded when the project opens, not stored in it.
+ */
+export type Backing =
+  | { kind: "ontology-features"; collection: string }
+  | { kind: "ontology"; objectType: string; geometryProperty: string; limit: number }
+  | { kind: "dataset"; datasetRid: string; limit: number };
+
+/** Edits made to a backed layer since it was loaded or last committed. */
+export interface PendingEdits {
+  created: string[];
+  modified: string[];
+  deleted: string[];
+}
+
+export type FieldType = "string" | "number" | "boolean" | "date";
+
+/** Optional per-field rules: the attribute form validates against these. */
+export interface FieldSpec {
+  type: FieldType;
+  required?: boolean;
+  /** Allowed values: the form shows a drop-down. */
+  options?: string[];
+}
+
 export interface VectorLayerNode {
   kind: "vector";
   id: string;
@@ -63,6 +95,12 @@ export interface VectorLayerNode {
   data: { type: "FeatureCollection"; features: StudioFeature[] };
   /** Fields in display order; features may carry others, which are appended. */
   fields: string[];
+  schema?: Record<string, FieldSpec>;
+  backing?: Backing;
+  pending?: PendingEdits;
+  /** Hidden outside this zoom range (scale-dependent visibility). */
+  minZoom?: number;
+  maxZoom?: number;
 }
 
 export type LayerNode = CatalogLayerNode | VectorLayerNode;
@@ -76,6 +114,8 @@ export interface MapView {
 
 export interface Project {
   format: "decho-studio-project/1";
+  /** Stable identity: the MapProject primary key when saved to Foundry. */
+  id: string;
   title: string;
   /** An optional catalog listing many datasets at once. */
   connection: Connection | null;
@@ -106,6 +146,7 @@ export function defaultVectorStyle(index: number): VectorStyle {
 export function newProject(connection: Connection | null = null): Project {
   return {
     format: "decho-studio-project/1",
+    id: typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : newId("project"),
     title: "Untitled map",
     connection,
     assets: null,
@@ -119,4 +160,14 @@ let counter = 0;
 export function newId(prefix: string): string {
   counter += 1;
   return `${prefix}-${Date.now().toString(36)}-${counter.toString(36)}`;
+}
+
+/** Whether the studio may edit this layer's features. */
+export function isEditable(layer: VectorLayerNode): boolean {
+  return !layer.backing || layer.backing.kind === "ontology-features";
+}
+
+export function pendingCount(layer: VectorLayerNode): number {
+  const p = layer.pending;
+  return p ? p.created.length + p.modified.length + p.deleted.length : 0;
 }

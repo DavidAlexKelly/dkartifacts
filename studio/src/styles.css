@@ -200,3 +200,24 @@ tr.selected td { background: color-mix(in srgb, #ffd400 30%, transparent); }
   .app.with-table { grid-template-areas: "top" "map" "table" "right" "left" "status"; grid-template-rows: auto 55vh 260px auto auto auto; }
   .tools span { display: none; }
 }
+
+/* Dialogs */
+.dialog-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.35); display: grid; place-items: center; z-index: 50; padding: 16px; }
+.dialog { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; width: min(560px, 100%); max-height: min(80vh, 760px); display: flex; flex-direction: column; box-shadow: 0 20px 60px rgba(0,0,0,0.3); }
+.dialog.wide { width: min(900px, 100%); }
+.dialog-head { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+.dialog-head h2 { margin: 0; font-size: 15px; }
+.dialog-body { padding: 10px 14px 14px; overflow: auto; }
+.dialog-filter { width: 100%; padding: 5px 8px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel-2); margin-bottom: 8px; }
+.dialog-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.dialog-cols h3 { font-size: 12px; margin: 4px 0 6px; }
+@media (max-width: 700px) { .dialog-cols { grid-template-columns: 1fr; } }
+.pick-list { list-style: none; margin: 0; padding: 0; }
+.pick-list li { display: flex; align-items: center; gap: 6px; padding: 6px 0; border-top: 1px solid var(--line); }
+.pick-list li > div { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.pick-list small { overflow: hidden; text-overflow: ellipsis; }
+.inline-form { display: flex; gap: 6px; margin-top: 8px; }
+.inline-form input { flex: 1; min-width: 0; padding: 3px 6px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel-2); }
+.button-row { display: flex; gap: 6px; flex-wrap: wrap; margin: 4px 0; }
+button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+button.primary:hover:not(:disabled) { background: var(--accent); filter: brightness(1.08); }

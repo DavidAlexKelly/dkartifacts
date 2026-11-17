@@ -3,3 +3,5 @@ dist/
 .env
 .env.local
 test-results/
+.fake-foundry.json
+.env.local

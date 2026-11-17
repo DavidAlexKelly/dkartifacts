@@ -6,6 +6,9 @@ import { Library, parseSource, sourceId, type CatalogEntry, type Connection, typ
 import type { LayerManifest } from "./data/manifest";
 import { hasAssets, registerProtocols, setAssetsDataset, setProtocolLibrary } from "./data/protocols";
 import { configuredCatalogRid, foundry } from "./foundry/auth";
+import { commitEdits, deleteProject as deleteFoundryProject, loadBacked, openProject as openFoundryProject, publishLayer, saveProject as saveFoundryProject } from "./foundry/layers";
+import { OntologyClient, type ObjectTypeDef } from "./foundry/ontology";
+import { OntologyDialog, ProjectsDialog } from "./ui/FoundryDialogs";
 import { download, importFile, safeName, toCsv, toGeoJson, toKml } from "./formats/vector";
 import { renderLayout } from "./formats/print";
 import { bbox, lengthM, midpoints, polygonAreaM2, vertices } from "./map/geometry";
@@ -18,6 +21,9 @@ import {
   defaultVectorStyle,
   newId,
   newProject,
+  isEditable,
+  pendingCount,
+  type Backing,
   type CatalogLayerNode,
   type LayerNode,
   type StudioFeature,
@@ -108,6 +114,18 @@ export default function App() {
   const [tableOpen, setTableOpen] = useState(false);
   const [zoom, setZoom] = useState(project.view.zoom);
   const initialView = useRef(project.view);
+  const ontology = useMemo(() => (foundry ? new OntologyClient(foundry) : null), []);
+  const [dialog, setDialog] = useState<null | "projects" | "ontology">(null);
+  // Per-layer load state for Foundry-backed layers: a message, or an error.
+  const [layerStatus, setLayerStatus] = useState<Map<string, { text: string; error?: boolean; busy?: boolean }>>(new Map());
+  const loadedLayers = useRef(new Set<string>());
+  const setStatus = (id: string, text: string | null, extra: { error?: boolean; busy?: boolean } = {}) =>
+    setLayerStatus((prev) => {
+      const next = new Map(prev);
+      if (text === null) {next.delete(id);}
+      else {next.set(id, { text, ...extra });}
+      return next;
+    });
 
   const say = useCallback((text: string, kind: "info" | "error" = "info") => setMessage({ text, kind }), []);
 
@@ -223,9 +241,88 @@ export default function App() {
       if (entry.bounds && map && project.layers.length === 0) {map.fitBounds(entry.bounds as LngLatBoundsLike, { padding: 40 });}
       say(`Added ${entry.title}.`);
     } catch (err) {
-      say(err instanceof Error ? err.message : String(err), "error");
+      const why = err instanceof Error ? err.message : String(err);
+      // A Foundry dataset without a manifest may be an ordinary table with
+      // lat/lon or WKT columns: try it as a read-only vector layer.
+      if ("datasetRid" in src && /no manifest\.json/.test(why)) {
+        addBackedLayer({ kind: "dataset", datasetRid: src.datasetRid, limit: 50000 }, `Dataset ${src.datasetRid.slice(-8)}`);
+        return;
+      }
+      say(why, "error");
       throw err;
     }
+  };
+
+  /** A vector layer whose features come from Foundry; they load in the effect below. */
+  const addBackedLayer = (backing: Backing, title: string) => {
+    const layer: VectorLayerNode = {
+      kind: "vector", id: newId("vec"), title, visible: true, opacity: 1,
+      style: defaultVectorStyle(project.layers.filter((l) => l.kind === "vector").length),
+      data: { type: "FeatureCollection", features: [] }, fields: [], backing,
+    };
+    dispatch({ type: "addLayer", layer });
+    setActiveId(layer.id);
+    return layer.id;
+  };
+
+  // Load (or reload) Foundry-backed layers. A layer with uncommitted edits
+  // from an earlier session keeps its local features instead.
+  useEffect(() => {
+    for (const l of project.layers) {
+      if (l.kind !== "vector" || !l.backing || loadedLayers.current.has(l.id)) {continue;}
+      loadedLayers.current.add(l.id);
+      if (pendingCount(l) > 0) {
+        setStatus(l.id, `${pendingCount(l)} uncommitted edits from an earlier session`);
+        continue;
+      }
+      setStatus(l.id, "Loading from Foundry…", { busy: true });
+      const id = l.id;
+      loadBacked(l, ontology, foundry)
+        .then((res) => {
+          dispatch({ type: "setLayerData", layerId: id, features: res.features, fields: res.fields });
+          setStatus(id, res.message ?? null);
+        })
+        .catch((e: unknown) => setStatus(id, e instanceof Error ? e.message : String(e), { error: true }));
+    }
+  }, [project.layers, ontology]);
+
+  const reloadLayer = (layer: VectorLayerNode) => {
+    if (pendingCount(layer) > 0 && !confirm(`Discard ${pendingCount(layer)} uncommitted edits to “${layer.title}” and reload it from Foundry?`)) {return;}
+    dispatch({ type: "markCommitted", layerId: layer.id });
+    loadedLayers.current.delete(layer.id);
+    // The effect picks it up on the next render.
+    dispatch({ type: "setLayerData", layerId: layer.id, features: layer.data.features, fields: layer.fields });
+  };
+
+  const commitLayer = async (layer: VectorLayerNode) => {
+    if (!ontology) {return;}
+    setStatus(layer.id, "Committing…", { busy: true });
+    const result = await commitEdits(layer, ontology, (done, total) => setStatus(layer.id, `Committing ${done}/${total}…`, { busy: true }));
+    dispatch({ type: "markCommitted", layerId: layer.id, keep: result.failed.map((f) => f.id) });
+    if (result.failed.length) {
+      setStatus(layer.id, `${result.failed.length} edits refused: ${result.failed[0].error}`, { error: true });
+      say(`${result.applied} edits committed, ${result.failed.length} refused — they stay pending.`, "error");
+    } else {
+      setStatus(layer.id, null);
+      say(`${result.applied} edits committed to Foundry.`);
+    }
+  };
+
+  const publishToFoundry = async (layer: VectorLayerNode) => {
+    if (!ontology) {return;}
+    const collection = prompt("Publish this layer to Foundry as a feature collection named:", layer.title)?.trim();
+    if (!collection) {return;}
+    setStatus(layer.id, "Publishing…", { busy: true });
+    const result = await publishLayer(layer, collection, ontology, (done, total) => setStatus(layer.id, `Publishing ${done}/${total}…`, { busy: true }));
+    if (result.failed.length) {
+      setStatus(layer.id, `${result.failed.length} features refused: ${result.failed[0].error}`, { error: true });
+      say(`Published ${result.applied} features; ${result.failed.length} were refused.`, "error");
+      return;
+    }
+    loadedLayers.current.add(layer.id); // already holds exactly what was written
+    dispatch({ type: "updateLayer", id: layer.id, patch: { backing: { kind: "ontology-features", collection }, pending: undefined } });
+    setStatus(layer.id, null);
+    say(`Published ${result.applied} features to the “${collection}” collection. Edits to it now commit to Foundry.`);
   };
 
   // ── Project state ──────────────────────────────────────────────────────
@@ -262,7 +359,7 @@ export default function App() {
 
   /** The active vector layer, or a new "Drawings" layer if there is none to draw into. */
   const ensureVectorLayer = (): string => {
-    if (activeVector) {return activeVector.id;}
+    if (activeVector && isEditable(activeVector)) {return activeVector.id;}
     const layer: VectorLayerNode = {
       kind: "vector",
       id: newId("vec"),
@@ -326,8 +423,16 @@ export default function App() {
           .finally(() => setProfileBusy(false));
       }
     },
-    commitGeometry: (d) => dispatch({ type: "setGeometry", layerId: d.layerId, featureId: d.featureId, geometry: d.geometry }),
+    commitGeometry: (d) => {
+      const l = project.layers.find((x) => x.id === d.layerId);
+      if (l?.kind === "vector" && isEditable(l)) {dispatch({ type: "setGeometry", layerId: d.layerId, featureId: d.featureId, geometry: d.geometry });}
+    },
     deleteSelected: () => {
+      const l = selection && project.layers.find((x) => x.id === selection.layerId);
+      if (l?.kind === "vector" && !isEditable(l)) {
+        say(`“${l.title}” is read-only.`, "error");
+        return;
+      }
       if (selection) {dispatch({ type: "deleteFeatures", layerId: selection.layerId, ids: selection.featureIds });}
       setSelection(null);
     },
@@ -400,7 +505,7 @@ export default function App() {
       out.push({ type: "Feature", properties: { role: "sketch" }, geometry: measured.kind === "area" ? { type: "Polygon", coordinates: [[...c, c[0]]] } : { type: "LineString", coordinates: c } });
       c.forEach((v) => out.push(pt(v, "vertex")));
     }
-    if (tool === "edit" && activeVector && selection?.layerId === activeVector.id && selection.featureIds.length === 1) {
+    if (tool === "edit" && activeVector && isEditable(activeVector) && selection?.layerId === activeVector.id && selection.featureIds.length === 1) {
       const f = activeVector.data.features.find((x) => x.id === selection.featureIds[0]);
       const g = draft && f && draft.featureId === f.id ? draft.geometry : f?.geometry;
       if (g) {
@@ -482,11 +587,49 @@ export default function App() {
 
   const saveProject = () => download(`${safeName(project.title)}.decho.json`, serializeProject(project), "application/json");
 
+  const replaceProject = (p: typeof project) => {
+    seeded.current = true;
+    loadedLayers.current.clear();
+    setLayerStatus(new Map());
+    dispatch({ type: "replace", project: p });
+    setActiveId(null);
+    setSelection(null);
+    map?.jumpTo({ center: p.view.center as [number, number], zoom: p.view.zoom, bearing: p.view.bearing, pitch: p.view.pitch });
+  };
+
+  const saveToFoundry = async () => {
+    if (!ontology) {
+      saveProject();
+      return;
+    }
+    const dirty = project.layers.filter((l) => l.kind === "vector" && pendingCount(l) > 0) as VectorLayerNode[];
+    if (dirty.length && confirm(`${dirty.length} layer(s) have uncommitted edits. Commit them first? (Cancel saves the project without them.)`)) {
+      for (const l of dirty) {await commitLayer(l);}
+    }
+    try {
+      const how = await saveFoundryProject(ontology, project);
+      say(`Project ${how === "created" ? "saved" : "updated"} in Foundry.`);
+    } catch (e) {
+      say(`Could not save to Foundry: ${e instanceof Error ? e.message : String(e)}`, "error");
+    }
+  };
+
+  const openFromFoundry = async (id: string) => {
+    if (!ontology) {return;}
+    try {
+      replaceProject(await openFoundryProject(ontology, id));
+      setDialog(null);
+      say("Opened from Foundry.");
+    } catch (e) {
+      say(`Could not open: ${e instanceof Error ? e.message : String(e)}`, "error");
+    }
+  };
+
   const openProject = async (file: File) => {
     try {
       const p = parseProject(await file.text());
+      replaceProject(p);
       seeded.current = true;
-      dispatch({ type: "replace", project: p });
       setActiveId(null);
       setSelection(null);
       map?.jumpTo({ center: p.view.center as [number, number], zoom: p.view.zoom, bearing: p.view.bearing, pitch: p.view.pitch });
@@ -500,6 +643,8 @@ export default function App() {
     if (!confirm("Start a new project? Unsaved changes to this one will be lost.")) {return;}
     clearAutosave();
     seeded.current = false;
+    loadedLayers.current.clear();
+    setLayerStatus(new Map());
     dispatch({ type: "replace", project: newProject(project.connection) });
     setActiveId(null);
     setSelection(null);
@@ -546,7 +691,7 @@ export default function App() {
         dispatch({ type: "redo" });
       } else if (e.key.toLowerCase() === "s") {
         e.preventDefault();
-        saveProject();
+        void saveToFoundry();
       }
     };
     window.addEventListener("keydown", onKey);
@@ -578,6 +723,10 @@ export default function App() {
         onNew={newProjectCmd}
         onOpen={openProject}
         onSave={saveProject}
+        foundryReady={!!ontology}
+        onOpenFoundry={() => setDialog("projects")}
+        onSaveFoundry={() => void saveToFoundry()}
+        onOntology={() => setDialog("ontology")}
         onImport={(f) => void importFiles(f)}
         onExportPng={() => void exportPng()}
         onExportLayer={exportLayer}
@@ -587,6 +736,7 @@ export default function App() {
           layers={project.layers}
           activeId={activeId}
           errors={manifestErrors}
+          status={layerStatus}
           kindOf={(id) => {
             const k = catalogKind(entries.get(id), manifests.get(id));
             return { basemap: "basemap", contours: "contours", "vector-tiles": "vector tiles", "raster-dem": "terrain", raster: "raster", "dem-cells": "DEM cells", other: "loading…" }[k];
@@ -655,7 +805,16 @@ export default function App() {
             setSketch([]);
           }}
         />
-        <PropertiesPanel node={activeNode} entry={activeEntry} manifest={activeManifest} glyphs={glyphs} dispatch={typedDispatch} />
+        <PropertiesPanel
+          node={activeNode} entry={activeEntry} manifest={activeManifest} glyphs={glyphs} dispatch={typedDispatch}
+          foundry={{
+            ready: !!ontology,
+            status: activeNode ? layerStatus.get(activeNode.id) : undefined,
+            onCommit: (l) => void commitLayer(l),
+            onReload: reloadLayer,
+            onPublish: (l) => void publishToFoundry(l),
+          }}
+        />
       </aside>
       {tableOpen && (
         <AttributeTable
@@ -664,6 +823,37 @@ export default function App() {
           onSelect={(ids) => activeVector && setSelection({ layerId: activeVector.id, featureIds: ids })}
           onZoomTo={(f) => zoomToBounds(bbox([f.geometry]))}
           dispatch={typedDispatch}
+          readOnly={!!activeVector && !isEditable(activeVector)}
+        />
+      )}
+      {dialog === "projects" && ontology && (
+        <ProjectsDialog
+          client={ontology}
+          currentId={project.id}
+          onOpen={(id) => void openFromFoundry(id)}
+          onDelete={async (id) => {
+            try {
+              await deleteFoundryProject(ontology, id);
+              say("Project deleted from Foundry.");
+            } catch (e) {
+              say(`Could not delete: ${e instanceof Error ? e.message : String(e)}`, "error");
+            }
+          }}
+          onClose={() => setDialog(null)}
+        />
+      )}
+      {dialog === "ontology" && ontology && (
+        <OntologyDialog
+          client={ontology}
+          onAddType={(t: ObjectTypeDef, g: string) => {
+            addBackedLayer({ kind: "ontology", objectType: t.apiName, geometryProperty: g, limit: 50000 }, t.pluralDisplayName ?? t.displayName);
+            setDialog(null);
+          }}
+          onAddCollection={(name: string) => {
+            addBackedLayer({ kind: "ontology-features", collection: name }, name);
+            setDialog(null);
+          }}
+          onClose={() => setDialog(null)}
         />
       )}
       <StatusBar

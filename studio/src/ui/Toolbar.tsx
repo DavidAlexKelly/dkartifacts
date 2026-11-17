@@ -33,6 +33,10 @@ interface Props {
   onNew(): void;
   onOpen(file: File): void;
   onSave(): void;
+  foundryReady: boolean;
+  onOpenFoundry(): void;
+  onSaveFoundry(): void;
+  onOntology(): void;
   onImport(files: FileList): void;
   onExportPng(): void;
   onExportLayer(format: "geojson" | "csv" | "kml"): void;
@@ -56,13 +60,16 @@ export function Toolbar(p: Props) {
         <summary>Project</summary>
         <div className="menu-items">
           {item("New project", p.onNew)}
-          {item("Open project…", () => openInput.current?.click())}
-          {item("Save project", p.onSave, false, "Ctrl+S")}
+          {item("Open from Foundry…", p.onOpenFoundry, !p.foundryReady, p.foundryReady ? "Projects saved as MapProject objects" : "Foundry is not configured")}
+          {item("Save to Foundry", p.onSaveFoundry, !p.foundryReady, "Ctrl+S — saves the project as a MapProject object others can open")}
+          {item("Open project file…", () => openInput.current?.click())}
+          {item("Download project file", p.onSave)}
         </div>
       </details>
       <details className="menu">
         <summary>Data</summary>
         <div className="menu-items">
+          {item("Add from the Ontology…", p.onOntology, !p.foundryReady, "Object types with a location, and editable feature collections")}
           {item("Import file…", () => importInput.current?.click(), false, "GeoJSON, CSV, KML or GPX — or drop files on the map")}
           {item("Export layer as GeoJSON", () => p.onExportLayer("geojson"), !p.hasVector)}
           {item("Export layer as CSV", () => p.onExportLayer("csv"), !p.hasVector)}

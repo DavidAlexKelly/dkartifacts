@@ -9,6 +9,7 @@ interface Props {
   onSelect(ids: string[]): void;
   onZoomTo(feature: StudioFeature): void;
   dispatch: Dispatch<Action>;
+  readOnly?: boolean;
 }
 
 const ROW_LIMIT = 2000;
@@ -29,7 +30,7 @@ function show(v: unknown): string {
 }
 
 /** The active vector layer as a table: filter, select, edit cells, add and remove fields and rows. */
-export function AttributeTable({ layer, selected, onSelect, onZoomTo, dispatch }: Props) {
+export function AttributeTable({ layer, selected, onSelect, onZoomTo, dispatch, readOnly }: Props) {
   const [filter, setFilter] = useState("");
   const [onlySelected, setOnlySelected] = useState(false);
   const [newField, setNewField] = useState("");
@@ -65,11 +66,12 @@ export function AttributeTable({ layer, selected, onSelect, onZoomTo, dispatch }
         <span className="muted">{rows.length} of {layer.data.features.length} features{selected.length ? ` · ${selected.length} selected` : ""}</span>
         <input placeholder="Filter…" value={filter} onChange={(e) => setFilter(e.target.value)} aria-label="Filter rows" />
         <label className="check"><input type="checkbox" checked={onlySelected} onChange={(e) => setOnlySelected(e.target.checked)} /> Selected only</label>
-        <form onSubmit={(e) => { e.preventDefault(); const f = newField.trim(); if (f) {dispatch({ type: "addField", layerId: layer.id, field: f }); setNewField("");} }}>
+        {readOnly && <span className="badge">read-only</span>}
+        {!readOnly && <form onSubmit={(e) => { e.preventDefault(); const f = newField.trim(); if (f) {dispatch({ type: "addField", layerId: layer.id, field: f }); setNewField("");} }}>
           <input placeholder="New field" value={newField} onChange={(e) => setNewField(e.target.value)} aria-label="New field name" />
           <button type="submit" className="small">Add field</button>
-        </form>
-        <button type="button" className="small" disabled={!selected.length} onClick={() => dispatch({ type: "deleteFeatures", layerId: layer.id, ids: selected })}><Icon name="trash" size={14} /> Delete selected</button>
+        </form>}
+        <button type="button" className="small" disabled={readOnly || !selected.length} onClick={() => dispatch({ type: "deleteFeatures", layerId: layer.id, ids: selected })}><Icon name="trash" size={14} /> Delete selected</button>
       </div>
       <div className="table-scroll">
         <table>
@@ -82,7 +84,7 @@ export function AttributeTable({ layer, selected, onSelect, onZoomTo, dispatch }
                   <button type="button" className="th" onClick={() => setSort(sort?.field === f ? (sort.dir === 1 ? { field: f, dir: -1 } : null) : { field: f, dir: 1 })}>
                     {f}{sort?.field === f ? (sort.dir === 1 ? " ▲" : " ▼") : ""}
                   </button>
-                  <button type="button" className="th-x" title={`Remove field ${f}`} onClick={() => { if (confirm(`Remove the field “${f}” from every feature?`)) {dispatch({ type: "removeField", layerId: layer.id, field: f });} }}>×</button>
+                  {!readOnly && <button type="button" className="th-x" title={`Remove field ${f}`} onClick={() => { if (confirm(`Remove the field “${f}” from every feature?`)) {dispatch({ type: "removeField", layerId: layer.id, field: f });} }}>×</button>}
                 </th>
               ))}
             </tr>
@@ -98,6 +100,7 @@ export function AttributeTable({ layer, selected, onSelect, onZoomTo, dispatch }
                   <td key={k}>
                     <input
                       className="cell"
+                      readOnly={readOnly}
                       defaultValue={show(f.properties[k])}
                       key={`${f.id}:${k}:${show(f.properties[k])}`}
                       onBlur={(e) => {

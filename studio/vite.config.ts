@@ -3,6 +3,7 @@ import { createReadStream, existsSync, statSync } from "node:fs";
 import { extname, resolve, sep } from "node:path";
 import react from "@vitejs/plugin-react";
 import { defineConfig, loadEnv, type Plugin } from "vite";
+import { fakeFoundry } from "./dev/fake-foundry";
 
 /**
  * Serve a local terrain-gen output folder at /data/ during development, so
@@ -41,7 +42,11 @@ function localData(dir: string | undefined): Plugin {
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
   return {
-    plugins: [react(), localData(env.STUDIO_DATA)],
+    plugins: [
+      react(),
+      localData(env.STUDIO_DATA),
+      fakeFoundry({ enabled: env.STUDIO_FAKE_FOUNDRY === "1", dataDir: env.STUDIO_DATA, statePath: env.STUDIO_FAKE_STATE }),
+    ],
     server: { port: 8080 },
     build: { chunkSizeWarningLimit: 2000 },
     test: { environment: "jsdom" },

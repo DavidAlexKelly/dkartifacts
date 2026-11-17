@@ -5,7 +5,16 @@ import { catalogKind } from "../map/style";
 import { fieldsOf, type Action } from "../project/reducer";
 import { PALETTE, type BasemapFlavor, type CatalogLayerNode, type LayerNode, type VectorLayerNode, type VectorStyle } from "../project/types";
 
+export interface FoundryLayerActions {
+  ready: boolean;
+  status?: { text: string; error?: boolean; busy?: boolean };
+  onCommit(layer: VectorLayerNode): void;
+  onReload(layer: VectorLayerNode): void;
+  onPublish(layer: VectorLayerNode): void;
+}
+
 interface Props {
+  foundry: FoundryLayerActions;
   node: LayerNode | null;
   entry?: CatalogEntry;
   manifest?: LayerManifest;
@@ -121,7 +130,45 @@ function CatalogOptions({ node, entry, manifest, glyphs, dispatch }: { node: Cat
   );
 }
 
-export function PropertiesPanel({ node, entry, manifest, glyphs, dispatch }: Props) {
+function FoundrySource({ node, foundry }: { node: VectorLayerNode; foundry: FoundryLayerActions }) {
+  const b = node.backing;
+  const pending = node.pending ? node.pending.created.length + node.pending.modified.length + node.pending.deleted.length : 0;
+  return (
+    <>
+      <h3>Source</h3>
+      {!b && (
+        <>
+          <p className="hint">Held in this project only.</p>
+          <button type="button" className="small" disabled={!foundry.ready || node.data.features.length === 0} title={foundry.ready ? "Write every feature as a MapFeature object, then edit it in Foundry" : "Foundry is not configured"} onClick={() => foundry.onPublish(node)}>Publish to Foundry…</button>
+        </>
+      )}
+      {b?.kind === "ontology-features" && (
+        <>
+          <p className="hint">Foundry feature collection <strong>{b.collection}</strong>. Edits stay here until you commit them; each one becomes an Action.</p>
+          <div className="button-row">
+            <button type="button" className="small primary" disabled={!pending || foundry.status?.busy} onClick={() => foundry.onCommit(node)}>Commit {pending || ""} edit{pending === 1 ? "" : "s"}</button>
+            <button type="button" className="small" disabled={foundry.status?.busy} onClick={() => foundry.onReload(node)}>{pending ? "Discard and reload" : "Reload"}</button>
+          </div>
+        </>
+      )}
+      {b?.kind === "ontology" && (
+        <>
+          <p className="hint">Ontology object type <code>{b.objectType}</code>, located by <code>{b.geometryProperty}</code>. Read-only.</p>
+          <button type="button" className="small" disabled={foundry.status?.busy} onClick={() => foundry.onReload(node)}>Reload</button>
+        </>
+      )}
+      {b?.kind === "dataset" && (
+        <>
+          <p className="hint">Dataset <code>{b.datasetRid}</code>, read as a table (first {b.limit.toLocaleString()} rows). Read-only.</p>
+          <button type="button" className="small" disabled={foundry.status?.busy} onClick={() => foundry.onReload(node)}>Reload</button>
+        </>
+      )}
+      {foundry.status && <p className={foundry.status.error ? "error-box" : "hint"}>{foundry.status.text}</p>}
+    </>
+  );
+}
+
+export function PropertiesPanel({ node, entry, manifest, glyphs, dispatch, foundry }: Props) {
   if (!node) {
     return (
       <section className="panel" aria-label="Layer properties">
@@ -136,6 +183,7 @@ export function PropertiesPanel({ node, entry, manifest, glyphs, dispatch }: Pro
       <div className="props">
         <Row label="Name"><input value={node.title} onChange={(e) => dispatch({ type: "updateLayer", id: node.id, patch: { title: e.target.value } })} /></Row>
         <Row label={`Opacity ${Math.round(node.opacity * 100)}%`}><input type="range" min={0} max={1} step={0.05} value={node.opacity} onChange={(e) => dispatch({ type: "updateLayer", id: node.id, patch: { opacity: Number(e.target.value) } })} /></Row>
+        {node.kind === "vector" && <FoundrySource node={node} foundry={foundry} />}
         {node.kind === "vector" ? <VectorStyleEditor node={node} glyphs={glyphs} dispatch={dispatch} /> : <CatalogOptions node={node} entry={entry} manifest={manifest} glyphs={glyphs} dispatch={dispatch} />}
       </div>
     </section>

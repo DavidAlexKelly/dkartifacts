@@ -1,14 +1,18 @@
 /**
  * Foundry hosting, when there is any.
  *
- * The OSDK template's meta tags carry the enrollment URL, OAuth client and
- * redirect. When they are filled in, the studio reads its datasets from
- * Foundry with the signed-in user's token; when they are empty (local
- * development against a terrain-gen folder) it never touches OAuth at all.
+ * Three ways to get a token, in order:
  *
- * Scopes: dataset reads only. The datasets must ALSO be added as Resources on
- * the application in Developer Console, or every read returns 403 — the
- * scope alone is not enough.
+ *   OAuth        the OSDK template's meta tags (enrollment URL, client id,
+ *                redirect). The normal, hosted case.
+ *   dev token    VITE_FOUNDRY_TOKEN in .env.local, in `npm run dev` only:
+ *                a personal token for working locally against a real
+ *                enrollment, or "fake" against the dev fake-Foundry server.
+ *                Never read by a production build.
+ *   none         no Foundry at all: the studio reads local folders only.
+ *
+ * Scopes: dataset reads, ontology reads and writes. Every dataset and object
+ * type must ALSO be a Resource on the application in Developer Console.
  */
 import { createPublicOauthClient, type PublicOauthClient } from "@osdk/oauth";
 
@@ -21,20 +25,29 @@ function meta(name: string): string | null {
 
 export interface FoundryConfig {
   foundryUrl: string;
-  auth: PublicOauthClient;
+  getToken(): Promise<string>;
+  /** Present for OAuth; absent for a dev token. */
+  auth?: PublicOauthClient;
 }
 
+export const SCOPES = [
+  "api:use-datasets-read",
+  "api:use-ontologies-read",
+  "api:use-ontologies-write",
+];
+
 function create(): FoundryConfig | null {
-  const foundryUrl = meta("osdk-foundryUrl");
+  const foundryUrl = meta("osdk-foundryUrl")?.replace(/\/$/, "");
+  if (!foundryUrl) {return null;}
+  const devToken = import.meta.env.DEV ? (import.meta.env.VITE_FOUNDRY_TOKEN as string | undefined) : undefined;
+  if (devToken) {
+    return { foundryUrl, getToken: async () => devToken };
+  }
   const clientId = meta("osdk-clientId");
   const redirectUrl = meta("osdk-redirectUrl");
-  if (!foundryUrl || !clientId || !redirectUrl) {return null;}
-  return {
-    foundryUrl: foundryUrl.replace(/\/$/, ""),
-    auth: createPublicOauthClient(clientId, foundryUrl, redirectUrl, {
-      scopes: ["api:use-datasets-read"],
-    }),
-  };
+  if (!clientId || !redirectUrl) {return null;}
+  const auth = createPublicOauthClient(clientId, foundryUrl, redirectUrl, { scopes: SCOPES });
+  return { foundryUrl, auth, getToken: () => auth() };
 }
 
 export const foundry: FoundryConfig | null = create();
@@ -45,7 +58,7 @@ export const configuredCatalogRid: string | null = meta("studio-catalogRid");
 /** True on the OAuth redirect page, which must finish signing in first. */
 export function isAuthCallback(): boolean {
   const redirect = meta("osdk-redirectUrl");
-  if (!redirect) {return false;}
+  if (!redirect || !foundry?.auth) {return false;}
   try {
     return new URL(redirect).pathname === window.location.pathname;
   } catch {

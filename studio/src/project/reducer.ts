@@ -24,11 +24,14 @@ export type Action =
   | { type: "deleteFeatures"; layerId: string; ids: string[] }
   | { type: "addField"; layerId: string; field: string }
   | { type: "removeField"; layerId: string; field: string }
+  | { type: "setLayerData"; layerId: string; features: StudioFeature[]; fields: string[] }
+  | { type: "markCommitted"; layerId: string; keep?: string[] }
+  | { type: "replaceFeatures"; layerId: string; features: StudioFeature[] }
   | { type: "undo" }
   | { type: "redo" };
 
 /** Actions that do not go into the undo history. */
-const TRANSIENT = new Set<Action["type"]>(["setView"]);
+const TRANSIENT = new Set<Action["type"]>(["setView", "setLayerData", "markCommitted"]);
 const HISTORY_LIMIT = 100;
 
 export interface History {
@@ -46,6 +49,25 @@ function mapVector(p: Project, id: string, fn: (l: VectorLayerNode) => VectorLay
 
 function withFeatures(l: VectorLayerNode, features: StudioFeature[]): VectorLayerNode {
   return { ...l, data: { ...l.data, features } };
+}
+
+/** Record edits to a Foundry-backed layer so they can be committed as Actions. */
+function track(l: VectorLayerNode, kind: "created" | "modified" | "deleted", ids: string[]): VectorLayerNode {
+  if (l.backing?.kind !== "ontology-features") {return l;}
+  const p = l.pending ?? { created: [], modified: [], deleted: [] };
+  const created = new Set(p.created);
+  const modified = new Set(p.modified);
+  const deleted = new Set(p.deleted);
+  for (const id of ids) {
+    if (kind === "created") {created.add(id);}
+    else if (kind === "modified") {if (!created.has(id)) {modified.add(id);}}
+    else if (created.has(id)) {created.delete(id);} // never reached Foundry: nothing to delete
+    else {
+      modified.delete(id);
+      deleted.add(id);
+    }
+  }
+  return { ...l, pending: { created: [...created], modified: [...modified], deleted: [...deleted] } };
 }
 
 export function apply(p: Project, a: Action): Project {
@@ -84,28 +106,54 @@ export function apply(p: Project, a: Action): Project {
         layers: p.layers.map((l) => (l.id === a.id ? ({ ...l, ...a.patch } as LayerNode) : l)),
       };
     case "addFeature":
-      return mapVector(p, a.layerId, (l) => withFeatures(l, [...l.data.features, a.feature]));
+      return mapVector(p, a.layerId, (l) => track(withFeatures(l, [...l.data.features, a.feature]), "created", [a.feature.id]));
     case "setGeometry":
       return mapVector(p, a.layerId, (l) =>
-        withFeatures(l, l.data.features.map((f) => (f.id === a.featureId ? { ...f, geometry: a.geometry } : f))),
+        track(withFeatures(l, l.data.features.map((f) => (f.id === a.featureId ? { ...f, geometry: a.geometry } : f))), "modified", [a.featureId]),
       );
     case "setProperty":
       return mapVector(p, a.layerId, (l) =>
-        withFeatures(
-          l,
-          l.data.features.map((f) =>
-            f.id === a.featureId ? { ...f, properties: { ...f.properties, [a.field]: a.value } } : f,
+        track(
+          withFeatures(
+            l,
+            l.data.features.map((f) =>
+              f.id === a.featureId ? { ...f, properties: { ...f.properties, [a.field]: a.value } } : f,
+            ),
           ),
+          "modified",
+          [a.featureId],
         ),
       );
     case "deleteFeatures": {
       const ids = new Set(a.ids);
-      return mapVector(p, a.layerId, (l) => withFeatures(l, l.data.features.filter((f) => !ids.has(f.id))));
+      return mapVector(p, a.layerId, (l) => track(withFeatures(l, l.data.features.filter((f) => !ids.has(f.id))), "deleted", a.ids));
     }
+    case "replaceFeatures": {
+      // Several features changed at once (split, merge, paste): diff to track them.
+      return mapVector(p, a.layerId, (l) => {
+        const before = new Map(l.data.features.map((f) => [f.id, f]));
+        const after = new Set(a.features.map((f) => f.id));
+        let next = withFeatures(l, a.features);
+        next = track(next, "deleted", [...before.keys()].filter((id) => !after.has(id)));
+        next = track(next, "created", a.features.filter((f) => !before.has(f.id)).map((f) => f.id));
+        next = track(next, "modified", a.features.filter((f) => before.has(f.id) && before.get(f.id) !== f).map((f) => f.id));
+        return next;
+      });
+    }
+    case "setLayerData":
+      return mapVector(p, a.layerId, (l) => ({ ...withFeatures(l, a.features), fields: a.fields, pending: undefined }));
+    case "markCommitted":
+      // `keep`: ids whose actions failed stay pending, to retry.
+      return mapVector(p, a.layerId, (l) => {
+        if (!a.keep?.length || !l.pending) {return { ...l, pending: undefined };}
+        const keep = new Set(a.keep);
+        const pick = (ids: string[]) => ids.filter((id) => keep.has(id));
+        return { ...l, pending: { created: pick(l.pending.created), modified: pick(l.pending.modified), deleted: pick(l.pending.deleted) } };
+      });
     case "addField":
       return mapVector(p, a.layerId, (l) => (l.fields.includes(a.field) ? l : { ...l, fields: [...l.fields, a.field] }));
     case "removeField":
-      return mapVector(p, a.layerId, (l) => ({
+      return mapVector(p, a.layerId, (l) => track({
         ...withFeatures(
           l,
           l.data.features.map((f) => {
@@ -114,7 +162,7 @@ export function apply(p: Project, a: Action): Project {
           }),
         ),
         fields: l.fields.filter((f) => f !== a.field),
-      }));
+      }, "modified", l.data.features.map((f) => f.id)));
     default:
       return p;
   }
