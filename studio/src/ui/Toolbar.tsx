@@ -12,6 +12,10 @@ const TOOLS: Array<{ tool: Tool; label: string; hint: string }> = [
   { tool: "measure-line", label: "Distance", hint: "Measure a distance along a path" },
   { tool: "measure-area", label: "Area", hint: "Measure an area" },
   { tool: "profile", label: "Profile", hint: "Draw a line to see the terrain along it" },
+  { tool: "los", label: "Sight", hint: "Line of sight: click the observer, then the target" },
+  { tool: "route", label: "Route", hint: "Terrain-aware route: click the start, then the destination (needs the pathfinding graphs in Foundry)" },
+  { tool: "split", label: "Split", hint: "Draw a line across features of the active layer to split them; double-click to finish" },
+  { tool: "viewshed", label: "Viewshed", hint: "Click a point to see what can be seen from it (settings in the panel on the right)" },
 ];
 
 interface Props {
@@ -33,10 +37,25 @@ interface Props {
   onNew(): void;
   onOpen(file: File): void;
   onSave(): void;
+  foundryReady: boolean;
+  onOpenFoundry(): void;
+  onSaveFoundry(): void;
+  onOntology(): void;
   onImport(files: FileList): void;
   onExportPng(): void;
-  onExportLayer(format: "geojson" | "csv" | "kml"): void;
+  onExportLayer(format: "geojson" | "csv" | "kml" | "kmz" | "shapefile" | "geopackage"): void;
+  onAnalysis(tab: "processing" | "select" | "calculate" | "stats"): void;
+  onGoto(text: string): boolean;
+  onPrint(): void;
+  onCopy(): void;
+  onPaste(): void;
+  onMerge(): void;
+  onDelete(): void;
 }
+
+const EXPORTS = [
+  ["geojson", "GeoJSON"], ["csv", "CSV"], ["kml", "KML"], ["kmz", "KMZ"], ["shapefile", "Shapefile (.zip)"], ["geopackage", "GeoPackage"],
+] as const;
 
 function closeMenus() {
   document.querySelectorAll("details.menu[open]").forEach((d) => d.removeAttribute("open"));
@@ -56,18 +75,39 @@ export function Toolbar(p: Props) {
         <summary>Project</summary>
         <div className="menu-items">
           {item("New project", p.onNew)}
-          {item("Open project…", () => openInput.current?.click())}
-          {item("Save project", p.onSave, false, "Ctrl+S")}
+          {item("Open from Foundry…", p.onOpenFoundry, !p.foundryReady, p.foundryReady ? "Projects saved as MapProject objects" : "Foundry is not configured")}
+          {item("Save to Foundry", p.onSaveFoundry, !p.foundryReady, "Ctrl+S — saves the project as a MapProject object others can open")}
+          {item("Open project file…", () => openInput.current?.click())}
+          {item("Download project file", p.onSave)}
         </div>
       </details>
       <details className="menu">
         <summary>Data</summary>
         <div className="menu-items">
-          {item("Import file…", () => importInput.current?.click(), false, "GeoJSON, CSV, KML or GPX — or drop files on the map")}
-          {item("Export layer as GeoJSON", () => p.onExportLayer("geojson"), !p.hasVector)}
-          {item("Export layer as CSV", () => p.onExportLayer("csv"), !p.hasVector)}
-          {item("Export layer as KML", () => p.onExportLayer("kml"), !p.hasVector)}
-          {item("Export map as PNG", p.onExportPng, false, "The current view, with title, legend, scale bar and north arrow")}
+          {item("Add from the Ontology…", p.onOntology, !p.foundryReady, "Object types with a location, and editable feature collections")}
+          {item("Import file…", () => importInput.current?.click(), false, "GeoJSON, CSV, KML/KMZ, GPX, Shapefile, GeoPackage, DXF — or drop files on the map")}
+          {EXPORTS.map(([f, label]) => <span key={f}>{item(`Export layer as ${label}`, () => p.onExportLayer(f), !p.hasVector)}</span>)}
+          {item("Print / export map…", p.onPrint, false, "PDF or PNG at paper size and DPI: legend, scale bar, north arrow, grid, atlas")}
+          {item("Quick PNG of the view", p.onExportPng, false, "The current view, with title, legend, scale bar and north arrow")}
+        </div>
+      </details>
+      <details className="menu">
+        <summary>Edit</summary>
+        <div className="menu-items">
+          {item("Copy selected features", p.onCopy, false, "Ctrl+C")}
+          {item("Paste into the active layer", p.onPaste, false, "Ctrl+V")}
+          {item("Merge selected features", p.onMerge, false, "Into one feature, keeping the first one's attributes")}
+          {item("Delete selected features", p.onDelete, false, "Delete")}
+          {item("Check topology of the active layer…", () => p.onAnalysis("processing"), false, "Overlaps and gaps between polygons (Processing → Check topology)")}
+        </div>
+      </details>
+      <details className="menu">
+        <summary>Analysis</summary>
+        <div className="menu-items">
+          {item("Processing toolbox…", () => p.onAnalysis("processing"), false, "Buffer, clip, intersect, dissolve, spatial join, nearest, …")}
+          {item("Select by expression or location…", () => p.onAnalysis("select"))}
+          {item("Field calculator…", () => p.onAnalysis("calculate"))}
+          {item("Statistics…", () => p.onAnalysis("stats"))}
         </div>
       </details>
       <div className="sep" />
@@ -85,8 +125,11 @@ export function Toolbar(p: Props) {
       <button type="button" className={p.snapping ? "icon on" : "icon"} aria-pressed={p.snapping} onClick={() => p.onSnapping(!p.snapping)} title="Snap to vertices of the active layer"><Icon name="magnet" /></button>
       <button type="button" className={p.globe ? "icon on" : "icon"} aria-pressed={p.globe} onClick={() => p.onGlobe(!p.globe)} title="Globe projection"><Icon name="globe" /></button>
       <button type="button" className={p.tableOpen ? "icon on" : "icon"} aria-pressed={p.tableOpen} onClick={() => p.onTable(!p.tableOpen)} title="Attribute table"><Icon name="table" /></button>
+      <form className="goto" onSubmit={(e) => { e.preventDefault(); const input = (e.currentTarget.elements.namedItem("goto") as HTMLInputElement); if (p.onGoto(input.value)) {input.value = "";} }}>
+        <input name="goto" placeholder="Go to: 61.63 8.31 · 32V MP 63562 33868" aria-label="Go to coordinate" title="Decimal degrees, DMS, MGRS or UTM" />
+      </form>
       <input ref={openInput} type="file" accept=".json,.decho.json" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) {p.onOpen(f);} e.target.value = ""; }} />
-      <input ref={importInput} type="file" multiple accept=".geojson,.json,.csv,.tsv,.txt,.kml,.gpx" hidden onChange={(e) => { if (e.target.files?.length) {p.onImport(e.target.files);} e.target.value = ""; }} />
+      <input ref={importInput} type="file" multiple accept=".geojson,.json,.csv,.tsv,.txt,.kml,.kmz,.gpx,.shp,.shx,.dbf,.prj,.cpg,.zip,.gpkg,.dxf" hidden onChange={(e) => { if (e.target.files?.length) {p.onImport(e.target.files);} e.target.value = ""; }} />
     </header>
   );
 }

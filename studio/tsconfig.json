@@ -12,7 +12,15 @@
     "skipLibCheck": true,
     "isolatedModules": true,
     "resolveJsonModule": true,
-    "types": ["vite/client"]
+    "types": ["vite/client"],
+    "baseUrl": ".",
+    "paths": {
+      "@acc/decho-pathfinding": ["../packages/decho-pathfinding/src/index.ts"],
+      "@acc/decho-foundry-bytes": ["../packages/decho-foundry-bytes/src/index.ts"],
+      "@osdk/client": ["node_modules/@osdk/client"],
+      "@osdk/foundry.datasets": ["node_modules/@osdk/foundry.datasets"],
+      "@osdk/foundry.mediasets": ["node_modules/@osdk/foundry.mediasets"]
+    }
   },
-  "include": ["src", "test", "vite.config.ts"]
+  "include": ["src", "test", "dev", "vite.config.ts"]
 }

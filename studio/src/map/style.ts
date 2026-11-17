@@ -17,8 +17,11 @@ import type {
 import type { CatalogEntry } from "../data/library";
 import type { LayerManifest } from "../data/manifest";
 import type { CatalogLayerNode, Project, VectorLayerNode } from "../project/types";
+import { aspectSource, slopeSource } from "../analysis/derivedtiles";
+import { decorate, modeOf } from "./symbology";
 
 export const OVERLAY = "__overlay";
+export const GRID = "__grid";
 
 export interface StyleContext {
   entries: Map<string, CatalogEntry>;
@@ -28,6 +31,24 @@ export interface StyleContext {
   selection: { layerId: string; featureIds: string[] } | null;
   background: string;
 }
+
+/**
+ * Heights to colours: sea, green lowland, through dry upland and brown rock,
+ * to snow. Voids are sea level in Terrarium, so 0 m reads as water.
+ */
+export const RELIEF_RAMP: ExpressionSpecification = [
+  "interpolate", ["linear"], ["elevation"],
+  -500, "#6f9fc6",
+  0, "#a9cbe4",
+  1, "#a7c98f",
+  200, "#c4d89a",
+  600, "#e2dca5",
+  1000, "#d9c08f",
+  1500, "#bf9f7c",
+  2000, "#a7927f",
+  2400, "#d8d3ce",
+  3200, "#ffffff",
+];
 
 export function layerIdOf(styleLayerId: string): string | null {
   const i = styleLayerId.indexOf("::");
@@ -118,18 +139,26 @@ function catalogLayers(node: CatalogLayerNode, ctx: StyleContext, sources: Recor
       const elev = enc.elevationProperty ?? "ELEV";
       const isIndex: ExpressionSpecification = ["==", ["get", enc.indexProperty ?? "index"], true];
       const color = o.color ?? "#8a5a2b";
+      // Index lines at every zoom; the rest only from z11, where there is
+      // room for them. Below that, 20 m contours in steep terrain are a
+      // solid brown fill rather than lines.
       out.push({
-        id: id("lines"), type: "line", source: id("src"), "source-layer": sl,
+        id: id("lines"), type: "line", source: id("src"), "source-layer": sl, filter: ["!", isIndex], minzoom: 11,
+        layout: { visibility: vis, "line-join": "round" },
+        paint: { "line-color": color, "line-opacity": 0.5 * node.opacity, "line-width": (o.width ?? 1) * 0.7 },
+      });
+      out.push({
+        id: id("index"), type: "line", source: id("src"), "source-layer": sl, filter: isIndex,
         layout: { visibility: vis, "line-join": "round" },
         paint: {
           "line-color": color,
-          "line-opacity": ["case", isIndex, 0.9 * node.opacity, 0.55 * node.opacity],
-          "line-width": ["case", isIndex, (o.width ?? 1) * 1.6, (o.width ?? 1) * 0.7],
+          "line-opacity": 0.85 * node.opacity,
+          "line-width": ["interpolate", ["linear"], ["zoom"], 8, (o.width ?? 1) * 0.6, 12, (o.width ?? 1) * 1.6],
         },
       });
       if (ctx.glyphs && o.labels !== false) {
         out.push({
-          id: id("labels"), type: "symbol", source: id("src"), "source-layer": sl, filter: isIndex, minzoom: 11,
+          id: id("labels"), type: "symbol", source: id("src"), "source-layer": sl, filter: isIndex, minzoom: 10,
           layout: {
             visibility: vis, "symbol-placement": "line", "text-field": ["concat", ["to-string", ["get", elev]], " m"],
             "text-font": ["Noto Sans Regular"], "text-size": 10,
@@ -146,8 +175,18 @@ function catalogLayers(node: CatalogLayerNode, ctx: StyleContext, sources: Recor
       return;
     }
     case "raster-dem": {
+      if (o.hillshade !== false || o.relief !== false) {sources[id("hs")] = tileSource(node, m, "raster-dem");}
+      if (o.relief !== false) {
+        // Colour by height (hypsometric tint), under the shading.
+        out.push({
+          id: id("relief"), type: "color-relief", source: id("hs"), layout: { visibility: vis },
+          paint: {
+            "color-relief-color": RELIEF_RAMP,
+            "color-relief-opacity": 0.85 * node.opacity,
+          },
+        } as LayerSpecification);
+      }
       if (o.hillshade !== false) {
-        sources[id("hs")] = tileSource(node, m, "raster-dem");
         out.push({
           id: id("hillshade"), type: "hillshade", source: id("hs"), layout: { visibility: vis },
           paint: {
@@ -157,6 +196,15 @@ function catalogLayers(node: CatalogLayerNode, ctx: StyleContext, sources: Recor
             "hillshade-accent-color": "#5a5a5a",
           },
         });
+      }
+      const { maxzoom } = zoomRange(m);
+      if (o.slope) {
+        sources[id("slope")] = slopeSource(node.catalogId, maxzoom);
+        out.push({ id: id("slope"), type: "raster", source: id("slope"), minzoom: 8, layout: { visibility: vis }, paint: { "raster-opacity": 0.75 * node.opacity, "raster-resampling": "nearest" } });
+      }
+      if (o.aspect) {
+        sources[id("aspect")] = aspectSource(node.catalogId, maxzoom);
+        out.push({ id: id("aspect"), type: "raster", source: id("aspect"), minzoom: 8, layout: { visibility: vis }, paint: { "raster-opacity": 0.6 * node.opacity } });
       }
       if (o.terrain3d && node.visible) {
         sources[id("dem")] = tileSource(node, m, "raster-dem");
@@ -201,31 +249,76 @@ const isPolygon: ExpressionSpecification = ["match", ["geometry-type"], ["Polygo
 const isLine: ExpressionSpecification = ["match", ["geometry-type"], ["LineString", "MultiLineString"], true, false];
 const isPoint: ExpressionSpecification = ["match", ["geometry-type"], ["Point", "MultiPoint"], true, false];
 
-function vectorLayers(node: VectorLayerNode, ctx: StyleContext, sources: Record<string, SourceSpecification>, out: LayerSpecification[]) {
+/** A date-ish value in ms, or null: numbers (epoch s or ms), ISO strings, Dates. */
+export function timeValue(v: unknown): number | null {
+  if (v === null || v === undefined || v === "") {return null;}
+  if (typeof v === "number") {return v < 1e11 ? v * 1000 : v;}
+  const t = Date.parse(String(v));
+  return Number.isNaN(t) ? null : t;
+}
+
+function vectorLayers(node: VectorLayerNode, ctx: StyleContext, sources: Record<string, SourceSpecification>, out: LayerSpecification[], timeWindow: [number, number] | null | undefined) {
   const src = `${node.id}::src`;
-  sources[src] = {
-    type: "geojson",
-    data: {
-      type: "FeatureCollection",
-      features: node.data.features.map((f) => ({ ...f, properties: { ...f.properties, __fid: f.id } })),
-    },
-  };
+  let features = node.data.features;
+  if (node.timeField && timeWindow) {
+    const [a, b] = timeWindow;
+    features = features.filter((f) => {
+      const t = timeValue(f.properties[node.timeField!]);
+      return t !== null && t >= a && t <= b;
+    });
+  }
+  sources[src] = { type: "geojson", data: { type: "FeatureCollection", features: decorate(node, features) } };
   const vis = node.visible ? "visible" : "none";
   const s = node.style;
-  const color = colorExpression(node);
   const op = node.opacity;
+  const zoom = { ...(node.minZoom !== undefined ? { minzoom: node.minZoom } : {}), ...(node.maxZoom !== undefined ? { maxzoom: node.maxZoom } : {}) };
+  const color: ExpressionSpecification = ["get", "__c"];
+  const mode = modeOf(s);
+  const marker = s.marker ?? "circle";
+  const outlineColor = mode === "single" ? s.strokeColor : color;
+
+  if (mode === "heatmap") {
+    const h = s.heatmap ?? { radius: 20, intensity: 1 };
+    out.push({
+      id: `${node.id}::heat`, type: "heatmap", source: src, filter: isPoint, layout: { visibility: vis }, ...zoom,
+      paint: {
+        "heatmap-weight": ["get", "__k"],
+        "heatmap-radius": h.radius,
+        "heatmap-intensity": h.intensity,
+        "heatmap-opacity": op,
+        "heatmap-color": ["interpolate", ["linear"], ["heatmap-density"], 0, "rgba(33,102,172,0)", 0.2, "rgb(103,169,207)", 0.4, "rgb(209,229,240)", 0.6, "rgb(253,219,199)", 0.8, "rgb(239,138,98)", 1, "rgb(178,24,43)"],
+      },
+    });
+  }
+  if (s.extrude) {
+    out.push({
+      id: `${node.id}::extrude`, type: "fill-extrusion", source: src, filter: isPolygon, layout: { visibility: vis }, ...zoom,
+      paint: { "fill-extrusion-color": color, "fill-extrusion-height": ["get", "__h"], "fill-extrusion-opacity": Math.max(0.1, 0.85 * op) },
+    });
+  } else {
+    out.push({ id: `${node.id}::fill`, type: "fill", source: src, filter: isPolygon, layout: { visibility: vis }, ...zoom, paint: { "fill-color": color, "fill-opacity": s.fillOpacity * op } });
+  }
   out.push(
-    { id: `${node.id}::fill`, type: "fill", source: src, filter: isPolygon, layout: { visibility: vis }, paint: { "fill-color": color, "fill-opacity": s.fillOpacity * op } },
-    { id: `${node.id}::outline`, type: "line", source: src, filter: isPolygon, layout: { visibility: vis, "line-join": "round" }, paint: { "line-color": s.categorize ? color : s.strokeColor, "line-width": s.strokeWidth, "line-opacity": op } },
-    { id: `${node.id}::line`, type: "line", source: src, filter: isLine, layout: { visibility: vis, "line-join": "round", "line-cap": "round" }, paint: { "line-color": color, "line-width": s.strokeWidth, "line-opacity": op } },
-    { id: `${node.id}::point`, type: "circle", source: src, filter: isPoint, layout: { visibility: vis }, paint: { "circle-color": color, "circle-radius": s.radius, "circle-opacity": op, "circle-stroke-color": "#ffffff", "circle-stroke-width": 1.5, "circle-stroke-opacity": op } },
+    { id: `${node.id}::outline`, type: "line", source: src, filter: isPolygon, layout: { visibility: vis, "line-join": "round" }, ...zoom, paint: { "line-color": outlineColor, "line-width": s.strokeWidth, "line-opacity": op } },
+    { id: `${node.id}::line`, type: "line", source: src, filter: isLine, layout: { visibility: vis, "line-join": "round", "line-cap": "round" }, ...zoom, paint: { "line-color": color, "line-width": ["get", "__w"], "line-opacity": op } },
   );
+  if (mode !== "heatmap") {
+    if (marker === "circle") {
+      out.push({ id: `${node.id}::point`, type: "circle", source: src, filter: isPoint, layout: { visibility: vis }, ...zoom, paint: { "circle-color": color, "circle-radius": ["get", "__r"], "circle-opacity": op, "circle-stroke-color": "#ffffff", "circle-stroke-width": 1.5, "circle-stroke-opacity": op } });
+    } else {
+      out.push({
+        id: `${node.id}::point`, type: "symbol", source: src, filter: ["all", isPoint, ["!=", ["get", "__i"], ""]], ...zoom,
+        layout: { visibility: vis, "icon-image": ["get", "__i"], "icon-allow-overlap": true, "icon-ignore-placement": true },
+        paint: { "icon-opacity": op },
+      });
+    }
+  }
   if (s.labelField && ctx.glyphs) {
     out.push({
-      id: `${node.id}::label`, type: "symbol", source: src,
+      id: `${node.id}::label`, type: "symbol", source: src, ...zoom,
       layout: {
         visibility: vis, "text-field": ["to-string", ["get", s.labelField]], "text-font": ["Noto Sans Regular"],
-        "text-size": s.labelSize, "text-offset": [0, 1.2], "text-anchor": "top", "symbol-placement": "point",
+        "text-size": s.labelSize, "text-offset": [0, marker === "milsymbol" ? 2 : 1.2], "text-anchor": "top", "symbol-placement": "point",
       },
       paint: { "text-color": "#222", "text-halo-color": "#fff", "text-halo-width": 1.5, "text-opacity": op },
     });
@@ -235,8 +328,29 @@ function vectorLayers(node: VectorLayerNode, ctx: StyleContext, sources: Record<
     out.push(
       { id: `${node.id}::sel-fill`, type: "fill", source: src, filter: ["all", isPolygon, sel], paint: { "fill-color": "#ffd400", "fill-opacity": 0.35 } },
       { id: `${node.id}::sel-line`, type: "line", source: src, filter: ["all", ["!", isPoint], sel], paint: { "line-color": "#ffd400", "line-width": s.strokeWidth + 3 } },
-      { id: `${node.id}::sel-point`, type: "circle", source: src, filter: ["all", isPoint, sel], paint: { "circle-color": "#ffd400", "circle-radius": s.radius + 3, "circle-stroke-color": "#000", "circle-stroke-width": 1 } },
+      { id: `${node.id}::sel-point`, type: "circle", source: src, filter: ["all", isPoint, sel], paint: { "circle-color": "rgba(0,0,0,0)", "circle-radius": ["+", ["get", "__r"], 4], "circle-stroke-color": "#ffd400", "circle-stroke-width": 3 } },
     );
+  }
+}
+
+function gridLayers(ctx: StyleContext, sources: Record<string, SourceSpecification>, out: LayerSpecification[]) {
+  // Data is pushed by the app on every move (it depends on the view).
+  sources[GRID] = { type: "geojson", data: { type: "FeatureCollection", features: [] } };
+  const level = ["get", "level"] as unknown as ExpressionSpecification;
+  out.push({
+    id: `${GRID}::lines`, type: "line", source: GRID, filter: ["==", ["geometry-type"], "LineString"],
+    paint: {
+      "line-color": ["match", level, "gzd", "#1b3a8a", "100km", "#1d4fd8", "#3b6fe0"],
+      "line-width": ["match", level, "gzd", 2, "100km", 1.4, "10km", 0.9, 0.6],
+      "line-opacity": 0.75,
+    },
+  });
+  if (ctx.glyphs) {
+    out.push({
+      id: `${GRID}::labels`, type: "symbol", source: GRID, filter: ["==", ["geometry-type"], "Point"],
+      layout: { "text-field": ["get", "label"], "text-font": ["Noto Sans Regular"], "text-size": ["match", level, "gzd", 14, "100km", 13, 11], "text-allow-overlap": false },
+      paint: { "text-color": "#1b3a8a", "text-halo-color": "#ffffff", "text-halo-width": 1.6 },
+    });
   }
 }
 
@@ -245,7 +359,8 @@ function overlayLayers(ctx: StyleContext, sources: Record<string, SourceSpecific
   const role = (r: string): ExpressionSpecification => ["==", ["get", "role"], r];
   out.push(
     { id: `${OVERLAY}::fill`, type: "fill", source: OVERLAY, filter: ["all", isPolygon, ["!=", ["get", "role"], "handle"]], paint: { "fill-color": "#ff5a00", "fill-opacity": 0.15 } },
-    { id: `${OVERLAY}::line`, type: "line", source: OVERLAY, filter: ["!", isPoint], paint: { "line-color": "#ff5a00", "line-width": 2.5, "line-dasharray": [2, 1] } },
+    { id: `${OVERLAY}::line`, type: "line", source: OVERLAY, filter: ["all", ["!", isPoint], ["!", ["in", ["get", "role"], ["literal", ["los-visible", "los-hidden"]]]]], paint: { "line-color": "#ff5a00", "line-width": 2.5, "line-dasharray": [2, 1] } },
+    { id: `${OVERLAY}::los`, type: "line", source: OVERLAY, filter: ["in", ["get", "role"], ["literal", ["los-visible", "los-hidden"]]], layout: { "line-cap": "round" }, paint: { "line-color": ["match", ["get", "role"], "los-visible", "#1aa64b", "#d7263d"], "line-width": 5 } },
     { id: `${OVERLAY}::vertex`, type: "circle", source: OVERLAY, filter: role("vertex"), paint: { "circle-color": "#ff5a00", "circle-radius": 4, "circle-stroke-color": "#fff", "circle-stroke-width": 1.5 } },
     { id: `${OVERLAY}::mid`, type: "circle", source: OVERLAY, filter: role("mid"), paint: { "circle-color": "#ffffff", "circle-radius": 3.5, "circle-stroke-color": "#ff5a00", "circle-stroke-width": 1.5 } },
     { id: `${OVERLAY}::handle`, type: "circle", source: OVERLAY, filter: role("handle"), paint: { "circle-color": "#ffffff", "circle-radius": 5.5, "circle-stroke-color": "#ff5a00", "circle-stroke-width": 2 } },
@@ -261,8 +376,9 @@ export function buildStyle(project: Project, ctx: StyleContext): StyleSpecificat
   const extra: Partial<StyleSpecification> = {};
   for (const node of project.layers) {
     if (node.kind === "catalog") {catalogLayers(node, ctx, sources, layers, extra);}
-    else {vectorLayers(node, ctx, sources, layers);}
+    else {vectorLayers(node, ctx, sources, layers, project.timeWindow);}
   }
+  if (project.grid && project.grid !== "none") {gridLayers(ctx, sources, layers);}
   overlayLayers(ctx, sources, layers);
   return {
     version: 8,

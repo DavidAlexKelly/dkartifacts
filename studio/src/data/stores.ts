@@ -62,7 +62,7 @@ export class FoundryDatasetStore implements FileStore {
     const url =
       `${this.config.foundryUrl}/api/v2/datasets/${encodeURIComponent(this.datasetRid)}` +
       `/files/${encodeURIComponent(path)}/content?branchName=${encodeURIComponent(this.branch)}`;
-    const token = await this.config.auth();
+    const token = await this.config.getToken();
     const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` }, signal });
     if (res.status === 404) {return null;}
     if (res.status === 401 || res.status === 403) {

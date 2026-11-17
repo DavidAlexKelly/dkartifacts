@@ -3,6 +3,7 @@ import { createReadStream, existsSync, statSync } from "node:fs";
 import { extname, resolve, sep } from "node:path";
 import react from "@vitejs/plugin-react";
 import { defineConfig, loadEnv, type Plugin } from "vite";
+import { fakeFoundry } from "./dev/fake-foundry";
 
 /**
  * Serve a local terrain-gen output folder at /data/ during development, so
@@ -40,9 +41,27 @@ function localData(dir: string | undefined): Plugin {
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
+  const pkg = (name: string) => resolve(__dirname, "../packages", name, "src/index.ts");
   return {
-    plugins: [react(), localData(env.STUDIO_DATA)],
+    resolve: {
+      // The repo's own packages, used from source (routing).
+      alias: {
+        "@acc/decho-pathfinding": pkg("decho-pathfinding"),
+        "@acc/decho-foundry-bytes": pkg("decho-foundry-bytes"),
+      },
+      // Their own imports resolve from the studio's node_modules.
+      dedupe: ["@osdk/client", "@osdk/foundry.datasets", "@osdk/foundry.mediasets"],
+    },
+    plugins: [
+      react(),
+      localData(env.STUDIO_DATA),
+      fakeFoundry({ enabled: env.STUDIO_FAKE_FOUNDRY === "1", dataDir: env.STUDIO_DATA, statePath: env.STUDIO_FAKE_STATE }),
+    ],
     server: { port: 8080 },
+    // Libraries the app loads lazily. Pre-bundled so the dev server does not
+    // discover them mid-session and reload the page (which would, say, kill a
+    // print in progress). Production builds are unaffected.
+    optimizeDeps: { include: ["jspdf", "milsymbol", "proj4", "mgrs", "sql.js", "@turf/turf"] },
     build: { chunkSizeWarningLimit: 2000 },
     test: { environment: "jsdom" },
   };

@@ -1,95 +1,104 @@
 # Decho Studio
 
-A browser GIS over Foundry, in the spirit of QGIS. It reads the map datasets
-that [`terrain-gen`](../terrain-gen) builds (the `decho-layer/1` format: a
-catalog, one manifest per layer, chunked PMTiles archives) and lets you
-compose, style, draw, edit, measure and export maps on top of them. The map
-makes no external network calls: tiles, terrain, contours, glyphs and sprites
-all come from the catalog's datasets.
+A browser GIS over Foundry, in the spirit of QGIS and ArcGIS. It reads the map
+datasets that [`terrain-gen`](../terrain-gen) builds (the `decho-layer/1`
+format) and your Ontology, and lets you compose, style, analyse, edit, print
+and share maps on top of them. The map itself makes no external network
+calls: tiles, terrain, contours, glyphs and sprites all come from Foundry
+datasets.
 
 ## What it does
 
 | | |
 |---|---|
-| **Catalog** | Open a catalog from a Foundry dataset RID, or from a folder URL for local work. Every layer is listed with its kind, size and file count; add one to the map with a click. A fresh project starts with the basemap, terrain and contours. |
-| **Layers** | Layer tree with visibility, opacity, reordering, zoom-to and remove. Catalog layers: basemap (five Protomaps styles), terrain (hillshade and 3D terrain with exaggeration), contours (colour, width, height labels), raster overlays, DEM-cell footprints. |
-| **Vector data** | Import GeoJSON, CSV (lat/lon or WKT columns), KML and GPX by menu or by dropping files on the map. Style by single colour or categorised by a field, with labels. |
-| **Editing** | Draw points, lines and polygons; select (shift adds); drag vertices, drag a midpoint to insert one, alt-click to delete one; snapping to the active layer's vertices; Delete removes the selection. Editable attribute table: filter, sort, edit cells, add and remove fields. Undo and redo for everything (Ctrl+Z / Ctrl+Shift+Z). |
-| **Analysis** | Identify (features under the cursor, plus the height there). Distance and area measurement. Elevation profile along a drawn line, with range and total climb. Cursor coordinates and height in the status bar. |
-| **Output** | Save and open projects (`.decho.json`; autosaved in the browser too). Export the active layer as GeoJSON, CSV (WKT geometry) or KML. Export the map as a PNG with title, legend, scale bar, north arrow and attributions. |
+| **Data** | Paste a dataset ID into **Add data** and it becomes a layer; its own `manifest.json` says what it is (terrain, hillshade, contours, imagery, vector tiles, DEM cells, basemap). The `assets` dataset turns labels on. The older chunked planet basemap and glyph bundle already in Foundry work as they are. A tabular dataset with lat/lon or WKT columns becomes a point/shape layer. **Data → Add from the Ontology:** any object type with a geopoint/geoshape as a read-only layer, or an editable **feature collection**. Import GeoJSON, CSV, KML/KMZ, GPX, Shapefile (loose or zipped), GeoPackage and DXF, with reprojection from the file's CRS (or a prompt when it has none). An optional catalog lists many datasets under one ID. |
+| **Styling** | Single, categorized, graduated (natural breaks, quantile, equal interval, standard deviation; colour ramps), rule-based (any expression) and heatmap. Proportional symbol sizes, marker shapes, **APP-6D / MIL-STD-2525 symbols** from a SIDC field, labels, 3D extrusion, zoom ranges, a **time slider** for layers with a time field, save/load styles. Terrain: colour by height, hillshade, slope classes, aspect, 3D terrain. Basemap: five styles. |
+| **Analysis** | **Processing toolbox** (buffer, clip, difference, intersect, union, dissolve, spatial join, nearest, points in polygons, centroids, hulls, bounding boxes, simplify, points along lines, split, merge, topology check) with run history and "selected features only". **Select** by expression or location; **field calculator**; **statistics**. Terrain: identify height, elevation **profile**, **line of sight**, **viewshed** (curvature and refraction included), slope/aspect. **Terrain-aware routing** over the Foundry pathfinding graphs (tracked, wheeled, foot). Distance and area measurement. |
+| **Editing** | Draw points, lines and polygons; drag vertices, insert at midpoints, alt-click to delete; snapping to vertices and edges; split with a line, merge, copy/paste; editable attribute table and a **feature form** checked against per-field rules (type, required, allowed values). Undo/redo for everything. Edits to Foundry collections are committed as **Actions**. |
+| **Coordinates** | Readout in decimal, DMS, DDM, **MGRS** or UTM; **go to** any of those; lat/lon or **MGRS grid** over the map. |
+| **Output** | **Save to Foundry** (projects are MapProject objects others can open), or download/open project files. Export layers as GeoJSON, CSV, KML, KMZ, Shapefile or GeoPackage. **Print** PDF/PNG on A4–A2, Letter or Tabloid at up to 300 dpi with legend, scale bar, north arrow, lat/lon or MGRS frame grid, overview and notes; **atlas** mode prints a page per feature. |
 
-## How it reads the data
+## Setting up Foundry
 
-```
-catalog.json ──► layer entry ──► manifest.json ──► pathForTile(z,x,y) ──► archive.pmtiles ──► tile
-```
-
-- **One catalog RID** configures everything. Each catalog entry names the
-  dataset (Foundry) or folder (HTTP) holding that layer.
-- **The resolver** (`src/data/manifest.ts`) is a port of decho-basemap's
-  `manifestResolver`. A test runs it over tiles that terrain-gen chunked and
-  checks that both put every tile in the same archive.
-- **Whole-file reads, cached by content.** Foundry ignores HTTP Range, so an
-  archive is downloaded whole. Archives are kept in an in-memory LRU and in
-  Cache Storage **keyed by the `sha256` the manifest declares**, after checking
-  the downloaded bytes against it. A rebuilt dataset therefore re-downloads
-  only the archives whose bytes changed.
-- **MapLibre protocols** (`decho://`, `decho-glyphs://`, `decho-sprite://`)
-  serve tiles, glyphs and sprites from the catalog, so the style never names a
-  network URL.
-- **The project is the source of truth.** The map style is rebuilt from it on
-  every change and applied with MapLibre's style diff, which is what makes
-  undo, save and export exact.
+1. Register an OSDK application in Developer Console with the scopes
+   `api:use-datasets-read`, `api:use-ontologies-read` and
+   `api:use-ontologies-write`.
+2. For saved projects and editable collections, create the object types and
+   actions in **[ONTOLOGY.md](ONTOLOGY.md)** (two object types, six actions).
+3. Add **every** dataset, object type and action you will use as a Resource
+   on the app. Scopes alone return 403; the error names the resource.
+4. Copy `.env.example` to `.env` and fill in `VITE_FOUNDRY_API_URL`,
+   `VITE_FOUNDRY_CLIENT_ID` and `VITE_FOUNDRY_REDIRECT_URL` (and the
+   `VITE_ONTOLOGY…` names if yours differ from ONTOLOGY.md, and
+   `VITE_PATHFINDING_DATASET` if the routing graphs are not the default).
+5. `npm run build` and host `dist/` like the repo's other OSDK app. The
+   CSP must allow `'wasm-unsafe-eval'` for GeoPackage import/export.
 
 ## Run it locally
 
 ```bash
 cd studio
 npm install
-STUDIO_DATA=../terrain-gen/out npm run dev     # serves that folder at /data/
+STUDIO_DATA=../terrain-gen/out npm run dev        # http://localhost:8080
 ```
 
-Open http://localhost:8080. It connects to `/data/` by default; another folder
-or a Foundry catalog can be opened from the Catalog panel, or with
-`?data=<url>` / `?catalog=<rid>` in the address. `?fresh` ignores the
-autosaved project.
+Add layers by folder URL (`/data/terrain/`, `/data/contours/`, `/data/assets/`).
 
-## Host it on Foundry
+**Everything Foundry-side, without an enrollment.** A fake Foundry in the dev
+server implements the Ontology contract, Actions, dataset files and tables:
 
-1. Register an OSDK application in Developer Console with the
-   `api:use-datasets-read` scope.
-2. Add **every** dataset as a Resource on the app: the catalog and each layer
-   in it. The scope alone returns 403. The error message names the dataset.
-3. Copy `.env.example` to `.env` and fill in `VITE_FOUNDRY_API_URL`,
-   `VITE_FOUNDRY_CLIENT_ID`, `VITE_FOUNDRY_REDIRECT_URL` and, optionally,
-   `VITE_STUDIO_CATALOG_RID`.
-4. `npm run build` and host `dist/` the way the repo's other OSDK app is
-   hosted. The redirect URL's path is handled by the app itself.
+```bash
+cat > .env.local <<'ENV'
+VITE_FOUNDRY_API_URL=http://localhost:8080/fake-foundry
+VITE_FOUNDRY_TOKEN=fake
+ENV
+npx vite-node dev/make-test-graph.ts ../terrain-gen/out/pathgraph   # optional: a routing graph
+STUDIO_FAKE_FOUNDRY=1 STUDIO_DATA=../terrain-gen/out npm run dev
+```
 
-The catalog needs dataset RIDs: after uploading terrain-gen's folders, rebuild
-it with `python -m terrain_gen catalog --rids rids.json` and upload
-`out/catalog`.
+Each folder is served as a dataset; their fake IDs are printed at start-up and
+listed at `/fake-foundry/fake/rids`. Two made-up object types (Airfield,
+TrainingArea) stand in for your Ontology. `VITE_FOUNDRY_TOKEN` also works
+against a real enrollment in development (a personal token); production builds
+never read it.
+
+## How it works
+
+- **Datasets describe themselves.** `dataset ID → manifest.json →
+  pathForTile(z,x,y) → archive.pmtiles → tile`. The resolver is a port of
+  decho-basemap's and is tested against terrain-gen's own output.
+- **Cached by content.** Foundry ignores HTTP Range, so archives are read
+  whole, verified against the manifest's `sha256`, and cached under that hash:
+  a rebuilt dataset re-downloads only what changed.
+- **The project is the source of truth.** The map style is rebuilt from it and
+  applied by diff; symbology is computed per feature in JavaScript so styles
+  can use the full expression language. That's what makes undo, save, print
+  and export exact.
+- **Foundry-backed layers** store where their features come from, not the
+  features; edits are tracked (created/modified/deleted) and committed as
+  Actions, with refused ones kept for retry.
+- **Heavy code loads on demand**: GeoPackage (SQLite as WebAssembly), CRS
+  support (proj4), PDF (jsPDF), routing, military symbols.
 
 ## Check it
 
 ```bash
-npm test          # resolver vs terrain-gen, history, geometry, formats, style
+npm test          # 171 tests: resolver vs terrain-gen, Ontology flows against the fake,
+                  # history, geometry, analysis, formats, coordinates, print, symbology
 npm run build     # typecheck + production build
 ```
 
-## Limits, for now
+## Limits
 
-- **Projects and edits live in the browser and in files.** Nothing is written
-  back to Foundry yet: that needs a write path (Ontology Actions or dataset
-  transactions) and is the next step.
-- **Labels need the assets layer** (`terrain-gen assets`). Without it, label
-  options are disabled rather than broken.
-- **Web Mercator and globe only.** Data in other projections must be
-  reprojected before import.
-- **Vector layers are held in memory,** which is fine to roughly 100k features.
-  Bigger data belongs in a tiled catalog layer.
-- **Not yet tested against a live Foundry enrollment.** The Foundry store and
-  OAuth flow follow the repo's existing OSDK app. Everything else has been run
-  in a browser against real terrain-gen output (GLO-90 over Jotunheimen).
-  Neither the basemap nor the assets were available in that environment, so
-  the basemap and label paths have only been checked by the unit tests.
+- **Not yet run against a live enrollment.** The Ontology client, dataset
+  reads and OAuth follow Foundry's v2 API and the repo's existing app, and are
+  tested end to end against the fake, but the real thing may differ in
+  details (for example, geoshape parameter formats).
+- **Web Mercator and globe only** for display; data in other CRSs is
+  reprojected on import.
+- **Vector layers are held in memory** (fine to roughly 100k features). Bigger
+  data belongs in a tiled dataset (terrain-gen `vector`).
+- **Analysis runs in the browser**, without a spatial index: joins and
+  nearest-feature slow down past a few thousand features.
+- **Routing** has been tested on a synthetic graph, not the real one.
+- **Print:** PDF text uses Helvetica (no CJK); the overview has no coastlines.

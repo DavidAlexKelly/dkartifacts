@@ -7,19 +7,27 @@ interface Props {
   layers: LayerNode[];
   activeId: string | null;
   errors: Map<string, string>;
+  status: Map<string, { text: string; error?: boolean; busy?: boolean }>;
+  /** What a dataset layer is, for its subtitle ("terrain", "contours"…). */
+  kindOf(catalogId: string): string;
   onActivate(id: string): void;
   onZoomTo(node: LayerNode): void;
   onNewLayer(): void;
   dispatch: Dispatch<Action>;
 }
 
-function kindLabel(node: LayerNode): string {
-  if (node.kind === "vector") {return `${node.data.features.length} feature${node.data.features.length === 1 ? "" : "s"}`;}
-  return "catalog";
+function kindLabel(node: LayerNode, kindOf: (id: string) => string): string {
+  if (node.kind === "vector") {
+    const n = `${node.data.features.length} feature${node.data.features.length === 1 ? "" : "s"}`;
+    const pending = node.pending ? node.pending.created.length + node.pending.modified.length + node.pending.deleted.length : 0;
+    const source = !node.backing ? "" : node.backing.kind === "ontology-features" ? " · Foundry" : node.backing.kind === "ontology" ? " · Ontology, read-only" : " · dataset, read-only";
+    return `${n}${source}${pending ? ` · ${pending} unsaved` : ""}`;
+  }
+  return kindOf(node.catalogId);
 }
 
 /** The layer tree, top of the map first (the project stores bottom first). */
-export function LayersPanel({ layers, activeId, errors, onActivate, onZoomTo, onNewLayer, dispatch }: Props) {
+export function LayersPanel({ layers, activeId, errors, status, kindOf, onActivate, onZoomTo, onNewLayer, dispatch }: Props) {
   const ordered = [...layers].reverse();
   return (
     <section className="panel" aria-label="Layers">
@@ -27,10 +35,11 @@ export function LayersPanel({ layers, activeId, errors, onActivate, onZoomTo, on
         <h2>Layers</h2>
         <button type="button" className="small" onClick={onNewLayer} title="An empty layer to draw into"><Icon name="plus" size={14} /> New layer</button>
       </div>
-      {ordered.length === 0 && <p className="empty">No layers yet. Add some from the catalog below, or import a file.</p>}
+      {ordered.length === 0 && <p className="empty">No layers yet. Paste a dataset ID below to add one, or import a file.</p>}
       <ul className="layer-list">
         {ordered.map((node, i) => {
-          const error = node.kind === "catalog" ? errors.get(node.catalogId) : undefined;
+          const st = status.get(node.id);
+          const error = node.kind === "catalog" ? errors.get(node.catalogId) : st?.error ? st.text : undefined;
           return (
             <li key={node.id} className={node.id === activeId ? "layer active" : "layer"} onClick={() => onActivate(node.id)}>
               <input
@@ -43,7 +52,7 @@ export function LayersPanel({ layers, activeId, errors, onActivate, onZoomTo, on
               <span className="swatch" style={{ background: node.kind === "vector" ? node.style.color : "linear-gradient(135deg,#9bb 0%,#dca 100%)" }} />
               <span className="layer-name" title={error ?? node.title}>
                 {node.title}
-                <small className={error ? "error" : ""}>{error ? "⚠ " + error : kindLabel(node)}</small>
+                <small className={error ? "error" : ""}>{error ? "⚠ " + error : st?.busy ? st.text : kindLabel(node, kindOf)}</small>
               </span>
               <span className="layer-actions" onClick={(e) => e.stopPropagation()}>
                 <button type="button" className="icon tiny" title="Zoom to layer" onClick={() => onZoomTo(node)}><Icon name="zoom" size={14} /></button>

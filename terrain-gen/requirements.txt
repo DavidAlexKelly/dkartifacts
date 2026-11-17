@@ -4,4 +4,5 @@ pillow>=10         # PNG and WebP encoding
 pmtiles>=3.4       # PMTiles reader/writer
 shapely>=2.0       # contour clipping
 contourpy>=1.2     # contour tracing
+pyogrio>=0.7       # `vector` input from GeoPackage/Shapefile/FlatGeobuf (GDAL in its wheels; optional if ogr2ogr is on PATH)
 pytest>=8          # tests only

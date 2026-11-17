@@ -21,9 +21,13 @@ export type Tool =
   | "edit"
   | "measure-line"
   | "measure-area"
-  | "profile";
+  | "profile"
+  | "los"
+  | "viewshed"
+  | "route"
+  | "split";
 
-export const SKETCH_TOOLS = new Set<Tool>(["line", "polygon", "measure-line", "measure-area", "profile"]);
+export const SKETCH_TOOLS = new Set<Tool>(["line", "polygon", "measure-line", "measure-area", "profile", "los", "route", "split"]);
 
 export interface Draft {
   layerId: string;
@@ -41,6 +45,8 @@ export interface ToolContext {
   setCursor(c: { lngLat: Position; snapped: boolean } | null): void;
   finishSketch(coords: Position[]): void;
   addPoint(at: Position): void;
+  /** A single-click tool (viewshed) was used at this point. */
+  clickAt(at: Position): void;
   select(sel: { layerId: string; featureIds: string[] } | null): void;
   setDraft(d: Draft | null): void;
   commitGeometry(d: Draft): void;
@@ -67,7 +73,41 @@ function snapTarget(map: MlMap, ctx: ToolContext, e: MapMouseEvent, skip?: { fea
       }
     }
   }
-  return best ? { at: [best[0], best[1]], snapped: true } : { at: raw, snapped: false };
+  if (best) {return { at: [best[0], best[1]], snapped: true };}
+  // No vertex close by: snap onto the nearest edge instead.
+  let edge: Position | null = null;
+  let edgeD = SNAP_PX * 0.75;
+  for (const f of layer.data.features) {
+    for (const ring of lines(f.geometry)) {
+      for (let i = 1; i < ring.length; i++) {
+        const a = map.project([ring[i - 1][0], ring[i - 1][1]]);
+        const b = map.project([ring[i][0], ring[i][1]]);
+        const dx = b.x - a.x, dy = b.y - a.y;
+        const len2 = dx * dx + dy * dy;
+        if (!len2) {continue;}
+        const t = Math.max(0, Math.min(1, ((e.point.x - a.x) * dx + (e.point.y - a.y) * dy) / len2));
+        const px = a.x + t * dx, py = a.y + t * dy;
+        const d = Math.hypot(px - e.point.x, py - e.point.y);
+        if (d < edgeD) {
+          edgeD = d;
+          const ll = map.unproject([px, py]);
+          edge = [ll.lng, ll.lat];
+        }
+      }
+    }
+  }
+  return edge ? { at: edge, snapped: true } : { at: raw, snapped: false };
+}
+
+/** Every line string of a geometry: lines, and polygon rings. */
+function lines(g: Geometry): Position[][] {
+  switch (g.type) {
+    case "LineString": return [g.coordinates];
+    case "MultiLineString": return g.coordinates;
+    case "Polygon": return g.coordinates;
+    case "MultiPolygon": return g.coordinates.flat();
+    default: return [];
+  }
 }
 
 function vectorHits(map: MlMap, point: PointLike | [PointLike, PointLike], onlyLayer?: string): MapGeoJSONFeature[] {
@@ -127,6 +167,17 @@ export function attachTools(map: MlMap, get: () => ToolContext): () => void {
       case "point":
         ctx.addPoint(snapTarget(map, ctx, e).at);
         return;
+      case "viewshed":
+        ctx.clickAt(at);
+        return;
+      case "los":
+      case "route": {
+        // Two clicks: observer, then target.
+        const next = [...ctx.sketch, snapTarget(map, ctx, e).at];
+        if (next.length >= 2) {ctx.finishSketch(next.slice(0, 2));}
+        else {ctx.setSketch(next);}
+        return;
+      }
       default:
         if (SKETCH_TOOLS.has(ctx.tool)) {ctx.setSketch([...ctx.sketch, snapTarget(map, ctx, e).at]);}
     }

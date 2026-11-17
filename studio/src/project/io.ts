@@ -18,6 +18,8 @@ export function parseProject(text: string): Project {
   return {
     ...base,
     ...raw,
+    id: raw.id ?? base.id,
+    assets: raw.assets ?? null,
     view: { ...base.view, ...(raw.view ?? {}) },
     layers: Array.isArray(raw.layers) ? raw.layers : [],
   } as Project;
@@ -25,6 +27,20 @@ export function parseProject(text: string): Project {
 
 export function serializeProject(p: Project): string {
   return JSON.stringify(p, null, 1);
+}
+
+/**
+ * The project as stored in Foundry: backed layers keep where their features
+ * come from but not the features, which are reloaded from the Ontology or the
+ * dataset when the project opens. Local layers keep theirs.
+ */
+export function serializeForFoundry(p: Project): string {
+  return JSON.stringify({
+    ...p,
+    layers: p.layers.map((l) =>
+      l.kind === "vector" && l.backing ? { ...l, data: { type: "FeatureCollection", features: [] }, pending: undefined } : l,
+    ),
+  });
 }
 
 export function loadAutosave(): Project | null {

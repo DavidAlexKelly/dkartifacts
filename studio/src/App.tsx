@@ -2,15 +2,33 @@ import type { Feature, FeatureCollection, Geometry, Position } from "geojson";
 import type { LngLatBoundsLike, Map as MlMap, MapGeoJSONFeature } from "maplibre-gl";
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { elevationAt, profile as sampleProfile, type ProfilePoint } from "./data/elevation";
-import { Library, type CatalogEntry, type Connection } from "./data/library";
+import { Library, parseSource, sourceId, type CatalogEntry, type Connection, type DatasetSource } from "./data/library";
 import type { LayerManifest } from "./data/manifest";
-import { hasAssets, registerProtocols, setProtocolLibrary } from "./data/protocols";
+import { getProtocolLibrary, hasAssets, registerProtocols, setAssetsDataset, setProtocolLibrary } from "./data/protocols";
+import { registerDerivedProtocols } from "./data/derived";
+import { createHeightSource, type HeightSource } from "./analysis/heightgrid";
+import { lineOfSight, viewshed, type LineOfSightResult } from "./analysis/terrain";
+import { mergeFeatures, splitByLine } from "./analysis/processing";
+import { selectByLocation } from "./analysis/select";
+import { defaultGraphDataset, type ProfileName } from "./foundry/routing";
 import { configuredCatalogRid, foundry } from "./foundry/auth";
-import { download, importFile, safeName, toCsv, toGeoJson, toKml } from "./formats/vector";
+import { commitEdits, deleteProject as deleteFoundryProject, loadBacked, openProject as openFoundryProject, publishLayer, saveProject as saveFoundryProject } from "./foundry/layers";
+import { OntologyClient, type ObjectTypeDef } from "./foundry/ontology";
+import { OntologyDialog, ProjectsDialog } from "./ui/FoundryDialogs";
+import { AnalysisDialog, type AnalysisTab, type ProcessingRun } from "./ui/AnalysisDialog";
+import { CrsDialog } from "./ui/CrsDialog";
+import { TimeSlider } from "./ui/TimeSlider";
+import { invalidFeatures } from "./ui/FeatureForm";
+import { PrintDialog } from "./ui/PrintDialog";
+import type { CoordSystem } from "./coords/format";
+import { parseCoord } from "./coords/parse";
+import { graticule, mgrsGrid } from "./coords/grid";
+import { download, safeName } from "./formats/vector";
+import type { ExportFormat } from "./formats/import";
 import { renderLayout } from "./formats/print";
 import { bbox, lengthM, midpoints, polygonAreaM2, vertices } from "./map/geometry";
 import { MapView } from "./map/MapView";
-import { OVERLAY, buildStyle, catalogKind, layerIdOf } from "./map/style";
+import { GRID, OVERLAY, buildStyle, catalogKind, layerIdOf } from "./map/style";
 import { SKETCH_TOOLS, attachTools, type Draft, type Tool, type ToolContext } from "./map/tools";
 import { autosave, clearAutosave, loadAutosave, parseProject, serializeProject } from "./project/io";
 import { fieldsOf, historyReducer, type Action, type History } from "./project/reducer";
@@ -18,6 +36,9 @@ import {
   defaultVectorStyle,
   newId,
   newProject,
+  isEditable,
+  pendingCount,
+  type Backing,
   type CatalogLayerNode,
   type LayerNode,
   type StudioFeature,
@@ -27,13 +48,18 @@ import { AttributeTable } from "./ui/AttributeTable";
 import { BrowserPanel } from "./ui/BrowserPanel";
 import { LayersPanel } from "./ui/LayersPanel";
 import { PropertiesPanel } from "./ui/PropertiesPanel";
-import { ResultsPanel, type IdentifyResult, type Measurement } from "./ui/ResultsPanel";
+import { ResultsPanel, type IdentifyResult, type Measurement, type ViewshedSettings } from "./ui/ResultsPanel";
 import { StatusBar } from "./ui/StatusBar";
 import { Toolbar } from "./ui/Toolbar";
 
 registerProtocols();
+registerDerivedProtocols(getProtocolLibrary);
 
-/** Where the catalog is, when the project does not say: URL, then build config, then the dev folder. */
+/**
+ * An optional catalog to open at start: from the URL, then the build config,
+ * then (local development only) the /data/ folder. None is needed: datasets
+ * can be added one at a time.
+ */
 function defaultConnection(): Connection | null {
   const params = new URLSearchParams(window.location.search);
   const data = params.get("data");
@@ -48,16 +74,17 @@ function initHistory(): History {
   const params = new URLSearchParams(window.location.search);
   const saved = params.has("fresh") ? null : loadAutosave();
   const project = saved ?? newProject(defaultConnection());
-  if (!project.connection) {project.connection = defaultConnection();}
+  if (!project.connection && !saved) {project.connection = defaultConnection();}
   return { past: [], present: project, future: [] };
 }
 
-function catalogNode(entry: CatalogEntry): CatalogLayerNode {
+function catalogNode(entry: CatalogEntry, source?: DatasetSource): CatalogLayerNode {
   const kind = catalogKind(entry);
   return {
     kind: "catalog",
     id: newId("cat"),
     catalogId: entry.id,
+    ...(source ? { source } : {}),
     title: entry.title,
     visible: true,
     opacity: 1,
@@ -75,7 +102,13 @@ const ADD_ORDER = ["basemap", "raster-dem", "raster", "contours", "vector-tiles"
 export default function App() {
   const [history, dispatch] = useReducer(historyReducer, undefined, initHistory);
   const project = history.present;
-  const [library, setLibrary] = useState<Library | null>(null);
+  const [library, setLibrary] = useState<Library>(() => {
+    const lib = Library.empty(foundry);
+    setProtocolLibrary(lib);
+    return lib;
+  });
+  // Bumped whenever datasets are added to the library, which mutates in place.
+  const [libraryVersion, setLibraryVersion] = useState(0);
   const [libraryError, setLibraryError] = useState<string | null>(null);
   const [libraryLoading, setLibraryLoading] = useState(false);
   const [manifests, setManifests] = useState<Map<string, LayerManifest>>(new Map());
@@ -97,21 +130,57 @@ export default function App() {
   const [tableOpen, setTableOpen] = useState(false);
   const [zoom, setZoom] = useState(project.view.zoom);
   const initialView = useRef(project.view);
+  const ontology = useMemo(() => (foundry ? new OntologyClient(foundry) : null), []);
+  const [los, setLos] = useState<(LineOfSightResult & { from: Position; to: Position }) | null>(null);
+  const [viewshedSettings, setViewshedSettings] = useState<ViewshedSettings>({ radiusKm: 5, observerM: 2, targetM: 0 });
+  const [analysisBusy, setAnalysisBusy] = useState<string | null>(null);
+  const [routeSettings, setRouteSettings] = useState<{ profile: ProfileName; dataset: string }>({ profile: "tracked", dataset: defaultGraphDataset });
+  const clipboard = useRef<StudioFeature[]>([]);
+  const [dialog, setDialog] = useState<null | "projects" | "ontology" | "analysis" | "print">(null);
+  const [coordSystem, setCoordSystemState] = useState<CoordSystem>(() => {
+    try {
+      return (localStorage.getItem("decho-studio:coords") as CoordSystem | null) ?? "dms";
+    } catch {
+      return "dms";
+    }
+  });
+  const setCoordSystem = (c: CoordSystem) => {
+    setCoordSystemState(c);
+    try {
+      localStorage.setItem("decho-studio:coords", c);
+    } catch {
+      /* ignore */
+    }
+  };
+  const [gotoPoint, setGotoPoint] = useState<Position | null>(null);
+  const [analysisTab, setAnalysisTab] = useState<AnalysisTab>("processing");
+  const [processingHistory, setProcessingHistory] = useState<ProcessingRun[]>([]);
+  // Per-layer load state for Foundry-backed layers: a message, or an error.
+  const [layerStatus, setLayerStatus] = useState<Map<string, { text: string; error?: boolean; busy?: boolean }>>(new Map());
+  const loadedLayers = useRef(new Set<string>());
+  const setStatus = (id: string, text: string | null, extra: { error?: boolean; busy?: boolean } = {}) =>
+    setLayerStatus((prev) => {
+      const next = new Map(prev);
+      if (text === null) {next.delete(id);}
+      else {next.set(id, { text, ...extra });}
+      return next;
+    });
 
   const say = useCallback((text: string, kind: "info" | "error" = "info") => setMessage({ text, kind }), []);
 
-  // ── Catalog ────────────────────────────────────────────────────────────
+  // ── Data: an optional catalog, plus datasets added on their own ─────────
   const connectionKey = JSON.stringify(project.connection);
   useEffect(() => {
     const connection = project.connection;
-    if (!connection) {
-      setLibrary(null);
-      return;
-    }
     let cancelled = false;
-    setLibraryLoading(true);
     setLibraryError(null);
-    Library.open(connection, foundry)
+    const opened = connection ? Library.open(connection, foundry) : Promise.resolve(Library.empty(foundry));
+    setLibraryLoading(!!connection);
+    opened
+      .catch((err: unknown) => {
+        if (!cancelled) {setLibraryError(err instanceof Error ? err.message : String(err));}
+        return Library.empty(foundry);
+      })
       .then((lib) => {
         if (cancelled) {return;}
         setProtocolLibrary(lib);
@@ -119,7 +188,6 @@ export default function App() {
         setManifestErrors(new Map());
         setLibrary(lib);
       })
-      .catch((err: unknown) => !cancelled && setLibraryError(err instanceof Error ? err.message : String(err)))
       .finally(() => !cancelled && setLibraryLoading(false));
     return () => {
       cancelled = true;
@@ -127,10 +195,28 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [connectionKey]);
 
+  // Datasets the project added on their own (layers and the labels dataset)
+  // are re-registered whenever the library is new: after loading a project,
+  // reloading the page, or switching catalogs.
+  useEffect(() => {
+    const wanted: DatasetSource[] = [
+      ...project.layers.flatMap((l) => (l.kind === "catalog" && l.source ? [l.source] : [])),
+      ...(project.assets ? [project.assets] : []),
+    ];
+    for (const src of wanted) {
+      const id = sourceId(src);
+      if (library.entry(id) || manifestErrors.has(id)) {continue;}
+      library
+        .addDataset(src)
+        .then(() => setLibraryVersion((v) => v + 1))
+        .catch((err: unknown) => setManifestErrors((prev) => new Map(prev).set(id, err instanceof Error ? err.message : String(err))));
+    }
+  }, [library, project.layers, project.assets, manifestErrors]);
+
   // A fresh project on a fresh catalog starts with the obvious layers.
   const seeded = useRef(false);
   useEffect(() => {
-    if (!library || seeded.current || project.layers.length > 0) {return;}
+    if (!library.connection || seeded.current || project.layers.length > 0) {return;}
     seeded.current = true;
     const entries = library.catalog.layers
       .filter((e) => !library.unavailable(e) && ["basemap", "raster-dem", "contours"].includes(catalogKind(e)))
@@ -140,21 +226,164 @@ export default function App() {
     if (bounds && map) {map.fitBounds(bounds as LngLatBoundsLike, { padding: 40, duration: 0 });}
   }, [library, project.layers.length, map]);
 
-  // Manifests for every catalog layer on the map.
+  // Manifests for every dataset layer on the map.
   useEffect(() => {
-    if (!library) {return;}
     for (const node of project.layers) {
       if (node.kind !== "catalog" || manifests.has(node.catalogId) || manifestErrors.has(node.catalogId)) {continue;}
+      if (!library.entry(node.catalogId)) {continue;} // a standalone dataset still registering
       library
         .manifest(node.catalogId)
         .then((m) => setManifests((prev) => new Map(prev).set(node.catalogId, m)))
         .catch((err: unknown) => setManifestErrors((prev) => new Map(prev).set(node.catalogId, err instanceof Error ? err.message : String(err))));
     }
-  }, [library, project.layers, manifests, manifestErrors]);
+  }, [library, libraryVersion, project.layers, manifests, manifestErrors]);
 
-  const entries = useMemo(() => new Map((library?.catalog.layers ?? []).map((e) => [e.id, e])), [library]);
-  const terrainId = useMemo(() => library?.catalog.layers.find((e) => e.kind === "raster-dem" && !library.unavailable(e))?.id ?? null, [library]);
-  const glyphs = !!library && hasAssets();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const entries = useMemo(() => new Map(library.entries().map((e) => [e.id, e])), [library, libraryVersion]);
+  const terrainId = useMemo(() => {
+    // Prefer terrain that is on the map; otherwise any terrain the catalog offers.
+    const onMap = project.layers.find((l) => l.kind === "catalog" && entries.get(l.catalogId)?.kind === "raster-dem");
+    if (onMap && onMap.kind === "catalog") {return onMap.catalogId;}
+    return library.entries().find((e) => e.kind === "raster-dem" && !library.unavailable(e))?.id ?? null;
+  }, [library, entries, project.layers]);
+
+  // Heights for analysis (line of sight, viewshed, zonal statistics).
+  const [heights, setHeights] = useState<HeightSource | null>(null);
+  useEffect(() => {
+    setHeights(null);
+    if (!terrainId) {return;}
+    let cancelled = false;
+    createHeightSource(library, terrainId)
+      .then((h) => !cancelled && setHeights(h))
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [library, terrainId, libraryVersion]);
+  const needHeights = (): HeightSource | null => {
+    if (!heights) {say("This needs a terrain layer (raster-dem): add one first.", "error");}
+    return heights;
+  };
+
+  // Labels: the project's own glyphs dataset, else one the catalog lists.
+  const assetsId = project.assets ? sourceId(project.assets) : (library.entries().find((e) => e.kind === "assets")?.id ?? null);
+  const assetsReady = !!assetsId && entries.get(assetsId)?.kind === "assets";
+  setAssetsDataset(assetsReady ? assetsId : null);
+  const glyphs = assetsReady && hasAssets();
+
+  /** Add one dataset by ID or folder URL: a layer, the labels dataset, or a whole catalog. */
+  const addDataset = async (text: string) => {
+    const src = parseSource(text);
+    try {
+      const entry = await library.addDataset(src);
+      setLibraryVersion((v) => v + 1);
+      if (entry.kind === "assets") {
+        dispatch({ type: "setAssets", assets: src });
+        say(`Labels on: glyphs and sprites from ${entry.title}.`);
+        return;
+      }
+      if (entry.kind === "catalog") {
+        // A catalog was pasted: open it rather than adding it as a layer.
+        const connection: Connection = "datasetRid" in src
+          ? { kind: "foundry", catalogRid: src.datasetRid }
+          : { kind: "http", baseUrl: new URL("../", new URL(sourceId(src), window.location.href)).href };
+        seeded.current = project.layers.length > 0;
+        dispatch({ type: "setConnection", connection });
+        say("That is a catalog — opened it.");
+        return;
+      }
+      const node = catalogNode(entry, src);
+      dispatch({ type: "addLayer", layer: node, at: catalogKind(entry) === "basemap" ? 0 : undefined });
+      setActiveId(node.id);
+      if (entry.bounds && map && project.layers.length === 0) {map.fitBounds(entry.bounds as LngLatBoundsLike, { padding: 40 });}
+      say(`Added ${entry.title}.`);
+    } catch (err) {
+      const why = err instanceof Error ? err.message : String(err);
+      // A Foundry dataset without a manifest may be an ordinary table with
+      // lat/lon or WKT columns: try it as a read-only vector layer.
+      if ("datasetRid" in src && /no manifest\.json/.test(why)) {
+        addBackedLayer({ kind: "dataset", datasetRid: src.datasetRid, limit: 50000 }, `Dataset ${src.datasetRid.slice(-8)}`);
+        return;
+      }
+      say(why, "error");
+      throw err;
+    }
+  };
+
+  /** A vector layer whose features come from Foundry; they load in the effect below. */
+  const addBackedLayer = (backing: Backing, title: string) => {
+    const layer: VectorLayerNode = {
+      kind: "vector", id: newId("vec"), title, visible: true, opacity: 1,
+      style: defaultVectorStyle(project.layers.filter((l) => l.kind === "vector").length),
+      data: { type: "FeatureCollection", features: [] }, fields: [], backing,
+    };
+    dispatch({ type: "addLayer", layer });
+    setActiveId(layer.id);
+    return layer.id;
+  };
+
+  // Load (or reload) Foundry-backed layers. A layer with uncommitted edits
+  // from an earlier session keeps its local features instead.
+  useEffect(() => {
+    for (const l of project.layers) {
+      if (l.kind !== "vector" || !l.backing || loadedLayers.current.has(l.id)) {continue;}
+      loadedLayers.current.add(l.id);
+      if (pendingCount(l) > 0) {
+        setStatus(l.id, `${pendingCount(l)} uncommitted edits from an earlier session`);
+        continue;
+      }
+      setStatus(l.id, "Loading from Foundry…", { busy: true });
+      const id = l.id;
+      loadBacked(l, ontology, foundry)
+        .then((res) => {
+          dispatch({ type: "setLayerData", layerId: id, features: res.features, fields: res.fields });
+          setStatus(id, res.message ?? null);
+        })
+        .catch((e: unknown) => setStatus(id, e instanceof Error ? e.message : String(e), { error: true }));
+    }
+  }, [project.layers, ontology]);
+
+  const reloadLayer = (layer: VectorLayerNode) => {
+    if (pendingCount(layer) > 0 && !confirm(`Discard ${pendingCount(layer)} uncommitted edits to “${layer.title}” and reload it from Foundry?`)) {return;}
+    dispatch({ type: "markCommitted", layerId: layer.id });
+    loadedLayers.current.delete(layer.id);
+    // The effect picks it up on the next render.
+    dispatch({ type: "setLayerData", layerId: layer.id, features: layer.data.features, fields: layer.fields });
+  };
+
+  const commitLayer = async (layer: VectorLayerNode) => {
+    if (!ontology) {return;}
+    const pendingIds = layer.pending ? [...layer.pending.created, ...layer.pending.modified] : [];
+    const bad = invalidFeatures(layer, pendingIds);
+    if (bad && !confirm(`${bad} of the features to commit break the layer's field rules (required or allowed values). Commit anyway?`)) {return;}
+    setStatus(layer.id, "Committing…", { busy: true });
+    const result = await commitEdits(layer, ontology, (done, total) => setStatus(layer.id, `Committing ${done}/${total}…`, { busy: true }));
+    dispatch({ type: "markCommitted", layerId: layer.id, keep: result.failed.map((f) => f.id) });
+    if (result.failed.length) {
+      setStatus(layer.id, `${result.failed.length} edits refused: ${result.failed[0].error}`, { error: true });
+      say(`${result.applied} edits committed, ${result.failed.length} refused — they stay pending.`, "error");
+    } else {
+      setStatus(layer.id, null);
+      say(`${result.applied} edits committed to Foundry.`);
+    }
+  };
+
+  const publishToFoundry = async (layer: VectorLayerNode) => {
+    if (!ontology) {return;}
+    const collection = prompt("Publish this layer to Foundry as a feature collection named:", layer.title)?.trim();
+    if (!collection) {return;}
+    setStatus(layer.id, "Publishing…", { busy: true });
+    const result = await publishLayer(layer, collection, ontology, (done, total) => setStatus(layer.id, `Publishing ${done}/${total}…`, { busy: true }));
+    if (result.failed.length) {
+      setStatus(layer.id, `${result.failed.length} features refused: ${result.failed[0].error}`, { error: true });
+      say(`Published ${result.applied} features; ${result.failed.length} were refused.`, "error");
+      return;
+    }
+    loadedLayers.current.add(layer.id); // already holds exactly what was written
+    dispatch({ type: "updateLayer", id: layer.id, patch: { backing: { kind: "ontology-features", collection }, pending: undefined } });
+    setStatus(layer.id, null);
+    say(`Published ${result.applied} features to the “${collection}” collection. Edits to it now commit to Foundry.`);
+  };
 
   // ── Project state ──────────────────────────────────────────────────────
   useEffect(() => autosave(project), [project]);
@@ -181,6 +410,8 @@ export default function App() {
     setMeasured(null);
     setProfilePoints(null);
     setIdentify(null);
+    setLos(null);
+    setGotoPoint(null);
     if (map) {
       if (SKETCH_TOOLS.has(t)) {map.doubleClickZoom.disable();}
       else {map.doubleClickZoom.enable();}
@@ -190,7 +421,7 @@ export default function App() {
 
   /** The active vector layer, or a new "Drawings" layer if there is none to draw into. */
   const ensureVectorLayer = (): string => {
-    if (activeVector) {return activeVector.id;}
+    if (activeVector && isEditable(activeVector)) {return activeVector.id;}
     const layer: VectorLayerNode = {
       kind: "vector",
       id: newId("vec"),
@@ -234,12 +465,101 @@ export default function App() {
       if (sel && sel.layerId !== activeId) {setActiveId(sel.layerId);}
     },
     addPoint: (at) => addFeature({ type: "Point", coordinates: at }),
+    clickAt: (at) => {
+      if (tool !== "viewshed") {return;}
+      const src = needHeights();
+      if (!src) {return;}
+      const { radiusKm, observerM, targetM } = viewshedSettings;
+      setAnalysisBusy(`Computing the viewshed (${radiusKm} km)…`);
+      viewshed(src, at as [number, number], { radiusM: radiusKm * 1000, observerHeightM: observerM, targetHeightM: targetM })
+        .then((res) => {
+          const pct = res.stats.totalAreaM2 ? (100 * res.stats.visibleAreaM2) / res.stats.totalAreaM2 : 0;
+          const features: StudioFeature[] = res.features.map((f) => ({
+            type: "Feature", id: newId("f"), geometry: f.geometry,
+            properties: { observer: `${at[1].toFixed(5)}, ${at[0].toFixed(5)}`, radius_km: radiusKm, observer_m: observerM, target_m: targetM, visible_km2: +(res.stats.visibleAreaM2 / 1e6).toFixed(2), visible_pct: +pct.toFixed(1) },
+          }));
+          features.push({ type: "Feature", id: newId("f"), geometry: { type: "Point", coordinates: at }, properties: { observer: "observer", radius_km: radiusKm, observer_m: observerM } });
+          const layer: VectorLayerNode = {
+            kind: "vector", id: newId("vec"), title: `Viewshed ${radiusKm} km`, visible: true, opacity: 1,
+            style: { ...defaultVectorStyle(2), color: "#1aa64b", strokeColor: "#0d6b2f", fillOpacity: 0.35, strokeWidth: 1 },
+            data: { type: "FeatureCollection", features }, fields: ["observer", "radius_km", "observer_m", "target_m", "visible_km2", "visible_pct"],
+          };
+          dispatch({ type: "addLayer", layer });
+          say(`Viewshed: ${pct.toFixed(0)}% of the ${radiusKm} km circle is visible (${(res.stats.visibleAreaM2 / 1e6).toFixed(1)} km²). Added as a layer.`);
+        })
+        .catch((e: unknown) => say(`Viewshed failed: ${String(e)}`, "error"))
+        .finally(() => setAnalysisBusy(null));
+    },
     finishSketch: (coords) => {
       setSketch([]);
       if (tool === "line" && coords.length >= 2) {addFeature({ type: "LineString", coordinates: coords });}
       else if (tool === "polygon" && coords.length >= 3) {addFeature({ type: "Polygon", coordinates: [[...coords, coords[0]]] });}
       else if (tool === "measure-line" && coords.length >= 2) {setMeasured({ kind: "distance", coords });}
       else if (tool === "measure-area" && coords.length >= 3) {setMeasured({ kind: "area", coords });}
+      else if (tool === "route" && coords.length >= 2) {
+        if (!foundry) {
+          say("Routing reads the pathfinding graphs from Foundry, which is not configured.", "error");
+          return;
+        }
+        const { profile, dataset } = routeSettings;
+        const fc = foundry;
+        setAnalysisBusy(`Finding a ${profile} route…`);
+        void import("./foundry/routing")
+          .then(({ routeBetween }) => routeBetween(fc, dataset, profile, coords[0] as [number, number], coords[1] as [number, number]))
+          .then((r) => {
+            if (r.waypoints.length < 2) {
+              say("No route found between those points.", "error");
+              return;
+            }
+            const props = { profile, distance_km: +(r.distanceM / 1000).toFixed(2), eta_min: r.etaS === null ? null : Math.round(r.etaS / 60), truncated: r.truncated };
+            const layer: VectorLayerNode = {
+              kind: "vector", id: newId("vec"), title: `Route (${profile})`, visible: true, opacity: 1,
+              style: { ...defaultVectorStyle(4), color: "#7b2ff7", strokeWidth: 4 },
+              data: { type: "FeatureCollection", features: [{ type: "Feature", id: newId("f"), geometry: { type: "LineString", coordinates: r.waypoints.map(([lat, lon]) => [lon, lat]) }, properties: props }] },
+              fields: Object.keys(props),
+            };
+            dispatch({ type: "addLayer", layer });
+            say(`Route: ${props.distance_km} km${props.eta_min !== null ? `, about ${props.eta_min} min` : ""} for ${profile} vehicles${r.truncated ? " (search budget reached: may not be the best route)" : ""}.`);
+          })
+          .catch((e: unknown) => say(`Routing failed: ${e instanceof Error ? e.message : String(e)}`, "error"))
+          .finally(() => setAnalysisBusy(null));
+      }
+      else if (tool === "split" && coords.length >= 2) {
+        const layer = activeVector;
+        if (!layer || !isEditable(layer)) {
+          say("Make an editable vector layer active to split its features.", "error");
+          return;
+        }
+        const cutter = { type: "LineString" as const, coordinates: coords };
+        // Selected features the line crosses, or else every feature it crosses.
+        const scope = selection?.layerId === layer.id && selection.featureIds.length ? new Set(selection.featureIds) : null;
+        let hit = new Set(selectByLocation(layer.data.features.filter((f) => !scope || scope.has(f.id)), [cutter], "intersects"));
+        if (scope && hit.size === 0) {hit = new Set(selectByLocation(layer.data.features, [cutter], "intersects"));}
+        let made = 0;
+        const next = layer.data.features.flatMap((f) => {
+          if (!hit.has(f.id) || f.geometry.type.endsWith("Point")) {return [f];}
+          const parts = splitByLine(f, cutter).features;
+          if (parts.length < 2) {return [f];}
+          made += parts.length;
+          // The first piece keeps the feature's id; the rest are new features.
+          return parts.map((p, i) => (i === 0 ? { ...p, id: f.id } : p));
+        });
+        if (!made) {
+          say("The line did not cut any feature into pieces.", "error");
+          return;
+        }
+        dispatch({ type: "replaceFeatures", layerId: layer.id, features: next });
+        say(`Split into ${made} pieces.`);
+      }
+      else if (tool === "los" && coords.length >= 2) {
+        const src = needHeights();
+        if (!src) {return;}
+        setAnalysisBusy("Checking line of sight…");
+        lineOfSight(src, coords[0] as [number, number], coords[1] as [number, number], { observerHeightM: viewshedSettings.observerM, targetHeightM: viewshedSettings.targetM })
+          .then((r) => setLos({ ...r, from: coords[0], to: coords[1] }))
+          .catch((e: unknown) => say(`Line of sight failed: ${String(e)}`, "error"))
+          .finally(() => setAnalysisBusy(null));
+      }
       else if (tool === "profile" && coords.length >= 2) {
         if (!library || !terrainId) {
           say("An elevation profile needs a terrain layer (raster-dem) in the catalog.", "error");
@@ -254,8 +574,16 @@ export default function App() {
           .finally(() => setProfileBusy(false));
       }
     },
-    commitGeometry: (d) => dispatch({ type: "setGeometry", layerId: d.layerId, featureId: d.featureId, geometry: d.geometry }),
+    commitGeometry: (d) => {
+      const l = project.layers.find((x) => x.id === d.layerId);
+      if (l?.kind === "vector" && isEditable(l)) {dispatch({ type: "setGeometry", layerId: d.layerId, featureId: d.featureId, geometry: d.geometry });}
+    },
     deleteSelected: () => {
+      const l = selection && project.layers.find((x) => x.id === selection.layerId);
+      if (l?.kind === "vector" && !isEditable(l)) {
+        say(`“${l.title}” is read-only.`, "error");
+        return;
+      }
       if (selection) {dispatch({ type: "deleteFeatures", layerId: selection.layerId, ids: selection.featureIds });}
       setSelection(null);
     },
@@ -305,7 +633,7 @@ export default function App() {
     () => buildStyle(project, { entries, manifests, glyphs, overlay: { type: "FeatureCollection", features: [] }, selection, background }),
     // view changes do not change the style
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [project.layers, project.globe, entries, manifests, glyphs, selection, background],
+    [project.layers, project.globe, project.timeWindow, project.grid, entries, manifests, glyphs, selection, background],
   );
 
   const overlay = useMemo((): FeatureCollection => {
@@ -328,7 +656,7 @@ export default function App() {
       out.push({ type: "Feature", properties: { role: "sketch" }, geometry: measured.kind === "area" ? { type: "Polygon", coordinates: [[...c, c[0]]] } : { type: "LineString", coordinates: c } });
       c.forEach((v) => out.push(pt(v, "vertex")));
     }
-    if (tool === "edit" && activeVector && selection?.layerId === activeVector.id && selection.featureIds.length === 1) {
+    if (tool === "edit" && activeVector && isEditable(activeVector) && selection?.layerId === activeVector.id && selection.featureIds.length === 1) {
       const f = activeVector.data.features.find((x) => x.id === selection.featureIds[0]);
       const g = draft && f && draft.featureId === f.id ? draft.geometry : f?.geometry;
       if (g) {
@@ -338,9 +666,43 @@ export default function App() {
       }
     }
     if (identify) {out.push(pt(identify.at, "vertex"));}
+    if (gotoPoint) {out.push(pt(gotoPoint, "handle"));}
+    if (los) {
+      // The sight line, green where the target-height line is in view and red where it is not.
+      const total = los.profile[los.profile.length - 1]?.distanceM ?? 0;
+      const along = (d: number): Position => [los.from[0] + (los.to[0] - los.from[0]) * (d / total), los.from[1] + (los.to[1] - los.from[1]) * (d / total)];
+      let cursorM = 0;
+      for (const [a, b] of los.visibleSegments) {
+        if (a > cursorM) {out.push({ type: "Feature", properties: { role: "los-hidden" }, geometry: { type: "LineString", coordinates: [along(cursorM), along(a)] } });}
+        out.push({ type: "Feature", properties: { role: "los-visible" }, geometry: { type: "LineString", coordinates: [along(a), along(b)] } });
+        cursorM = b;
+      }
+      if (total > cursorM) {out.push({ type: "Feature", properties: { role: "los-hidden" }, geometry: { type: "LineString", coordinates: [along(cursorM), along(total)] } });}
+      out.push(pt(los.from, "vertex"), pt(los.to, "vertex"));
+    }
     if (cursor?.snapped) {out.push(pt(cursor.lngLat, "snap"));}
     return { type: "FeatureCollection", features: out };
-  }, [tool, sketch, cursor, measured, activeVector, selection, draft, identify]);
+  }, [tool, sketch, cursor, measured, activeVector, selection, draft, identify, los, gotoPoint]);
+
+  // The coordinate grid depends on the view, so it is recomputed on every
+  // move and pushed straight into its source, like the overlay.
+  useEffect(() => {
+    if (!map || !project.grid || project.grid === "none") {return;}
+    const kind = project.grid;
+    const update = () => {
+      const b = map.getBounds();
+      const bounds: [number, number, number, number] = [b.getWest(), Math.max(-85, b.getSouth()), b.getEast(), Math.min(85, b.getNorth())];
+      const data = kind === "mgrs" ? mgrsGrid(bounds, map.getZoom()) : graticule(bounds, map.getZoom());
+      (map.getSource(GRID) as { setData?(d: unknown): void } | undefined)?.setData?.(data);
+    };
+    update();
+    map.on("moveend", update);
+    map.on("styledata", update);
+    return () => {
+      map.off("moveend", update);
+      map.off("styledata", update);
+    };
+  }, [map, project.grid]);
 
   // The overlay changes on every mouse move, so it bypasses the style diff
   // and is pushed straight into its source.
@@ -384,37 +746,120 @@ export default function App() {
     setActiveId(node.id);
   };
 
-  const importFiles = async (files: FileList | File[]) => {
-    for (const file of Array.from(files)) {
-      try {
-        const imported = importFile(file.name, await file.text());
-        const layer: VectorLayerNode = {
-          kind: "vector",
-          id: newId("vec"),
-          title: imported.title,
-          visible: true,
-          opacity: 1,
-          style: defaultVectorStyle(project.layers.filter((l) => l.kind === "vector").length),
-          data: { type: "FeatureCollection", features: imported.features },
-          fields: imported.fields,
-        };
-        dispatch({ type: "addLayer", layer });
-        setActiveId(layer.id);
-        zoomToBounds(bbox(imported.features.map((f) => f.geometry)));
-        say(`Imported ${imported.features.length} features from ${file.name}${imported.skipped ? ` (${imported.skipped} without a location skipped)` : ""}.`);
-      } catch (e) {
-        say(`Could not import ${file.name}: ${e instanceof Error ? e.message : String(e)}`, "error");
-      }
+  // Formats load on demand: GeoPackage pulls in SQLite (WebAssembly), CRS support proj4.
+  const [crsRequest, setCrsRequest] = useState<{ files: File[]; names: string[] } | null>(null);
+  const importFiles = async (list: FileList | File[], crs?: string) => {
+    const files = Array.from(list);
+    const { importFiles: importAny } = await import("./formats/import");
+    const { layers, errors, needsCrs } = await importAny(files, crs ? { crs } : undefined);
+    let firstBounds: [number, number, number, number] | null = null;
+    for (const imported of layers) {
+      const layer: VectorLayerNode = {
+        kind: "vector",
+        id: newId("vec"),
+        title: imported.title,
+        visible: true,
+        opacity: 1,
+        style: defaultVectorStyle(project.layers.filter((l) => l.kind === "vector").length + layers.indexOf(imported)),
+        data: { type: "FeatureCollection", features: imported.features },
+        fields: imported.fields,
+      };
+      dispatch({ type: "addLayer", layer });
+      setActiveId(layer.id);
+      firstBounds ??= bbox(imported.features.map((f) => f.geometry));
     }
+    if (firstBounds) {zoomToBounds(firstBounds);}
+    const n = layers.reduce((a, l) => a + l.features.length, 0);
+    const skipped = layers.reduce((a, l) => a + l.skipped, 0);
+    if (errors.length) {say(`${layers.length ? `Imported ${layers.length} layer(s). ` : ""}${errors.join(" ")}`, "error");}
+    else if (layers.length) {say(`Imported ${n} features in ${layers.length} layer(s)${skipped ? ` (${skipped} without a location skipped)` : ""}.`);}
+    if (needsCrs.length && !crs) {setCrsRequest({ files, names: needsCrs });}
+  };
+
+  // ── Editing commands ────────────────────────────────────────────────────
+  const selectedFeatures = (): StudioFeature[] => {
+    const layer = selection && project.layers.find((l) => l.id === selection.layerId);
+    if (!layer || layer.kind !== "vector") {return [];}
+    const ids = new Set(selection!.featureIds);
+    return layer.data.features.filter((f) => ids.has(f.id));
+  };
+  const copySelected = () => {
+    const features = selectedFeatures();
+    clipboard.current = features;
+    if (features.length) {
+      void navigator.clipboard?.writeText(JSON.stringify({ type: "FeatureCollection", features })).catch(() => undefined);
+      say(`Copied ${features.length} feature(s).`);
+    } else {say("Select features to copy.", "error");}
+  };
+  const paste = () => {
+    if (!clipboard.current.length) {return say("Nothing copied yet.", "error");}
+    const layerId = ensureVectorLayer();
+    const copies = clipboard.current.map((f) => ({ ...f, id: newId("f"), properties: { ...f.properties } }));
+    const layer = project.layers.find((l) => l.id === layerId);
+    const existing = layer?.kind === "vector" ? layer.data.features : [];
+    dispatch({ type: "replaceFeatures", layerId, features: [...existing, ...copies] });
+    setSelection({ layerId, featureIds: copies.map((f) => f.id) });
+    say(`Pasted ${copies.length} feature(s).`);
+  };
+  const mergeSelected = () => {
+    const layer = selection && project.layers.find((l) => l.id === selection.layerId);
+    const features = selectedFeatures();
+    if (!layer || layer.kind !== "vector" || features.length < 2) {return say("Select two or more features in one layer to merge.", "error");}
+    if (!isEditable(layer)) {return say(`“${layer.title}” is read-only.`, "error");}
+    const merged = mergeFeatures(features).features[0];
+    if (!merged) {return say("Those features could not be merged.", "error");}
+    const keep = { ...merged, id: features[0].id };
+    const gone = new Set(features.map((f) => f.id));
+    dispatch({ type: "replaceFeatures", layerId: layer.id, features: [...layer.data.features.filter((f) => !gone.has(f.id)), keep] });
+    setSelection({ layerId: layer.id, featureIds: [keep.id] });
+    say(`Merged ${features.length} features.`);
   };
 
   const saveProject = () => download(`${safeName(project.title)}.decho.json`, serializeProject(project), "application/json");
 
+  const replaceProject = (p: typeof project) => {
+    seeded.current = true;
+    loadedLayers.current.clear();
+    setLayerStatus(new Map());
+    dispatch({ type: "replace", project: p });
+    setActiveId(null);
+    setSelection(null);
+    map?.jumpTo({ center: p.view.center as [number, number], zoom: p.view.zoom, bearing: p.view.bearing, pitch: p.view.pitch });
+  };
+
+  const saveToFoundry = async () => {
+    if (!ontology) {
+      saveProject();
+      return;
+    }
+    const dirty = project.layers.filter((l) => l.kind === "vector" && pendingCount(l) > 0) as VectorLayerNode[];
+    if (dirty.length && confirm(`${dirty.length} layer(s) have uncommitted edits. Commit them first? (Cancel saves the project without them.)`)) {
+      for (const l of dirty) {await commitLayer(l);}
+    }
+    try {
+      const how = await saveFoundryProject(ontology, project);
+      say(`Project ${how === "created" ? "saved" : "updated"} in Foundry.`);
+    } catch (e) {
+      say(`Could not save to Foundry: ${e instanceof Error ? e.message : String(e)}`, "error");
+    }
+  };
+
+  const openFromFoundry = async (id: string) => {
+    if (!ontology) {return;}
+    try {
+      replaceProject(await openFoundryProject(ontology, id));
+      setDialog(null);
+      say("Opened from Foundry.");
+    } catch (e) {
+      say(`Could not open: ${e instanceof Error ? e.message : String(e)}`, "error");
+    }
+  };
+
   const openProject = async (file: File) => {
     try {
       const p = parseProject(await file.text());
+      replaceProject(p);
       seeded.current = true;
-      dispatch({ type: "replace", project: p });
       setActiveId(null);
       setSelection(null);
       map?.jumpTo({ center: p.view.center as [number, number], zoom: p.view.zoom, bearing: p.view.bearing, pitch: p.view.pitch });
@@ -428,19 +873,23 @@ export default function App() {
     if (!confirm("Start a new project? Unsaved changes to this one will be lost.")) {return;}
     clearAutosave();
     seeded.current = false;
+    loadedLayers.current.clear();
+    setLayerStatus(new Map());
     dispatch({ type: "replace", project: newProject(project.connection) });
     setActiveId(null);
     setSelection(null);
   };
 
-  const exportLayer = (format: "geojson" | "csv" | "kml") => {
+  const exportLayer = async (format: ExportFormat) => {
     const layer = activeVector;
     if (!layer) {return;}
-    const fields = fieldsOf(layer);
-    const name = safeName(layer.title);
-    if (format === "geojson") {download(`${name}.geojson`, toGeoJson(layer.data.features), "application/geo+json");}
-    if (format === "csv") {download(`${name}.csv`, toCsv(layer.data.features, fields), "text/csv");}
-    if (format === "kml") {download(`${name}.kml`, toKml(layer.title, layer.data.features, fields, layer.style.labelField), "application/vnd.google-earth.kml+xml");}
+    try {
+      const { exportLayer: write } = await import("./formats/import");
+      const { blob, filename } = await write(format, layer.title, layer.data.features, fieldsOf(layer), layer.style.labelField);
+      download(filename, blob, blob.type || "application/octet-stream");
+    } catch (e) {
+      say(`Export failed: ${e instanceof Error ? e.message : String(e)}`, "error");
+    }
   };
 
   const exportPng = async () => {
@@ -472,9 +921,15 @@ export default function App() {
       } else if (e.key.toLowerCase() === "y") {
         e.preventDefault();
         dispatch({ type: "redo" });
+      } else if (e.key.toLowerCase() === "c" && selection?.featureIds.length) {
+        e.preventDefault();
+        copySelected();
+      } else if (e.key.toLowerCase() === "v" && clipboard.current.length) {
+        e.preventDefault();
+        paste();
       } else if (e.key.toLowerCase() === "s") {
         e.preventDefault();
-        saveProject();
+        void saveToFoundry();
       }
     };
     window.addEventListener("keydown", onKey);
@@ -506,15 +961,40 @@ export default function App() {
         onNew={newProjectCmd}
         onOpen={openProject}
         onSave={saveProject}
+        foundryReady={!!ontology}
+        onOpenFoundry={() => setDialog("projects")}
+        onSaveFoundry={() => void saveToFoundry()}
+        onOntology={() => setDialog("ontology")}
         onImport={(f) => void importFiles(f)}
         onExportPng={() => void exportPng()}
-        onExportLayer={exportLayer}
+        onExportLayer={(f) => void exportLayer(f)}
+        onAnalysis={(tab) => { setAnalysisTab(tab); setDialog("analysis"); }}
+        onPrint={() => setDialog("print")}
+        onCopy={copySelected}
+        onPaste={paste}
+        onMerge={mergeSelected}
+        onDelete={() => toolCtx.current?.deleteSelected()}
+        onGoto={(text) => {
+          const p = parseCoord(text);
+          if (!p) {
+            say(`Could not read “${text}” as a coordinate. Try 61.636 8.312, 61°38'11"N 8°18'45"E, 32V MP 63562 33868 or 32V 463563 6833868.`, "error");
+            return false;
+          }
+          setGotoPoint([p.lon, p.lat]);
+          map?.flyTo({ center: [p.lon, p.lat], zoom: Math.max(map.getZoom(), 12) });
+          return true;
+        }}
       />
       <aside className="left">
         <LayersPanel
           layers={project.layers}
           activeId={activeId}
           errors={manifestErrors}
+          status={layerStatus}
+          kindOf={(id) => {
+            const k = catalogKind(entries.get(id), manifests.get(id));
+            return { basemap: "basemap", contours: "contours", "vector-tiles": "vector tiles", "raster-dem": "terrain", raster: "raster", "dem-cells": "DEM cells", other: "loading…" }[k];
+          }}
           onActivate={setActiveId}
           onZoomTo={zoomToLayer}
           onNewLayer={() => {
@@ -530,6 +1010,12 @@ export default function App() {
         />
         <BrowserPanel
           library={library}
+          onAddDataset={addDataset}
+          labels={assetsReady && assetsId ? { title: entries.get(assetsId)?.title ?? "assets" } : null}
+          onRemoveLabels={() => {
+            if (project.assets) {dispatch({ type: "setAssets", assets: null });}
+            else {say("These labels come from the catalog; close the catalog to turn them off.");}
+          }}
           error={libraryError}
           loading={libraryLoading}
           connection={project.connection}
@@ -559,9 +1045,21 @@ export default function App() {
           onReady={setMap}
           onError={(m) => say(m, "error")}
         />
+        <TimeSlider
+          layers={project.layers.filter((l): l is VectorLayerNode => l.kind === "vector" && !!l.timeField)}
+          window={project.timeWindow}
+          onWindow={(w) => dispatch({ type: "setTimeWindow", window: w })}
+        />
       </main>
       <aside className="right">
         <ResultsPanel
+          tool={tool}
+          los={los}
+          busy={analysisBusy}
+          viewshedSettings={viewshedSettings}
+          routeSettings={routeSettings}
+          onRouteSettings={setRouteSettings}
+          onViewshedSettings={setViewshedSettings}
           identify={identify}
           measurement={liveMeasurement}
           profile={profilePoints}
@@ -571,9 +1069,20 @@ export default function App() {
             setMeasured(null);
             setProfilePoints(null);
             setSketch([]);
+            setLos(null);
           }}
         />
-        <PropertiesPanel node={activeNode} entry={activeEntry} manifest={activeManifest} glyphs={glyphs} dispatch={typedDispatch} />
+        <PropertiesPanel
+          selectedFeature={activeVector && selection?.layerId === activeVector.id && selection.featureIds.length === 1 ? activeVector.data.features.find((f) => f.id === selection.featureIds[0]) ?? null : null}
+          node={activeNode} entry={activeEntry} manifest={activeManifest} glyphs={glyphs} dispatch={typedDispatch}
+          foundry={{
+            ready: !!ontology,
+            status: activeNode ? layerStatus.get(activeNode.id) : undefined,
+            onCommit: (l) => void commitLayer(l),
+            onReload: reloadLayer,
+            onPublish: (l) => void publishToFoundry(l),
+          }}
+        />
       </aside>
       {tableOpen && (
         <AttributeTable
@@ -582,6 +1091,90 @@ export default function App() {
           onSelect={(ids) => activeVector && setSelection({ layerId: activeVector.id, featureIds: ids })}
           onZoomTo={(f) => zoomToBounds(bbox([f.geometry]))}
           dispatch={typedDispatch}
+          readOnly={!!activeVector && !isEditable(activeVector)}
+        />
+      )}
+      {dialog === "projects" && ontology && (
+        <ProjectsDialog
+          client={ontology}
+          currentId={project.id}
+          onOpen={(id) => void openFromFoundry(id)}
+          onDelete={async (id) => {
+            try {
+              await deleteFoundryProject(ontology, id);
+              say("Project deleted from Foundry.");
+            } catch (e) {
+              say(`Could not delete: ${e instanceof Error ? e.message : String(e)}`, "error");
+            }
+          }}
+          onClose={() => setDialog(null)}
+        />
+      )}
+      {dialog === "analysis" && (
+        <AnalysisDialog
+          tab={analysisTab}
+          onTab={setAnalysisTab}
+          layers={project.layers.filter((l): l is VectorLayerNode => l.kind === "vector")}
+          activeId={activeId}
+          selection={selection}
+          history={processingHistory}
+          onResult={(tool, params, result, inputTitle) => {
+            const layer: VectorLayerNode = {
+              kind: "vector", id: newId("vec"), title: `${tool.title}${inputTitle ? ` · ${inputTitle}` : ""}`, visible: true, opacity: 1,
+              style: defaultVectorStyle(project.layers.filter((l) => l.kind === "vector").length),
+              data: { type: "FeatureCollection", features: result.features }, fields: result.fields,
+            };
+            if (result.features.length) {
+              dispatch({ type: "addLayer", layer });
+              setActiveId(layer.id);
+            }
+            setProcessingHistory((h) => [...h, { tool: tool.id, title: tool.title, params, at: new Date().toISOString(), output: result.features.length ? layer.title : undefined }]);
+            say(result.message ?? (result.features.length ? `${tool.title}: ${result.features.length} features in a new layer.` : `${tool.title}: no features in the result.`), result.features.length ? "info" : "error");
+          }}
+          onSelect={(layerId, ids) => {
+            setActiveId(layerId);
+            setSelection(ids.length ? { layerId, featureIds: ids } : null);
+            say(`${ids.length} feature(s) selected.`);
+          }}
+          onCalculate={(layerId, field, values) => {
+            const layer = project.layers.find((l) => l.id === layerId);
+            if (layer?.kind !== "vector") {return;}
+            if (!fieldsOf(layer).includes(field)) {dispatch({ type: "addField", layerId, field });}
+            dispatch({
+              type: "replaceFeatures", layerId,
+              features: layer.data.features.map((f) => (values.has(f.id) ? { ...f, properties: { ...f.properties, [field]: values.get(f.id) } } : f)),
+            });
+            say(`Calculated “${field}” for ${values.size} feature(s).`);
+          }}
+          onClose={() => setDialog(null)}
+        />
+      )}
+      {dialog === "print" && map && (
+        <PrintDialog map={map} project={project} onClose={() => setDialog(null)} onMessage={say} />
+      )}
+      {crsRequest && (
+        <CrsDialog
+          names={crsRequest.names}
+          onChoose={(crs) => {
+            const files = crsRequest.files;
+            setCrsRequest(null);
+            void importFiles(files, crs);
+          }}
+          onClose={() => setCrsRequest(null)}
+        />
+      )}
+      {dialog === "ontology" && ontology && (
+        <OntologyDialog
+          client={ontology}
+          onAddType={(t: ObjectTypeDef, g: string) => {
+            addBackedLayer({ kind: "ontology", objectType: t.apiName, geometryProperty: g, limit: 50000 }, t.pluralDisplayName ?? t.displayName);
+            setDialog(null);
+          }}
+          onAddCollection={(name: string) => {
+            addBackedLayer({ kind: "ontology-features", collection: name }, name);
+            setDialog(null);
+          }}
+          onClose={() => setDialog(null)}
         />
       )}
       <StatusBar
@@ -592,6 +1185,10 @@ export default function App() {
         sketchLength={sketch.length}
         message={message}
         onDismiss={() => setMessage(null)}
+        coordSystem={coordSystem}
+        onCoordSystem={setCoordSystem}
+        grid={project.grid ?? "none"}
+        onGrid={(g) => dispatch({ type: "setGrid", grid: g })}
       />
     </div>
   );

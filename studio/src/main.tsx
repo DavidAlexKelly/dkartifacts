@@ -6,7 +6,7 @@ import "./styles.css";
 
 const root = createRoot(document.getElementById("root")!);
 
-if (foundry && isAuthCallback()) {
+if (foundry?.auth && isAuthCallback()) {
   // The OAuth redirect lands here: finish signing in, then go to the app.
   root.render(<p className="boot">Signing in…</p>);
   foundry.auth

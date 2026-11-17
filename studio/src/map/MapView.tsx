@@ -35,6 +35,8 @@ export function MapView({ style, initialView, onViewChange, onReady, onError }: 
       canvasContextAttributes: { preserveDrawingBuffer: true }, // PNG export reads the canvas
     });
     map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), "top-right");
+    // Shift is for adding to the selection (shift-click), not box-zoom.
+    map.boxZoom.disable();
     map.addControl(new maplibregl.ScaleControl({ unit: "metric" }), "bottom-right");
     map.on("moveend", () => {
       const c = map.getCenter();
@@ -47,6 +49,13 @@ export function MapView({ style, initialView, onViewChange, onReady, onError }: 
       if (/abort/i.test(message) || message === lastError) {return;}
       lastError = message;
       callbacks.current.onError?.(message);
+    });
+    // Marker shapes and military symbols are drawn on demand, the first time
+    // a style asks for one (ids are written by map/symbology.ts).
+    map.on("styleimagemissing", (e: { id: string }) => {
+      void import("./symbology").then(({ markerImage }) => markerImage(e.id)).then((img) => {
+        if (img && !map.hasImage(e.id)) {map.addImage(e.id, { width: img.width, height: img.height, data: img.data }, { pixelRatio: img.pixelRatio });}
+      });
     });
     mapRef.current = map;
     onReady(map);
