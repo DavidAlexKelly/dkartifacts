@@ -244,3 +244,17 @@ button.primary:hover:not(:disabled) { background: var(--accent); filter: brightn
 .history li { display: flex; gap: 6px; align-items: baseline; padding: 2px 0; }
 .crs-list { width: 100%; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel-2); margin-bottom: 8px; }
 .props textarea { box-sizing: border-box; }
+
+.legend.block { margin: 6px 0; flex-direction: column; }
+.rules { list-style: none; margin: 4px 0; padding: 0; }
+.rules li { display: grid; grid-template-columns: 28px 1fr 90px auto; gap: 4px; align-items: center; margin: 3px 0; }
+.rules input:not([type]) { min-width: 0; padding: 2px 5px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel-2); font: 11px ui-monospace, Menlo, monospace; }
+.rules input.bad { border-color: var(--danger); }
+.rules input[type="color"] { width: 26px; height: 20px; padding: 0; border: 1px solid var(--line); }
+.pair { display: flex; gap: 4px; }
+.pair input, .props input[type="number"] { width: 70px; padding: 2px 6px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel-2); }
+.file-button { border: 1px solid var(--line); border-radius: var(--radius); padding: 2px 8px; cursor: pointer; background: var(--panel); }
+
+.time-slider { position: absolute; left: 12px; right: 60px; bottom: 72px; z-index: 2; display: flex; align-items: center; gap: 8px; padding: 6px 10px; background: color-mix(in srgb, var(--panel) 92%, transparent); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.12); font-size: 12px; }
+.time-slider input[type="range"] { flex: 1; min-width: 80px; }
+.time-label { font-variant-numeric: tabular-nums; white-space: nowrap; }

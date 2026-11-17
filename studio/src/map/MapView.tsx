@@ -48,6 +48,13 @@ export function MapView({ style, initialView, onViewChange, onReady, onError }: 
       lastError = message;
       callbacks.current.onError?.(message);
     });
+    // Marker shapes and military symbols are drawn on demand, the first time
+    // a style asks for one (ids are written by map/symbology.ts).
+    map.on("styleimagemissing", (e: { id: string }) => {
+      void import("./symbology").then(({ markerImage }) => markerImage(e.id)).then((img) => {
+        if (img && !map.hasImage(e.id)) {map.addImage(e.id, { width: img.width, height: img.height, data: img.data }, { pixelRatio: img.pixelRatio });}
+      });
+    });
     mapRef.current = map;
     onReady(map);
     return () => {

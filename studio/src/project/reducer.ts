@@ -14,6 +14,7 @@ export type Action =
   | { type: "setAssets"; assets: DatasetSource | null }
   | { type: "setView"; view: MapView }
   | { type: "setGlobe"; globe: boolean }
+  | { type: "setTimeWindow"; window: [number, number] | null }
   | { type: "addLayer"; layer: LayerNode; at?: number }
   | { type: "removeLayer"; id: string }
   | { type: "moveLayer"; id: string; delta: number }
@@ -31,7 +32,7 @@ export type Action =
   | { type: "redo" };
 
 /** Actions that do not go into the undo history. */
-const TRANSIENT = new Set<Action["type"]>(["setView", "setLayerData", "markCommitted"]);
+const TRANSIENT = new Set<Action["type"]>(["setView", "setLayerData", "markCommitted", "setTimeWindow"]);
 const HISTORY_LIMIT = 100;
 
 export interface History {
@@ -84,6 +85,8 @@ export function apply(p: Project, a: Action): Project {
       return { ...p, view: a.view };
     case "setGlobe":
       return { ...p, globe: a.globe };
+    case "setTimeWindow":
+      return { ...p, timeWindow: a.window };
     case "addLayer": {
       const layers = [...p.layers];
       layers.splice(a.at ?? layers.length, 0, a.layer);

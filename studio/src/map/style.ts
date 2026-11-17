@@ -18,6 +18,7 @@ import type { CatalogEntry } from "../data/library";
 import type { LayerManifest } from "../data/manifest";
 import type { CatalogLayerNode, Project, VectorLayerNode } from "../project/types";
 import { aspectSource, slopeSource } from "../analysis/derivedtiles";
+import { decorate, modeOf } from "./symbology";
 
 export const OVERLAY = "__overlay";
 
@@ -247,31 +248,76 @@ const isPolygon: ExpressionSpecification = ["match", ["geometry-type"], ["Polygo
 const isLine: ExpressionSpecification = ["match", ["geometry-type"], ["LineString", "MultiLineString"], true, false];
 const isPoint: ExpressionSpecification = ["match", ["geometry-type"], ["Point", "MultiPoint"], true, false];
 
-function vectorLayers(node: VectorLayerNode, ctx: StyleContext, sources: Record<string, SourceSpecification>, out: LayerSpecification[]) {
+/** A date-ish value in ms, or null: numbers (epoch s or ms), ISO strings, Dates. */
+export function timeValue(v: unknown): number | null {
+  if (v === null || v === undefined || v === "") {return null;}
+  if (typeof v === "number") {return v < 1e11 ? v * 1000 : v;}
+  const t = Date.parse(String(v));
+  return Number.isNaN(t) ? null : t;
+}
+
+function vectorLayers(node: VectorLayerNode, ctx: StyleContext, sources: Record<string, SourceSpecification>, out: LayerSpecification[], timeWindow: [number, number] | null | undefined) {
   const src = `${node.id}::src`;
-  sources[src] = {
-    type: "geojson",
-    data: {
-      type: "FeatureCollection",
-      features: node.data.features.map((f) => ({ ...f, properties: { ...f.properties, __fid: f.id } })),
-    },
-  };
+  let features = node.data.features;
+  if (node.timeField && timeWindow) {
+    const [a, b] = timeWindow;
+    features = features.filter((f) => {
+      const t = timeValue(f.properties[node.timeField!]);
+      return t !== null && t >= a && t <= b;
+    });
+  }
+  sources[src] = { type: "geojson", data: { type: "FeatureCollection", features: decorate(node, features) } };
   const vis = node.visible ? "visible" : "none";
   const s = node.style;
-  const color = colorExpression(node);
   const op = node.opacity;
+  const zoom = { ...(node.minZoom !== undefined ? { minzoom: node.minZoom } : {}), ...(node.maxZoom !== undefined ? { maxzoom: node.maxZoom } : {}) };
+  const color: ExpressionSpecification = ["get", "__c"];
+  const mode = modeOf(s);
+  const marker = s.marker ?? "circle";
+  const outlineColor = mode === "single" ? s.strokeColor : color;
+
+  if (mode === "heatmap") {
+    const h = s.heatmap ?? { radius: 20, intensity: 1 };
+    out.push({
+      id: `${node.id}::heat`, type: "heatmap", source: src, filter: isPoint, layout: { visibility: vis }, ...zoom,
+      paint: {
+        "heatmap-weight": ["get", "__k"],
+        "heatmap-radius": h.radius,
+        "heatmap-intensity": h.intensity,
+        "heatmap-opacity": op,
+        "heatmap-color": ["interpolate", ["linear"], ["heatmap-density"], 0, "rgba(33,102,172,0)", 0.2, "rgb(103,169,207)", 0.4, "rgb(209,229,240)", 0.6, "rgb(253,219,199)", 0.8, "rgb(239,138,98)", 1, "rgb(178,24,43)"],
+      },
+    });
+  }
+  if (s.extrude) {
+    out.push({
+      id: `${node.id}::extrude`, type: "fill-extrusion", source: src, filter: isPolygon, layout: { visibility: vis }, ...zoom,
+      paint: { "fill-extrusion-color": color, "fill-extrusion-height": ["get", "__h"], "fill-extrusion-opacity": Math.max(0.1, 0.85 * op) },
+    });
+  } else {
+    out.push({ id: `${node.id}::fill`, type: "fill", source: src, filter: isPolygon, layout: { visibility: vis }, ...zoom, paint: { "fill-color": color, "fill-opacity": s.fillOpacity * op } });
+  }
   out.push(
-    { id: `${node.id}::fill`, type: "fill", source: src, filter: isPolygon, layout: { visibility: vis }, paint: { "fill-color": color, "fill-opacity": s.fillOpacity * op } },
-    { id: `${node.id}::outline`, type: "line", source: src, filter: isPolygon, layout: { visibility: vis, "line-join": "round" }, paint: { "line-color": s.categorize ? color : s.strokeColor, "line-width": s.strokeWidth, "line-opacity": op } },
-    { id: `${node.id}::line`, type: "line", source: src, filter: isLine, layout: { visibility: vis, "line-join": "round", "line-cap": "round" }, paint: { "line-color": color, "line-width": s.strokeWidth, "line-opacity": op } },
-    { id: `${node.id}::point`, type: "circle", source: src, filter: isPoint, layout: { visibility: vis }, paint: { "circle-color": color, "circle-radius": s.radius, "circle-opacity": op, "circle-stroke-color": "#ffffff", "circle-stroke-width": 1.5, "circle-stroke-opacity": op } },
+    { id: `${node.id}::outline`, type: "line", source: src, filter: isPolygon, layout: { visibility: vis, "line-join": "round" }, ...zoom, paint: { "line-color": outlineColor, "line-width": s.strokeWidth, "line-opacity": op } },
+    { id: `${node.id}::line`, type: "line", source: src, filter: isLine, layout: { visibility: vis, "line-join": "round", "line-cap": "round" }, ...zoom, paint: { "line-color": color, "line-width": ["get", "__w"], "line-opacity": op } },
   );
+  if (mode !== "heatmap") {
+    if (marker === "circle") {
+      out.push({ id: `${node.id}::point`, type: "circle", source: src, filter: isPoint, layout: { visibility: vis }, ...zoom, paint: { "circle-color": color, "circle-radius": ["get", "__r"], "circle-opacity": op, "circle-stroke-color": "#ffffff", "circle-stroke-width": 1.5, "circle-stroke-opacity": op } });
+    } else {
+      out.push({
+        id: `${node.id}::point`, type: "symbol", source: src, filter: ["all", isPoint, ["!=", ["get", "__i"], ""]], ...zoom,
+        layout: { visibility: vis, "icon-image": ["get", "__i"], "icon-allow-overlap": true, "icon-ignore-placement": true },
+        paint: { "icon-opacity": op },
+      });
+    }
+  }
   if (s.labelField && ctx.glyphs) {
     out.push({
-      id: `${node.id}::label`, type: "symbol", source: src,
+      id: `${node.id}::label`, type: "symbol", source: src, ...zoom,
       layout: {
         visibility: vis, "text-field": ["to-string", ["get", s.labelField]], "text-font": ["Noto Sans Regular"],
-        "text-size": s.labelSize, "text-offset": [0, 1.2], "text-anchor": "top", "symbol-placement": "point",
+        "text-size": s.labelSize, "text-offset": [0, marker === "milsymbol" ? 2 : 1.2], "text-anchor": "top", "symbol-placement": "point",
       },
       paint: { "text-color": "#222", "text-halo-color": "#fff", "text-halo-width": 1.5, "text-opacity": op },
     });
@@ -281,7 +327,7 @@ function vectorLayers(node: VectorLayerNode, ctx: StyleContext, sources: Record<
     out.push(
       { id: `${node.id}::sel-fill`, type: "fill", source: src, filter: ["all", isPolygon, sel], paint: { "fill-color": "#ffd400", "fill-opacity": 0.35 } },
       { id: `${node.id}::sel-line`, type: "line", source: src, filter: ["all", ["!", isPoint], sel], paint: { "line-color": "#ffd400", "line-width": s.strokeWidth + 3 } },
-      { id: `${node.id}::sel-point`, type: "circle", source: src, filter: ["all", isPoint, sel], paint: { "circle-color": "#ffd400", "circle-radius": s.radius + 3, "circle-stroke-color": "#000", "circle-stroke-width": 1 } },
+      { id: `${node.id}::sel-point`, type: "circle", source: src, filter: ["all", isPoint, sel], paint: { "circle-color": "rgba(0,0,0,0)", "circle-radius": ["+", ["get", "__r"], 4], "circle-stroke-color": "#ffd400", "circle-stroke-width": 3 } },
     );
   }
 }
@@ -308,7 +354,7 @@ export function buildStyle(project: Project, ctx: StyleContext): StyleSpecificat
   const extra: Partial<StyleSpecification> = {};
   for (const node of project.layers) {
     if (node.kind === "catalog") {catalogLayers(node, ctx, sources, layers, extra);}
-    else {vectorLayers(node, ctx, sources, layers);}
+    else {vectorLayers(node, ctx, sources, layers, project.timeWindow);}
   }
   overlayLayers(ctx, sources, layers);
   return {

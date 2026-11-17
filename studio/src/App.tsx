@@ -14,6 +14,7 @@ import { OntologyClient, type ObjectTypeDef } from "./foundry/ontology";
 import { OntologyDialog, ProjectsDialog } from "./ui/FoundryDialogs";
 import { AnalysisDialog, type AnalysisTab, type ProcessingRun } from "./ui/AnalysisDialog";
 import { CrsDialog } from "./ui/CrsDialog";
+import { TimeSlider } from "./ui/TimeSlider";
 import { download, safeName } from "./formats/vector";
 import type { ExportFormat } from "./formats/import";
 import { renderLayout } from "./formats/print";
@@ -547,7 +548,7 @@ export default function App() {
     () => buildStyle(project, { entries, manifests, glyphs, overlay: { type: "FeatureCollection", features: [] }, selection, background }),
     // view changes do not change the style
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [project.layers, project.globe, entries, manifests, glyphs, selection, background],
+    [project.layers, project.globe, project.timeWindow, entries, manifests, glyphs, selection, background],
   );
 
   const overlay = useMemo((): FeatureCollection => {
@@ -877,6 +878,11 @@ export default function App() {
           }}
           onReady={setMap}
           onError={(m) => say(m, "error")}
+        />
+        <TimeSlider
+          layers={project.layers.filter((l): l is VectorLayerNode => l.kind === "vector" && !!l.timeField)}
+          window={project.timeWindow}
+          onWindow={(w) => dispatch({ type: "setTimeWindow", window: w })}
         />
       </main>
       <aside className="right">

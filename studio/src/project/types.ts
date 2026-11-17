@@ -41,6 +41,20 @@ export interface CatalogLayerNode {
 }
 
 export interface VectorStyle {
+  /** How colour is decided; absent means "categorized" if `categorize` is set, else "single". */
+  mode?: "single" | "categorized" | "graduated" | "rules" | "heatmap";
+  graduated?: { field: string; method: "quantile" | "equal" | "jenks" | "stddev"; classes: number; ramp: "viridis" | "magma" | "blues" | "reds" | "greens" | "spectral" | "rdylgn"; breaks: number[]; colors: string[] } | null;
+  rules?: Array<{ expr: string; color: string; label: string }>;
+  /** Draw features no rule matches (grey). Default true. */
+  rulesElse?: boolean;
+  /** Proportional symbols: point radius (and line width) from a numeric field. */
+  size?: { field: string; min: number; max: number } | null;
+  marker?: "circle" | "square" | "triangle" | "star" | "cross" | "milsymbol";
+  /** Field holding an APP-6D / MIL-STD-2525 SIDC, for marker "milsymbol". */
+  sidcField?: string | null;
+  heatmap?: { radius: number; intensity: number; weightField?: string | null };
+  /** Polygons as 3D blocks: a fixed height, or a field times a scale. */
+  extrude?: { field: string | null; height: number; scale: number } | null;
   color: string;
   strokeColor: string;
   strokeWidth: number;
@@ -104,6 +118,8 @@ export interface VectorLayerNode {
   /** Hidden outside this zoom range (scale-dependent visibility). */
   minZoom?: number;
   maxZoom?: number;
+  /** Field holding a date/time: the time slider filters the layer on it. */
+  timeField?: string | null;
 }
 
 export type LayerNode = CatalogLayerNode | VectorLayerNode;
@@ -126,6 +142,8 @@ export interface Project {
   assets: DatasetSource | null;
   view: MapView;
   globe: boolean;
+  /** The time slider's window, in ms since the epoch; null shows everything. */
+  timeWindow?: [number, number] | null;
   /** Bottom to top: index 0 is drawn first. The layer panel shows it reversed. */
   layers: LayerNode[];
 }
